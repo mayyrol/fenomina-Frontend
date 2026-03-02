@@ -2,11 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown } from 'lucide-react';
 import { useUsuarios } from '../hooks/useUsuarios';
+import { useState, useRef, useEffect } from 'react';
+import { useAccionesUsuario } from '../hooks/useAccionesUsuario';
 
 export default function UsuariosPage() {
   const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [tabActiva, setTabActiva] = useState('activos');
+  const [dropdownAbierto, setDropdownAbierto] = useState(null);
+  const { ejecutar, cargando: cargandoAccion } = useAccionesUsuario(() => {
+    window.location.reload();
+  });
 
   const { usuarios, cargando, error } = useUsuarios();
 
@@ -22,10 +28,12 @@ export default function UsuariosPage() {
     return coincideBusqueda && coincideTab;
   });
 
-  const getEstadoEstilo = (estado) => {
-    if (estado === true) return { label: 'Activo', color: '#0B662A', bg: '#e6f4ec' };
-    if (estado === false) return { label: 'Inactivo', color: '#e53e3e', bg: '#fde8e8' };
-    return { label: 'Bloqueado', color: '#b45309', bg: '#fef3c7' };
+  const getEstadoEstilo = (usuario) => {
+    if (usuario.bloqueadoLogin)
+      return { label: 'Bloqueado', color: '#b45309', bg: '#fef3c7' };
+    if (usuario.estadoUsuario === true)
+      return { label: 'Activo', color: '#0B662A', bg: '#e6f4ec' };
+    return { label: 'Inactivo', color: '#e53e3e', bg: '#fde8e8' };
   };
 
   const formatearFecha = (fecha) => {
@@ -65,7 +73,7 @@ export default function UsuariosPage() {
           <Search size={16} color="#A3A3A3" style={styles.searchIcon} />
           <input
             type="text"
-            placeholder="Enter search word"
+            placeholder="Enter a search word"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             style={styles.searchInput}
@@ -130,7 +138,7 @@ export default function UsuariosPage() {
               </tr>
             ) : (
               usuariosFiltrados.map((u, index) => {
-                const estado = getEstadoEstilo(u.estadoUsuario);
+                const estado = getEstadoEstilo(u);
                 return (
                   <tr key={u.usuarioId} style={styles.tr}>
                     <td style={styles.td}>{String(index + 1).padStart(2, '0')}</td>
@@ -141,13 +149,49 @@ export default function UsuariosPage() {
                     <td style={styles.td}>{u.userName}</td>
                     <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
                     <td style={styles.td}>
-                      <div style={{
-                        ...styles.estadoBadge,
-                        color: estado.color,
-                        backgroundColor: estado.bg,
-                      }}>
-                        {estado.label}
-                        <ChevronDown size={14} />
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
+                          style={{
+                            ...styles.estadoBadge,
+                            color: getEstadoEstilo(u).color,
+                            backgroundColor: getEstadoEstilo(u).bg,
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {getEstadoEstilo(u).label}
+                          <ChevronDown size={14} />
+                        </button>
+
+                        {dropdownAbierto === u.usuarioId && (
+                          <div style={styles.dropdown}>
+                            {u.estadoUsuario === false && !u.bloqueadoLogin && (
+                              <button
+                                style={styles.dropdownItem}
+                                onClick={() => { ejecutar('activar', u.usuarioId); setDropdownAbierto(null); }}
+                              >
+                                Activar
+                              </button>
+                            )}
+                            {u.estadoUsuario === true && !u.bloqueadoLogin && (
+                              <button
+                                style={styles.dropdownItem}
+                                onClick={() => { ejecutar('inactivar', u.usuarioId); setDropdownAbierto(null); }}
+                              >
+                                Inactivar
+                              </button>
+                            )}
+                            {u.bloqueadoLogin && (
+                              <button
+                                style={styles.dropdownItem}
+                                onClick={() => { ejecutar('desbloquear-login', u.usuarioId); setDropdownAbierto(null); }}
+                              >
+                                Desbloquear login
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -160,6 +204,7 @@ export default function UsuariosPage() {
     </div>
   );
 }
+
 
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -228,4 +273,30 @@ const styles = {
     display: 'inline-flex', alignItems: 'center', gap: '4px',
     padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
   },
+
+  dropdown: {
+  position: 'absolute',
+  top: '100%',
+  left: 0,
+  backgroundColor: '#ffffff',
+  border: '1px solid #D0D0D0',
+  borderRadius: '6px',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+  zIndex: 100,
+  minWidth: '160px',
+  overflow: 'hidden',
+},
+dropdownItem: {
+  display: 'block',
+  width: '100%',
+  padding: '10px 14px',
+  background: 'none',
+  border: 'none',
+  textAlign: 'left',
+  fontSize: '13px',
+  fontFamily: 'Nunito, sans-serif',
+  color: '#272525',
+  cursor: 'pointer',
+},
+
 };
