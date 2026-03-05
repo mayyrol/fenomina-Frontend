@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080', //URL de APIGateway (Backend)
+  baseURL: 'http://localhost:8081', //URL de AuthService (¡TEMPORAL!) una vez que se implemente APIGateway (Backend) cambiar a 8080
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

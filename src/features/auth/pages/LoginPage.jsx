@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import imagenLogin from '../../../assets/Imagenautenticacion.png';
-import logoFE from '../../../assets/logo_fe.png';
+import logoNombre from '../../../assets/logo_nombre.png';
 import { useAuthStore } from '../../../store/authStore';
 import axiosInstance from '../../../api/axiosInstance';
 
@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [hoverBoton, setHoverBoton] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -60,8 +61,7 @@ export default function LoginPage() {
         <img src={imagenLogin} alt="FENomina oficina" style={styles.imagen} />
         <div style={styles.overlay}>
           <div style={styles.logo}>
-            <img src={logoFE} alt="FENomina logo" style={styles.logoImg} />
-            <span style={styles.logoTexto}>FENomina</span>
+            <img src={logoNombre} alt="FENomina" style={styles.logoImg} />
           </div>
         </div>
       </div>
@@ -114,7 +114,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={cargando}
-            style={{ ...styles.boton, opacity: cargando ? 0.7 : 1 }}
+            onMouseEnter={() => setHoverBoton(true)}
+            onMouseLeave={() => setHoverBoton(false)}
+            style={{ 
+              ...styles.boton, 
+              opacity: cargando ? 0.7 : 1,
+              background: hoverBoton
+                ? 'linear-gradient(135deg, #0B662A 0%, #1a9e45 100%)'
+                : '#0B662A',
+              transition: 'background 0.3s ease',
+            }}
           >
             {cargando ? 'Ingresando...' : 'Ingresar'}
           </button>
@@ -129,16 +138,19 @@ const styles = {
     display: 'flex',
     height: '100vh',
     width: '100vw',
+    overflow: 'hidden',
   },
   imagenLado: {
-    flex: 1,
+    flex: '0 0 55%',
     position: 'relative',
     overflow: 'hidden',
+    minHeight: '100vh',
   },
   imagen: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
+    objectPosition: 'center center',
   },
   overlay: {
     position: 'absolute',
@@ -146,26 +158,26 @@ const styles = {
     backgroundColor: 'rgba(11, 102, 42, 0.45)',
     display: 'flex',
     alignItems: 'flex-start',
-    padding: '32px',
+    justifyContent: 'flex-start',
+    paddingTop: '50px',
+    paddingLeft: '50px',
   },
   logo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
   },
   logoImg: {
-  width: '36px',
-  height: '36px',
-  objectFit: 'contain',
+    height: '52px',
+    objectFit: 'contain',
   },
-  logoTexto: {
+    logoTexto: {
     color: '#ffffff',
     fontSize: '22px',
     fontWeight: '800',
     fontFamily: 'Nunito, sans-serif',
   },
   formularioLado: {
-    width: '420px',
+    flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -174,17 +186,20 @@ const styles = {
   },
   formulario: {
     width: '100%',
+    maxWidth: '380px',
   },
   bienvenido: {
     fontSize: '14px',
     color: '#A3A3A3',
     marginBottom: '4px',
+    textAlign: 'left',
   },
   titulo: {
     fontSize: '24px',
     fontWeight: '800',
     color: '#272525',
     marginBottom: '32px',
+    textAlign: 'left',
   },
   campo: {
     marginBottom: '20px',
@@ -195,6 +210,7 @@ const styles = {
     fontWeight: '600',
     color: '#272525',
     marginBottom: '6px',
+    textAlign: 'left',
   },
   input: {
     width: '100%',
@@ -205,6 +221,7 @@ const styles = {
     color: '#272525',
     outline: 'none',
     fontFamily: 'Nunito, sans-serif',
+    textAlign: 'center',
   },
   inputWrapper: {
     position: 'relative',

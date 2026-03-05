@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown } from 'lucide-react';
-import { useUsuarios } from '../hooks/useUsuarios';
+import { useUsuarios } from '../../hooks/useUsuarios';
 import { useState, useRef, useEffect } from 'react';
-import { useAccionesUsuario } from '../hooks/useAccionesUsuario';
+import { useAccionesUsuario } from '../../hooks/useAccionesUsuario';
+import logoFE from '../../../../assets/logo_fe.png';
 
 export default function UsuariosPage() {
   const navigate = useNavigate();
@@ -53,7 +53,10 @@ export default function UsuariosPage() {
       {/**/}
       <div style={styles.encabezado}>
         <div>
-          <h1 style={styles.titulo}>Usuarios</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img src={logoFE} alt="" style={{ width: '28px', height: '28px' }} />
+            <h1 style={styles.titulo}>Usuarios</h1>
+          </div>
           <p style={styles.subtitulo}>Gestiona los usuarios del sistema</p>
         </div>
         <div style={styles.headerDerecha}>
@@ -201,6 +204,15 @@ export default function UsuariosPage() {
           </tbody>
         </table>
       </div>
+      {/* Paginación */}
+      <div style={styles.paginacion}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} style={{ ...styles.pageBtn, ...(n === 1 ? styles.pageBtnActivo : {}) }}>
+            {n}
+          </button>
+        ))}
+        <button style={styles.pageBtn}>{'>>'}</button>
+      </div>
     </div>
   );
 }
@@ -223,7 +235,7 @@ const styles = {
   totalSub: { fontSize: '12px', color: '#A3A3A3' },
   searchWrapper: {
     position: 'relative', display: 'flex', alignItems: 'center',
-    width: '280px',
+    width: '420px',
   },
   searchIcon: { position: 'absolute', left: '12px' },
   searchInput: {
@@ -231,6 +243,7 @@ const styles = {
     border: '1px solid #D0D0D0', borderRadius: '6px',
     fontSize: '13px', color: '#272525', outline: 'none',
     fontFamily: 'Nunito, sans-serif',
+    transition: 'border-color 0.3s ease',
   },
   filaBotones: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -270,8 +283,10 @@ const styles = {
     textAlign: 'center', padding: '32px', color: '#A3A3A3', fontSize: '13px',
   },
   estadoBadge: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+    backgroundColor: 'transparent',   
+    border: '1px solid currentColor', 
   },
 
   dropdown: {
@@ -297,6 +312,19 @@ dropdownItem: {
   fontFamily: 'Nunito, sans-serif',
   color: '#272525',
   cursor: 'pointer',
+},
+paginacion: {
+  display: 'flex', justifyContent: 'center', alignItems: 'center',
+  gap: '6px', paddingTop: '8px',
+},
+pageBtn: {
+  width: '34px', height: '34px', borderRadius: '6px',
+  border: '1px solid #D0D0D0', background: '#ffffff',
+  fontSize: '13px', fontWeight: '600', color: '#272525',
+  cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
+},
+pageBtnActivo: {
+  backgroundColor: '#0B662A', color: '#ffffff', border: '1px solid #0B662A',
 },
 
 };

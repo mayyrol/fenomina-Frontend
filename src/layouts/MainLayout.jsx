@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import {
@@ -8,11 +9,13 @@ import {
   ScrollText,
   LogOut
 } from 'lucide-react';
-import logoFE from '../../../assets/logo_fe.png';
+import logoFE from '../assets/logo_fe.png';
+import logoERP from '../assets/logoerp.png'; 
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const { usuario, logout } = useAuthStore();
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -28,50 +31,63 @@ export default function MainLayout() {
   };
 
   const navItems = [
-    { to: '/inicio', label: 'Inicio', icon: <LayoutGrid size={20} /> },
-    { to: '/empresas', label: 'Empresas', icon: <Building2 size={20} /> },
-    { to: '/parametros', label: 'Parámetros Generales', icon: <Settings2 size={20} /> },
-    { to: '/usuarios', label: 'Usuarios', icon: <UserRound size={20} /> },
-    { to: '/logs', label: 'Logs FENomina', icon: <ScrollText size={20} /> },
+    { to: '/inicio', label: 'Inicio', icon: <LayoutGrid size={16} /> },
+    { to: '/empresas', label: 'Empresas', icon: <Building2 size={16} /> },
+    { to: '/parametros', label: 'Parámetros Generales', icon: <Settings2 size={16} /> },
+    { to: '/usuarios', label: 'Usuarios', icon: <UserRound size={16} /> },
+    { to: '/logs', label: 'Logs FENomina', icon: <ScrollText size={16} /> },
   ];
 
   return (
     <div style={styles.container}>
       {/**/}
-      <aside style={styles.sidebar}>
-        {/**/}
+      <aside
+        style={{
+          ...styles.sidebar,
+          width: sidebarExpanded ? '220px' : '64px',
+          transition: 'width 0.25s ease',
+        }}
+        onMouseEnter={() => setSidebarExpanded(true)}
+        onMouseLeave={() => setSidebarExpanded(false)}
+      >
+        {/* Logo */}
         <div style={styles.logoArea}>
-          {/* <img src={logoFE} alt="logo" style={styles.logoImg} /> */}
-          <div style={styles.logoCircle}>FE</div>
-          <div>
-            <p style={styles.logoNombre}>FENomina</p>
-            <p style={styles.logoSub}>ERP System</p>
-          </div>
+          <img src={logoFE} alt="FENomina ERP" style={styles.logoImg} />
         </div>
 
-        {/**/}
+        {/* Nav */}
         <nav style={styles.nav}>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              title={!sidebarExpanded ? item.label : ''}
               style={({ isActive }) => ({
                 ...styles.navItem,
-                backgroundColor: isActive ? '#f0f0f0' : 'transparent',
-                color: isActive ? '#0B662A' : '#ffffff',
-                fontWeight: isActive ? '700' : '400',
+                backgroundColor: isActive ? 'rgba(14,78,30,0.1)' : 'transparent',
+                color: isActive ? '#0E4E1E' : '#0F172A',
+                justifyContent: sidebarExpanded ? 'flex-start' : 'center',
               })}
             >
               {item.icon}
-              {item.label}
+              {sidebarExpanded && (
+                <span style={styles.navLabel}>{item.label}</span>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        {/**/}
-        <button onClick={handleLogout} style={styles.logoutBtn}>
-          <LogOut size={18} />
-          Salir
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          style={{
+            ...styles.logoutBtn,
+            justifyContent: 'center',
+          }}
+          title={!sidebarExpanded ? 'Salir' : ''}
+        >
+          <LogOut size={16} />
+          {sidebarExpanded && <span style={styles.navLabel}>Salir</span>}
         </button>
       </aside>
 
@@ -110,20 +126,33 @@ const styles = {
     overflow: 'hidden',
   },
   sidebar: {
-    width: '220px',
-    backgroundColor: '#272525',
+    width: '64px',
+    backgroundColor: '#ffffff',
     display: 'flex',
     flexDirection: 'column',
-    padding: '24px 0',
+    alignItems: 'center',
+    padding: '20px 0',
     flexShrink: 0,
+    borderRight: '1px solid #D0D0D0',
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 10,
   },
   logoArea: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '0 20px 28px 20px',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    marginBottom: '16px',
+    justifyContent: 'center',
+    padding: '0 14px 20px 14px',
+    width: '100%',
+  },
+  logoImg: {       
+    height: '50px',
+    objectFit: 'contain',
+    maxWidth: '100%',
+  },
+  logoTextos: {
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
   },
   logoCircle: {
     width: '38px',
@@ -139,8 +168,8 @@ const styles = {
     flexShrink: 0,
   },
   logoNombre: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: '#272525',
+  fontWeight: '800',
     fontSize: '15px',
     lineHeight: 1.2,
   },
@@ -152,34 +181,48 @@ const styles = {
   nav: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
-    padding: '0 12px',
+    gap: '2px',
+    padding: '8px 10px',
     flex: 1,
+    width: '100%',
   },
   navItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '10px 12px',
+    width: '100%',
+    padding: '10px 10px',
     borderRadius: '8px',
     textDecoration: 'none',
     fontSize: '13px',
     fontFamily: 'Nunito, sans-serif',
-    transition: 'background-color 0.2s',
+    transition: 'background-color 0.2s, color 0.2s',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+  },
+  navLabel: {
+    fontSize: '13px',
+    fontWeight: '600',
+    fontFamily: 'Nunito, sans-serif',
   },
   logoutBtn: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '10px',
-    margin: '0 12px',
-    padding: '10px 12px',
-    backgroundColor: 'transparent',
+    width: 'calc(100% - 20px)',
+    margin: '0 10px',
+    padding: '10px 14px',
+    backgroundColor: 'rgba(14, 78, 30, 0.15)', 
     border: 'none',
-    borderRadius: '8px',
-    color: '#ffffff',
+    borderRadius: '10px',
+    color: '#0F172A',
     fontSize: '13px',
+    fontWeight: '600',
     fontFamily: 'Nunito, sans-serif',
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
   },
   main: {
     flex: 1,
