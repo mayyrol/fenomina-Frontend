@@ -229,16 +229,16 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F0F2F5',
   },
   header: {
     height: '60px',
-    backgroundColor: '#ffffff',
-    display: 'flex',
+    backgroundColor: 'transparent',
+    display: 'none',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     padding: '0 28px',
-    borderBottom: '1px solid #D0D0D0',
+    borderBottom: 'none',
     flexShrink: 0,
   },
   userInfo: {
@@ -272,6 +272,6 @@ const styles = {
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '28px',
+    padding: '20px 28px',
   },
 };

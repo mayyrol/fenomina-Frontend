@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../../../store/authStore';
 import { Search, ChevronDown } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { useState, useRef, useEffect } from 'react';
@@ -15,6 +16,7 @@ export default function UsuariosPage() {
   });
 
   const { usuarios, cargando, error } = useUsuarios();
+  const { usuario } = useAuthStore();
 
   const usuariosFiltrados = usuarios.filter((u) => {
     const coincideBusqueda =
@@ -50,78 +52,76 @@ export default function UsuariosPage() {
 
   return (
     <div style={styles.container}>
-      {/**/}
+
+      {/* ENCABEZADO — título + perfil alineados */}
       <div style={styles.encabezado}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src={logoFE} alt="" style={{ width: '28px', height: '28px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src={logoFE} alt="" style={{ width: '24px', height: '24px' }} />
+          <div>
             <h1 style={styles.titulo}>Usuarios</h1>
+            <p style={styles.subtitulo}>Gestiona los usuarios del sistema</p>
           </div>
-          <p style={styles.subtitulo}>Gestiona los usuarios del sistema</p>
         </div>
-        <div style={styles.headerDerecha}>
-          <div style={styles.userInfo}>
-            {/**/}
+        <div style={styles.userInfo}>
+          <div style={styles.userAvatar}>
+            {usuario?.nombresUsuario?.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p style={styles.userName}>{usuario?.nombresUsuario} {usuario?.apellidosUsuario}</p>
+            <p style={styles.userCargo}>{usuario?.cargoUsuario}</p>
           </div>
         </div>
       </div>
 
-      {/* */}
-      <div style={styles.barraAcciones}>
-        <div>
-          <span style={styles.totalLabel}>{usuariosFiltrados.length}</span>
-          <p style={styles.totalSub}>Total usuarios</p>
-        </div>
-        <div style={styles.searchWrapper}>
-          <Search size={16} color="#A3A3A3" style={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Enter a search word"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={styles.searchInput}
-          />
+      {/* PANEL BLANCO — total + búsqueda */}
+      <div style={styles.panelSuperior}>
+        <div style={styles.barraAcciones}>
+          <div>
+            <span style={styles.totalLabel}>{usuariosFiltrados.length}</span>
+            <p style={styles.totalSub}>Total usuarios</p>
+          </div>
+          <div style={styles.searchWrapper}>
+            <Search size={16} color="#A3A3A3" style={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Enter search word"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={styles.searchInput}
+              onFocus={(e) => e.target.style.borderColor = '#0B662A'}
+              onBlur={(e) => e.target.style.borderColor = '#0B662A'}
+            />
+          </div>
         </div>
       </div>
 
-      {/**/}
+      {/* FILA BOTONES */}
       <div style={styles.filaBotones}>
         <p style={styles.creaLabel}>Crea un nuevo usuario</p>
-        <button
-          onClick={() => navigate('/usuarios/crear')}
-          style={styles.btnCrear}
-        >
+        <button onClick={() => navigate('/usuarios/crear')} style={styles.btnCrear}>
           Crear usuario
         </button>
       </div>
 
-      {/* */}
+      {/* TABS */}
       <div style={styles.tabs}>
-        <button
-          onClick={() => setTabActiva('activos')}
-          style={{
-            ...styles.tab,
-            borderBottom: tabActiva === 'activos' ? '2px solid #0B662A' : '2px solid transparent',
-            color: tabActiva === 'activos' ? '#0B662A' : '#A3A3A3',
-            fontWeight: tabActiva === 'activos' ? '700' : '400',
-          }}
-        >
-          Activos
-        </button>
-        <button
-          onClick={() => setTabActiva('inactivos')}
-          style={{
-            ...styles.tab,
-            borderBottom: tabActiva === 'inactivos' ? '2px solid #0B662A' : '2px solid transparent',
-            color: tabActiva === 'inactivos' ? '#0B662A' : '#A3A3A3',
-            fontWeight: tabActiva === 'inactivos' ? '700' : '400',
-          }}
-        >
-          Inactivos
-        </button>
+        {['activos', 'inactivos'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setTabActiva(tab)}
+            style={{
+              ...styles.tab,
+              borderBottom: tabActiva === tab ? '2px solid #0B662A' : '2px solid transparent',
+              color: tabActiva === tab ? '#0B662A' : '#A3A3A3',
+              fontWeight: tabActiva === tab ? '700' : '400',
+            }}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
       </div>
 
-      {/* */}
+      {/* TABLA */}
       <div style={styles.tablaWrapper}>
         <h2 style={styles.tablaTitulo}>Todos los Usuarios</h2>
         <table style={styles.tabla}>
@@ -135,76 +135,65 @@ export default function UsuariosPage() {
           <tbody>
             {usuariosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={8} style={styles.sinResultados}>
-                  No se encontraron usuarios.
-                </td>
+                <td colSpan={8} style={styles.sinResultados}>No se encontraron usuarios.</td>
               </tr>
             ) : (
-              usuariosFiltrados.map((u, index) => {
-                const estado = getEstadoEstilo(u);
-                return (
-                  <tr key={u.usuarioId} style={styles.tr}>
-                    <td style={styles.td}>{String(index + 1).padStart(2, '0')}</td>
-                    <td style={styles.td}>{u.nombresUsuario}</td>
-                    <td style={styles.td}>{u.apellidosUsuario}</td>
-                    <td style={styles.td}>{u.cargoUsuario}</td>
-                    <td style={styles.td}>{u.numIdentiUsuario}</td>
-                    <td style={styles.td}>{u.userName}</td>
-                    <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
-                    <td style={styles.td}>
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
-                          style={{
-                            ...styles.estadoBadge,
-                            color: getEstadoEstilo(u).color,
-                            backgroundColor: getEstadoEstilo(u).bg,
-                            border: 'none',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {getEstadoEstilo(u).label}
-                          <ChevronDown size={14} />
-                        </button>
-
-                        {dropdownAbierto === u.usuarioId && (
-                          <div style={styles.dropdown}>
-                            {u.estadoUsuario === false && !u.bloqueadoLogin && (
-                              <button
-                                style={styles.dropdownItem}
-                                onClick={() => { ejecutar('activar', u.usuarioId); setDropdownAbierto(null); }}
-                              >
-                                Activar
-                              </button>
-                            )}
-                            {u.estadoUsuario === true && !u.bloqueadoLogin && (
-                              <button
-                                style={styles.dropdownItem}
-                                onClick={() => { ejecutar('inactivar', u.usuarioId); setDropdownAbierto(null); }}
-                              >
-                                Inactivar
-                              </button>
-                            )}
-                            {u.bloqueadoLogin && (
-                              <button
-                                style={styles.dropdownItem}
-                                onClick={() => { ejecutar('desbloquear-login', u.usuarioId); setDropdownAbierto(null); }}
-                              >
-                                Desbloquear login
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              usuariosFiltrados.map((u, index) => (
+                <tr key={u.usuarioId} style={styles.tr}>
+                  <td style={styles.td}>{String(index + 1).padStart(2, '0')}</td>
+                  <td style={styles.td}>{u.nombresUsuario}</td>
+                  <td style={styles.td}>{u.apellidosUsuario}</td>
+                  <td style={styles.td}>{u.cargoUsuario}</td>
+                  <td style={styles.td}>{u.numIdentiUsuario}</td>
+                  <td style={styles.td}>{u.userName}</td>
+                  <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
+                  <td style={styles.td}>
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
+                        style={{
+                          ...styles.estadoBadge,
+                          color: getEstadoEstilo(u).color,
+                          backgroundColor: getEstadoEstilo(u).bg,
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {getEstadoEstilo(u).label}
+                        <ChevronDown size={14} />
+                      </button>
+                      {dropdownAbierto === u.usuarioId && (
+                        <div style={styles.dropdown}>
+                          {u.estadoUsuario === false && !u.bloqueadoLogin && (
+                            <button style={styles.dropdownItem}
+                              onClick={() => { ejecutar('activar', u.usuarioId); setDropdownAbierto(null); }}>
+                              Activar
+                            </button>
+                          )}
+                          {u.estadoUsuario === true && !u.bloqueadoLogin && (
+                            <button style={styles.dropdownItem}
+                              onClick={() => { ejecutar('inactivar', u.usuarioId); setDropdownAbierto(null); }}>
+                              Inactivar
+                            </button>
+                          )}
+                          {u.bloqueadoLogin && (
+                            <button style={styles.dropdownItem}
+                              onClick={() => { ejecutar('desbloquear-login', u.usuarioId); setDropdownAbierto(null); }}>
+                              Desbloquear login
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
-      {/* Paginación */}
+
+      {/* PAGINACIÓN */}
       <div style={styles.paginacion}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} style={{ ...styles.pageBtn, ...(n === 1 ? styles.pageBtnActivo : {}) }}>
@@ -213,23 +202,32 @@ export default function UsuariosPage() {
         ))}
         <button style={styles.pageBtn}>{'>>'}</button>
       </div>
+
     </div>
   );
-}
+} 
 
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  container: { display: 'flex', flexDirection: 'column', gap: '12px' },
   mensaje: { textAlign: 'center', padding: '40px', color: '#A3A3A3' },
   mensajeError: { textAlign: 'center', padding: '40px', color: '#e53e3e' },
+  panelSuperior: {
+    backgroundColor: '#ffffff',
+    borderRadius: '10px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+    padding: '20px 24px',
+  },
   encabezado: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'transparent', padding: '0', boxShadow: 'none',
   },
   titulo: { fontSize: '20px', fontWeight: '800', color: '#272525' },
   subtitulo: { fontSize: '12px', color: '#A3A3A3', marginTop: '2px' },
   headerDerecha: { display: 'flex', alignItems: 'center' },
   barraAcciones: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'transparent', padding: '0', boxShadow: 'none',
   },
   totalLabel: { fontSize: '28px', fontWeight: '800', color: '#272525' },
   totalSub: { fontSize: '12px', color: '#A3A3A3' },
@@ -240,30 +238,32 @@ const styles = {
   searchIcon: { position: 'absolute', left: '12px' },
   searchInput: {
     width: '100%', padding: '9px 12px 9px 36px',
-    border: '1px solid #D0D0D0', borderRadius: '6px',
+    border: '1.5px solid #0B662A', borderRadius: '8px',
     fontSize: '13px', color: '#272525', outline: 'none',
     fontFamily: 'Nunito, sans-serif',
-    transition: 'border-color 0.3s ease',
+    backgroundColor: '#F7F9FB',
   },
   filaBotones: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#ffffff', padding: '14px 20px', borderRadius: '8px',
-    border: '1px solid #D0D0D0',
+    backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '10px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: 'none',
   },
-  creaLabel: { fontSize: '14px', fontWeight: '600', color: '#272525' },
+  creaLabel: { fontSize: '14px', fontWeight: '800', color: '#272525' },
   btnCrear: {
     backgroundColor: '#0B662A', color: '#ffffff', border: 'none',
-    borderRadius: '6px', padding: '9px 18px', fontSize: '13px',
-    fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
+    borderRadius: '8px', padding: '10px 60px', fontSize: '13px',
+    fontWeight: '400', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
   },
-  tabs: { display: 'flex', gap: '24px', borderBottom: '1px solid #D0D0D0' },
+  tabs: { display: 'flex', gap: '24px', backgroundColor: '#ffffff', padding: '0 24px', 
+    borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', 
+  },
   tab: {
     background: 'none', border: 'none', padding: '8px 0',
     fontSize: '13px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
   },
   tablaWrapper: {
-    backgroundColor: '#ffffff', borderRadius: '8px',
-    border: '1px solid #D0D0D0', overflow: 'hidden',
+    backgroundColor: '#ffffff', borderRadius: '10px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: 'none', overflow: 'hidden',
   },
   tablaTitulo: {
     fontSize: '14px', fontWeight: '700', color: '#272525',
@@ -325,6 +325,34 @@ pageBtn: {
 },
 pageBtnActivo: {
   backgroundColor: '#0B662A', color: '#ffffff', border: '1px solid #0B662A',
+},
+
+userInfo: {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+},
+userAvatar: {
+  width: '38px',
+  height: '38px',
+  borderRadius: '50%',
+  backgroundColor: '#e0e0e0',
+  color: '#555',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontWeight: '700',
+  fontSize: '15px',
+},
+userName: {
+  fontSize: '13px',
+  fontWeight: '700',
+  color: '#272525',
+  lineHeight: 1.2,
+},
+userCargo: {
+  fontSize: '11px',
+  color: '#A3A3A3',
 },
 
 };
