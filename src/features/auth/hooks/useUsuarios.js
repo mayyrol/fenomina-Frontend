@@ -6,13 +6,16 @@ export function useUsuarios() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const cargar = () => {
+    setCargando(true);
     axiosInstance
       .get('/auth/usuarios')
       .then(({ data }) => setUsuarios(data))
       .catch((err) => setError(err))
       .finally(() => setCargando(false));
-  }, []);
+  };
 
-  return { usuarios, cargando, error };
+  useEffect(() => { cargar(); }, []);
+
+  return { usuarios, cargando, error, recargar: cargar };
 }
