@@ -21,13 +21,16 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// RESPONSE: si el token expiró (401), intenta renovarlo automáticamente
+// si el token expiró, intenta renovarlo automaticamente
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const esRutaAuth = originalRequest.url?.includes('/auth/login') ||
+                       originalRequest.url?.includes('/auth/refresh');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !esRutaAuth) {
       originalRequest._retry = true;
 
       try {

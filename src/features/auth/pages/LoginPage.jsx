@@ -36,20 +36,21 @@ export default function LoginPage() {
       setUsuario(data.usuario);
       navigate('/inicio');
     } catch (err) {
-      const errorCode = err.response?.data?.errorCode;
+        const errorCode = err.response?.data?.errorCode;
+        const status = err.response?.status;
 
-      if (errorCode === 'AUTH_003') {
-        setError('Cuenta bloqueada por múltiples intentos fallidos. Contacta al administrador.');
-      } else if (errorCode === 'AUTH_009') {
-        setError('Tu cuenta está inactiva. Contacta al administrador.');
-      } else if (errorCode === 'AUTH_001' || status === 401) {
-        setError('Usuario o contraseña incorrectos.');
-      } else if (errorCode === 'AUTH_002') {
-        setError('Usuario no encontrado.');
-      }else {
-        setError('Ocurrió un error. Intenta de nuevo.');
-      }
-    } finally {
+        if (errorCode === 'AUTH_003') {
+          setError('Cuenta bloqueada por múltiples intentos fallidos. Contacta al administrador.');
+        } else if (errorCode === 'AUTH_009') {
+          setError('Tu cuenta está inactiva. Contacta al administrador.');
+        } else if (errorCode === 'AUTH_001' || status === 401) {
+          setError('Usuario o contraseña incorrectos.');
+        } else if (errorCode === 'AUTH_002') {
+          setError('Usuario no encontrado.');
+        } else {
+          setError('Ocurrió un error. Intenta de nuevo.');
+        }
+      } finally {
       setCargando(false);
     }
   };
