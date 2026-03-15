@@ -34,7 +34,7 @@ export default function LoginPage() {
 
       setTokens(data.accessToken, data.refreshToken, data.expiresIn);
       setUsuario(data.usuario);
-      navigate('/usuarios');
+      navigate('/inicio');
     } catch (err) {
       const errorCode = err.response?.data?.errorCode;
 

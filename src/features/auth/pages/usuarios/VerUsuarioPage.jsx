@@ -42,7 +42,7 @@ export default function VerUsuarioPage() {
           </div>
         </div>
         <div style={styles.userInfo}>
-          <div style={styles.userAvatar}>{usuarioActual?.nombresUsuario?.charAt(0).toUpperCase()}</div>
+          <div style={styles.userAvatar}> <UserRound size={20} color="#A3A3A3" /> </div>
           <div>
             <p style={styles.userName}>{usuarioActual?.nombresUsuario} {usuarioActual?.apellidosUsuario}</p>
             <p style={styles.userCargo}>{usuarioActual?.cargoUsuario}</p>

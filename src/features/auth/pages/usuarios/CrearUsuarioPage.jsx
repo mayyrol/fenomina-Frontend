@@ -111,7 +111,7 @@ export default function CrearUsuarioPage() {
           </div>
         </div>
         <div style={styles.userInfo}>
-          <div style={styles.userAvatar}>{usuario?.nombresUsuario?.charAt(0).toUpperCase()}</div>
+          <div style={styles.userAvatar}> <UserRound size={20} color="#A3A3A3" /> </div>
           <div>
             <p style={styles.userName}>{usuario?.nombresUsuario} {usuario?.apellidosUsuario}</p>
             <p style={styles.userCargo}>{usuario?.cargoUsuario}</p>

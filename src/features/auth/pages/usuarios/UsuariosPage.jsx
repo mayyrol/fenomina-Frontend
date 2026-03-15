@@ -143,7 +143,9 @@ export default function UsuariosPage() {
           </div>
         </div>
         <div style={styles.userInfo}>
-          <div style={styles.userAvatar}>{usuario?.nombresUsuario?.charAt(0).toUpperCase()}</div>
+          <div style={styles.userAvatar}>
+            <UserRound size={20} color="#A3A3A3" />
+          </div>
           <div>
             <p style={styles.userName}>{usuario?.nombresUsuario} {usuario?.apellidosUsuario}</p>
             <p style={styles.userCargo}>{usuario?.cargoUsuario}</p>
@@ -442,9 +444,8 @@ const styles = {
   pageBtnActivo: { backgroundColor: '#0B662A', color: '#ffffff', border: '1px solid #0B662A' },
   userInfo: { display: 'flex', alignItems: 'center', gap: '10px' },
   userAvatar: {
-    width: '38px', height: '38px', borderRadius: '50%',
-    backgroundColor: '#e0e0e0', color: '#555',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e0e0e0',
+    color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontWeight: '700', fontSize: '15px',
   },
   userName: { fontSize: '13px', fontWeight: '700', color: '#272525', lineHeight: 1.2 },

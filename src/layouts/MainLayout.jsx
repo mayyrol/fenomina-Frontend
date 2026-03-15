@@ -234,7 +234,7 @@ const styles = {
   header: {
     height: '60px',
     backgroundColor: 'transparent',
-    display: 'none',
+    display: 'none',  
     alignItems: 'center',
     justifyContent: 'flex-end',
     padding: '0 28px',
