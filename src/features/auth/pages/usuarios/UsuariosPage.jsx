@@ -43,7 +43,7 @@ export default function UsuariosPage() {
     SUPER_ADMIN: 'Super Admin', RRHH: 'Recursos Humanos',
     AUDITOR: 'Auditor', CLIENTE_EMPRESA: 'Cliente Empresa',
   };
-  const [tabActiva, setTabActiva] = useState('activos');
+  const [tabActiva, setTabActiva] = useState('activos'); // MANTENER
   const [dropdownAbierto, setDropdownAbierto] = useState(null);
   const [modal, setModal] = useState(null);
   const [paginaActual, setPaginaActual] = useState(1);
@@ -52,14 +52,15 @@ export default function UsuariosPage() {
   const dropdownRef = useRef(null);
 
   const { ejecutar } = useAccionesUsuario(
-    () => setModal({ tipo: 'exito', mensaje: 'El estado del usuario ha sido actualizado exitosamente.' }),
+    () => {
+      setModal({ tipo: 'exito', mensaje: 'El estado del usuario ha sido actualizado exitosamente.' });
+    },
     () => setModal({ tipo: 'error', mensaje: 'No se pudo cambiar el estado. Intenta de nuevo.' })
   );
 
   const { usuarios, cargando, error, recargar } = useUsuarios();
   const { usuario } = useAuthStore();
 
-  // Cierra dropdown al hacer clic fuera
   useEffect(() => {
     const handleClickFuera = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -70,6 +71,7 @@ export default function UsuariosPage() {
     return () => document.removeEventListener('mousedown', handleClickFuera);
   }, []);
 
+  // MODIFICAR LA LÓGICA DE FILTRADO
   const usuariosFiltrados = usuarios.filter((u) => {
     const textoBusqueda = busqueda.toLowerCase();
 
@@ -94,7 +96,16 @@ export default function UsuariosPage() {
         })()
       : true;
 
-    const coincideTab = tabActiva === 'activos' ? u.estadoUsuario === true : u.estadoUsuario === false;
+    // NUEVA LÓGICA DE FILTRADO POR TAB
+    let coincideTab;
+    if (tabActiva === 'activos') {
+      coincideTab = u.estadoUsuario === true && u.bloqueadoLogin === false;
+    } else if (tabActiva === 'inactivos') {
+      coincideTab = u.estadoUsuario === false && u.bloqueadoLogin === false;
+    } else if (tabActiva === 'bloqueados') {
+      coincideTab = u.bloqueadoLogin === true;
+    }
+
     return coincideBusqueda && coincideFecha && coincideTab;
   });
 
@@ -102,8 +113,8 @@ export default function UsuariosPage() {
   const inicio = (paginaActual - 1) * resultadosPorPagina;
   const usuariosPagina = usuariosFiltrados.slice(inicio, inicio + resultadosPorPagina);
 
+  // MODIFICAR getEstadoEstilo - ya no muestra "Bloqueado" aquí
   const getEstadoEstilo = (u) => {
-    if (u.bloqueadoLogin) return { label: 'Bloqueado', color: '#b45309' };
     if (u.estadoUsuario === true) return { label: 'Activo', color: '#0B662A' };
     return { label: 'Inactivo', color: '#e53e3e' };
   };
@@ -192,9 +203,9 @@ export default function UsuariosPage() {
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* MODIFICAR TABS - Agregar tercera pestaña */}
       <div style={styles.tabs}>
-        {['activos', 'inactivos'].map((tab) => (
+        {['activos', 'inactivos', 'bloqueados'].map((tab) => (
           <button key={tab} onClick={() => { setTabActiva(tab); setPaginaActual(1); }}
             style={{
               ...styles.tab,
@@ -224,20 +235,28 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      {/* Tabla */}
+      {/* TABLA - Modificar headers según tab */}
       <div style={styles.tablaWrapper}>
         <h2 style={styles.tablaTitulo}>Todos los Usuarios</h2>
         <table style={styles.tabla}>
           <thead>
             <tr>
-              {['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
-                <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left' , padding: col === 'Acciones' ? '12px 16px' : col === 'Estado' ? '12px 10px' : '12px 16px',}}>{col}</th>
-              ))}
+              {tabActiva === 'bloqueados' ? (
+                // Headers para tab bloqueados
+                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acceso login', 'Acciones'].map((col) => (
+                  <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: '12px 16px' }}>{col}</th>
+                ))
+              ) : (
+                // Headers para tabs activos/inactivos
+                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
+                  <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: col === 'Acciones' ? '12px 16px' : col === 'Estado' ? '12px 10px' : '12px 16px' }}>{col}</th>
+                ))
+              )}
             </tr>
           </thead>
           <tbody>
             {usuariosPagina.length === 0 ? (
-              <tr><td colSpan={8} style={styles.sinResultados}>No se encontraron usuarios.</td></tr>
+              <tr><td colSpan={tabActiva === 'bloqueados' ? 12 : 11} style={styles.sinResultados}>No se encontraron usuarios.</td></tr>
             ) : (
               usuariosPagina.map((u, index) => (
                 <tr key={u.usuarioId} style={styles.tr}>
@@ -250,61 +269,85 @@ export default function UsuariosPage() {
                   <td style={styles.td}>{u.rolUsuario || '—'}</td>
                   <td style={styles.td}>{u.fkIdEmpresa ?? 'Todas'}</td>                  
                   <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
+                  
+                  {/* COLUMNA ESTADO */}
                   <td style={{ ...styles.td, position: 'relative', padding: '12px 16px' }}>
-                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                      <button
-                        onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
-                        style={{ ...styles.estadoBadge, color: getEstadoEstilo(u).color }}
-                      >
+                    {tabActiva === 'bloqueados' ? (
+                      // En tab bloqueados: estado sin dropdown
+                      <div style={{
+                        ...styles.estadoBadge,
+                        color: getEstadoEstilo(u).color,
+                        cursor: 'default'
+                      }}>
                         <span>{getEstadoEstilo(u).label}</span>
-                        <ChevronDown size={14} color="#A3A3A3" />
-                      </button>
-                      {dropdownAbierto === u.usuarioId && (
-                        <div style={styles.dropdown}>
-                          {/* Activo */}
-                          <button
-                            style={{
-                              ...styles.dropdownItem,
-                              color: '#0B662A',
-                              backgroundColor: u.estadoUsuario === true ? '#f5fbf7' : 'transparent',
-                            }}
-                            onClick={() => u.estadoUsuario === false && solicitarAccion('activar', u.usuarioId)}
-                          >
-                            <span>Activo</span>
-                            {u.estadoUsuario === true && (
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                <path d="M2 7L5.5 10.5L12 3.5" stroke="#0B662A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                          </button>
-                          {/* Inactivo */}
-                          <button
-                            style={{
-                              ...styles.dropdownItem,
-                              color: '#e53e3e',
-                              backgroundColor: u.estadoUsuario === false ? '#fff5f5' : 'transparent',
-                            }}
-                            onClick={() => u.estadoUsuario === true && solicitarAccion('inactivar', u.usuarioId)}
-                          >
-                            <span>Inactivo</span>
-                            {u.estadoUsuario === false && (
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                <path d="M2 7L5.5 10.5L12 3.5" stroke="#e53e3e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                          </button>
-
-                          {/* Desbloquear */}
-                          {u.bloqueadoLogin && (
-                            <button style={{ ...styles.dropdownItem, color: '#b45309' }}
-                              onClick={() => solicitarAccion('desbloquear-login', u.usuarioId)}>
-                              <span>Desbloquear login</span>
+                      </div>
+                    ) : (
+                      // En tabs activos/inactivos: estado con dropdown
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button
+                          onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
+                          style={{ ...styles.estadoBadge, color: getEstadoEstilo(u).color }}
+                        >
+                          <span>{getEstadoEstilo(u).label}</span>
+                          <ChevronDown size={14} color="#A3A3A3" />
+                        </button>
+                        {dropdownAbierto === u.usuarioId && (
+                          <div style={styles.dropdown}>
+                            <button
+                              style={{
+                                ...styles.dropdownItem,
+                                color: '#0B662A',
+                                backgroundColor: u.estadoUsuario === true ? '#f5fbf7' : 'transparent',
+                              }}
+                              onClick={() => u.estadoUsuario === false && solicitarAccion('activar', u.usuarioId)}
+                            >
+                              <span>Activo</span>
+                              {u.estadoUsuario === true && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path d="M2 7L5.5 10.5L12 3.5" stroke="#0B662A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
                             </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                            <button
+                              style={{
+                                ...styles.dropdownItem,
+                                color: '#e53e3e',
+                                backgroundColor: u.estadoUsuario === false ? '#fff5f5' : 'transparent',
+                              }}
+                              onClick={() => u.estadoUsuario === true && solicitarAccion('inactivar', u.usuarioId)}
+                            >
+                              <span>Inactivo</span>
+                              {u.estadoUsuario === false && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path d="M2 7L5.5 10.5L12 3.5" stroke="#e53e3e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
+
+                  {/* COLUMNA ACCESO LOGIN (solo en tab bloqueados) */}
+                  {tabActiva === 'bloqueados' && (
+                    <td style={{ ...styles.td, padding: '12px 16px' }}>
+                      <button
+                        onClick={() => solicitarAccion('desbloquear-login', u.usuarioId)}
+                        style={{
+                          ...styles.estadoBadge,
+                          color: '#b45309',
+                          cursor: 'pointer',
+                          border: '1px solid #fbbf24',
+                          backgroundColor: '#fef3c7'
+                        }}
+                      >
+                        <span>Bloqueado</span>
+                      </button>
+                    </td>
+                  )}
+
+                  {/* COLUMNA ACCIONES */}
                   <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
                     <button onClick={() => navigate(`/usuarios/${u.usuarioId}`)} style={styles.btnAccion} title="Ver detalle">
                       <Eye size={17} color="#777777" />
