@@ -1,4 +1,3 @@
-// ProtectedRoute.jsx
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useEffect, useState } from 'react';
@@ -39,7 +38,6 @@ export default function ProtectedRoute({ rolesPermitidos }) {
           setAutorizado(false);
         }
       } else {
-
         setAutorizado(false);
       }
 
@@ -49,7 +47,6 @@ export default function ProtectedRoute({ rolesPermitidos }) {
     verificarAutenticacion();
   }, [accessToken, refreshToken, rolesPermitidos, usuario, setTokens]);
 
-  // Mostrar loading mientras verifica
   if (verificando) {
     return (
       <div style={{
