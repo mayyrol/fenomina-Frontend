@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
 import { useEmpresas } from '../../hooks/useEmpresas';
@@ -14,6 +15,9 @@ export default function InfoEmpresaPage() {
   const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
   const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo   = usuario?.cargoUsuario ?? '';
+
+  const [hoverEditar,   setHoverEditar]   = useState(false);
+  const [hoverRegresar, setHoverRegresar] = useState(false);
 
   if (!empresa) return <p>Empresa no encontrada.</p>;
 
@@ -141,8 +145,34 @@ export default function InfoEmpresaPage() {
 
       {/* ── Botones ── */}
       <div style={styles.botonesRow}>
-        <button style={styles.btnRegresar} onClick={() => navigate(-1)}>Regresar</button>
-        <button style={styles.btnEditar} onClick={() => navigate(`/empresas/${id}/info/editar`)}>Editar Información</button>
+        <button
+          style={{
+            ...styles.btnRegresar,
+            background: hoverRegresar
+              ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'
+              : '#fff',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverRegresar(true)}
+          onMouseLeave={() => setHoverRegresar(false)}
+          onClick={() => navigate(-1)}
+        >
+          Regresar
+        </button>
+        <button
+          style={{
+            ...styles.btnEditar,
+            background: hoverEditar
+              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
+              : '#0B662A',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverEditar(true)}
+          onMouseLeave={() => setHoverEditar(false)}
+          onClick={() => navigate(`/empresas/${id}/info/editar`)}
+        >
+          Editar Información
+        </button>
       </div>
 
     </div>
@@ -172,13 +202,12 @@ const styles = {
   selectReadOnly:  { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', backgroundColor: '#fff', color: '#272525', textAlign: 'center', boxSizing: 'border-box' },
   selectIcon:      { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
   logoBox:         { display: 'flex', alignItems: 'center', gap: '24px' },
-  fotoCirculo:     { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#EFEFEF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '6px', flexShrink: 0 },
+  fotoCirculo:     { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#EFEFEF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', flexShrink: 0 },
   fotoImg:         { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover' },
-  fotoLabel:       { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
   fotoInfo:        { display: 'flex', flexDirection: 'column', gap: '2px' },
   fotoInfoTitulo:  { fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 },
   fotoInfoTexto:   { fontSize: '12px', color: '#A3A3A3', margin: '0 0 8px 0' },
   botonesRow:      { display: 'flex', gap: '16px', justifyContent: 'center', paddingBottom: '16px' },
-  btnEditar:       { backgroundColor: '#0B662A', color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  btnRegresar:     { backgroundColor: '#fff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnEditar:       { color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnRegresar:     { color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
 };

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEmpresas } from '../../hooks/useEmpresas';
 import { useAuthStore } from '../../../../store/authStore';
 import { Building2, Plus, Search } from 'lucide-react';
+import { useState } from 'react';
 
 function Carpeta({ children, dashed = false }) {
   return (
@@ -34,6 +35,8 @@ export default function EmpresasPage() {
     busqueda, setBusqueda,
     size, setSize,
   } = useEmpresas();
+  const [fechaFiltro, setFechaFiltro] = useState('');
+
 
   const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
   const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
@@ -64,19 +67,27 @@ export default function EmpresasPage() {
         </div>
       </div>
 
-      {/* Toolbar: total + buscador */}
-      <div style={styles.toolbar}>
+      {/* Toolbar en bloque blanco */}
+      <div style={styles.toolbarCard}>
         <div>
           <p style={styles.totalNum}>{total}</p>
           <p style={styles.totalLabel}>Total companies</p>
         </div>
-        <div style={styles.searchBox}>
-          <Search size={14} color="#A3A3A3" />
+        <div style={styles.filtrosBox}>
+          <div style={styles.searchBox}>
+            <Search size={14} color="#A3A3A3" />
+            <input
+              style={styles.searchInput}
+              placeholder="Buscar empresa por palabra clave"
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+            />
+          </div>
           <input
-            style={styles.searchInput}
-            placeholder="Enter search word"
-            value={busqueda}
-            onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+            type="date"
+            value={fechaFiltro}
+            onChange={(e) => setFechaFiltro(e.target.value)}
+            style={styles.dateInput}
           />
         </div>
       </div>
@@ -163,11 +174,8 @@ const styles = {
   avatar:        { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', color: '#272525', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 },
   perfilNombre:  { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:   { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  toolbar:       { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' },
   totalNum:      { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:    { fontSize: '12px', color: '#A3A3A3', margin: 0 },
-  searchBox:     { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '280px' },
-  searchInput:   { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   card:          { backgroundColor: '#fff', borderRadius: '16px', padding: '24px 32px' },
   gridHeader:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
   gridTitle:     { fontSize: '16px', fontWeight: '700', color: '#272525' },
@@ -179,4 +187,9 @@ const styles = {
   paginacion:    { display: 'flex', justifyContent: 'center', gap: '6px' },
   pageBtn:       { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #D0D0D0', cursor: 'pointer', fontSize: '13px', fontWeight: '600', backgroundColor: '#fff', color: '#272525', fontFamily: 'Nunito, sans-serif' },
   pageBtnActivo: { backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
+  toolbarCard:  { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
+  filtrosBox:   { display: 'flex', alignItems: 'center', gap: '12px' },
+  searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
+  searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  dateInput:    { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', cursor: 'pointer', color: '#272525' },
 };

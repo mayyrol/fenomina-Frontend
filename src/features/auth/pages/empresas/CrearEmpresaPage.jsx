@@ -16,7 +16,10 @@ export default function CrearEmpresaPage() {
   const [fotoPreview, setFotoPreview] = useState(null);
   const [modal, setModal]             = useState(null);
   const [errores, setErrores]         = useState({});
-  const [form, setForm]               = useState({
+  const [hoverCrear, setHoverCrear]   = useState(false);
+  const [hoverRegresar, setHoverRegresar] = useState(false);
+
+  const [form, setForm] = useState({
     nitEmpresa:        '',
     razonSocial:       '',
     nombreEmpresa:     '',
@@ -40,13 +43,12 @@ export default function CrearEmpresaPage() {
 
   const validar = () => {
     const nuevosErrores = {};
-    const textoCampos = ['nitEmpresa', 'razonSocial', 'nombreEmpresa'];
+    const textoCampos  = ['nitEmpresa', 'razonSocial', 'nombreEmpresa'];
     const selectCampos = ['ley1607', 'reportesNomina', 'reportesPrimas', 'reportesCesantias'];
 
     textoCampos.forEach((campo) => {
       if (!form[campo].trim()) nuevosErrores[campo] = 'Este campo es obligatorio.';
     });
-
     selectCampos.forEach((campo) => {
       if (!form[campo]) nuevosErrores[campo] = 'Debes seleccionar una opción.';
     });
@@ -82,8 +84,6 @@ export default function CrearEmpresaPage() {
           </div>
         </div>
       </div>
-
-      
 
       {/* ── Sección 1: Información Básica ── */}
       <div style={styles.card}>
@@ -247,8 +247,34 @@ export default function CrearEmpresaPage() {
 
       {/* ── Botones ── */}
       <div style={styles.botonesRow}>
-        <button style={styles.btnCrear} onClick={handleSubmit}>Crear Empresa</button>
-        <button style={styles.btnRegresar} onClick={() => navigate('/empresas')}>Regresar</button>
+        <button
+          style={{
+            ...styles.btnCrear,
+            background: hoverCrear
+              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
+              : '#0B662A',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverCrear(true)}
+          onMouseLeave={() => setHoverCrear(false)}
+          onClick={handleSubmit}
+        >
+          Crear Empresa
+        </button>
+        <button
+          style={{
+            ...styles.btnRegresar,
+            background: hoverRegresar
+              ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'
+              : '#fff',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverRegresar(true)}
+          onMouseLeave={() => setHoverRegresar(false)}
+          onClick={() => navigate('/empresas')}
+        >
+          Regresar
+        </button>
       </div>
 
       {/* Modal */}
@@ -267,7 +293,7 @@ const styles = {
   avatar:          { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', color: '#272525', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 },
   perfilNombre:    { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:     { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  formTitulo:      { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 40px 0'},
+  formTitulo:      { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 40px 0' },
   card:            { backgroundColor: '#fff', borderRadius: '16px', padding: '55px 55px' },
   seccionTitulo:   { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 20px 0' },
   textoDescripcion:{ fontSize: '13px', color: '#555', margin: '0 0 20px 0', lineHeight: 1.7 },
@@ -290,6 +316,6 @@ const styles = {
   fotoInfoTitulo:  { fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 },
   fotoInfoTexto:   { fontSize: '12px', color: '#A3A3A3', margin: '0 0 8px 0' },
   botonesRow:      { display: 'flex', gap: '16px', justifyContent: 'center', paddingBottom: '16px' },
-  btnCrear:        { backgroundColor: '#0B662A', color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  btnRegresar:     { backgroundColor: '#fff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnCrear:        { color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnRegresar:     { color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
 };
