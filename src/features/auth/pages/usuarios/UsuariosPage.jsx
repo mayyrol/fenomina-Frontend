@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
 import { Search, ChevronDown, UserRound, CheckCircle2, AlertTriangle, Eye } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAccionesUsuario } from '../../hooks/useAccionesUsuario';
+import { useEmpresasLista } from '../../hooks/useEmpresasLista';
 
 function Modal({ tipo, mensaje, onAceptar, onCancelar }) {
   const esConfirmacion = tipo === 'confirmacion';
@@ -60,6 +61,14 @@ export default function UsuariosPage() {
 
   const { usuarios, cargando, error, recargar } = useUsuarios();
   const { usuario } = useAuthStore();
+
+  const { empresas } = useEmpresasLista();
+
+  const mapaEmpresas = useMemo(() => {
+    const mapa = {};
+    empresas.forEach(e => { mapa[e.empresaId] = e.nombreEmpresa; });
+    return mapa;
+  }, [empresas]);
 
   useEffect(() => {
     const handleClickFuera = (e) => {
@@ -243,12 +252,12 @@ export default function UsuariosPage() {
             <tr>
               {tabActiva === 'bloqueados' ? (
                 // Headers para tab bloqueados
-                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acceso login', 'Acciones'].map((col) => (
+                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'Empresa', 'Fecha registro', 'Estado', 'Acceso login', 'Acciones'].map((col) => (
                   <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: '12px 16px' }}>{col}</th>
                 ))
               ) : (
                 // Headers para tabs activos/inactivos
-                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
+                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
                   <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: col === 'Acciones' ? '12px 16px' : col === 'Estado' ? '12px 10px' : '12px 16px' }}>{col}</th>
                 ))
               )}
@@ -267,7 +276,7 @@ export default function UsuariosPage() {
                   <td style={styles.td}>{u.numIdentiUsuario}</td>
                   <td style={styles.td}>{u.userName}</td>
                   <td style={styles.td}>{u.rolUsuario || '—'}</td>
-                  <td style={styles.td}>{u.fkIdEmpresa ?? 'Todas'}</td>                  
+                  <td style={styles.td}>{u.fkIdEmpresa ? (mapaEmpresas[u.fkIdEmpresa] ?? `Empresa ID: ${u.fkIdEmpresa}`) : 'Todas'}</td>                  
                   <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
                   
                   {/* COLUMNA ESTADO */}

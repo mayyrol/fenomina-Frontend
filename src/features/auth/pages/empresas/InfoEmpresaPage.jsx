@@ -12,6 +12,8 @@ export default function InfoEmpresaPage() {
 
   const [empresa, setEmpresa] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [hoverEditar,   setHoverEditar]   = useState(false);
+  const [hoverRegresar, setHoverRegresar] = useState(false);
 
   useEffect(() => {
     empresasService.getEmpresaById(id)
@@ -27,10 +29,6 @@ export default function InfoEmpresaPage() {
   const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo   = usuario?.cargoUsuario ?? '';
 
-  const [hoverEditar,   setHoverEditar]   = useState(false);
-  const [hoverRegresar, setHoverRegresar] = useState(false);
-
-  if (!empresa) return <p>Empresa no encontrada.</p>;
 
   return (
     <div style={styles.container}>

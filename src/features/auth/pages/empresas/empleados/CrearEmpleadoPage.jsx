@@ -157,6 +157,66 @@ export default function CrearEmpleadoPage() {
   };
 
   const handleSubmit    = () => { if (!validar()) return; setConfirmar(true); };
+  const MAPA_TIPO_CONTRATO = {
+    fijo:        'TERMINO_FIJO',
+    indefinido:  'TERMINO_INDEFINIDO',
+    obra:        'OBRA_LABOR',
+    aprendizaje: 'APRENDIZAJE',
+    temporal:    'TEMPORAL_OCASIONAL_ACCIDENTAL',
+    otro:        'OTRO',
+  };
+
+  const MAPA_JORNADA = {
+    unica:    'UNICA',
+    turnos:   'TURNOS',
+    rotativa: 'ROTATIVA',
+  };
+
+  const MAPA_TIPO_COTIZANTE = {
+    '01': 'DEPENDIENTE',
+    '02': 'SERVICIO_DOMESTICO',
+    '03': 'INDEPENDIENTE',
+    '12': 'APRENDIZ_SENA_LECTIVA',
+    '19': 'APRENDIZ_SENA_PRODUCTIVA',
+    '20': 'ESTUDIANTE_LEY_789',
+    '23': 'ESTUDIANTE_SOLO_ARL',
+    '44': 'COTIZANTE_EMERGENCIA_1',
+    '45': 'COTIZANTE_EMERGENCIA_2',
+    '51': 'TIEMPO_PARCIAL',
+    '59': 'INDEPENDIENTE_PRESTACION_SERVICIOS',
+  };
+
+  const MAPA_SUBTIPO_COTIZANTE = {
+    '0':  'CODIGO_0',
+    '1':  'CODIGO_1',
+    '3':  'CODIGO_3',
+    '4':  'CODIGO_4',
+    '5':  'CODIGO_5',
+    '6':  'CODIGO_6',
+    '9':  'CODIGO_9',
+    '11': 'CODIGO_11',
+    '12': 'CODIGO_12',
+  };
+
+  const MAPA_CLASE_RIESGO = {
+    'I':   'CLASE_I',
+    'II':  'CLASE_II',
+    'III': 'CLASE_III',
+    'IV':  'CLASE_IV',
+    'V':   'CLASE_V',
+  };
+
+  const MAPA_TIPO_DOCUMENTO = {   
+    CC:       'CC',
+    CE:       'CE',
+    TI:       'TI',
+    PEP:       'PEP',
+    NIT:       'NIT',
+    PPT:      'PPT',
+    PA:       'PASAPORTE',
+  };
+  
+  
   const handleConfirmar = async () => {
     setConfirmar(false);
 
@@ -164,28 +224,29 @@ export default function CrearEmpleadoPage() {
     const [dia, mes, anio] = form.fechaIngreso.split('/');
     const [diaFin, mesFin, anioFin] = form.fechaFinContrato.split('/');
 
+
     const empleadoDTO = {
       empresaId:          Number(empresaId),
-      tipoDocumento:      form.tipoDocumento,        // enum: CC, CE, PA, etc.
+      tipoDocumento:      MAPA_TIPO_DOCUMENTO[form.tipoDocumento] ?? form.tipoDocumento,
       documentoEmp:       form.numeroDocumento,
       nombresEmp:         form.nombresEmpleado,
       apellidosEmp:       form.apellidosEmpleado,
       direccionEmp:       form.direccion,
-      tipoContratoEmp:    form.tipoContrato.toUpperCase(), // back espera enum
-      fechaIngresoEmp:    `${anio}-${mes}-${dia}`,         // ISO: YYYY-MM-DD
+      tipoContratoEmp:    MAPA_TIPO_CONTRATO[form.tipoContrato],
+      fechaIngresoEmp:    `${anio}-${mes}-${dia}`,
       fechaFinContrato:   `${anioFin}-${mesFin}-${diaFin}`,
       cargoEmp:           form.cargo,
       salarioBascMensual: parseFloat(form.salario),
-      claseRiesgo:        form.claseRiesgo,           // enum: I, II, III, IV, V
-      tipoCotizante:      form.tipoCotizante,
-      subtipoCotizante:   form.subtipoCotizante,
+      claseRiesgo:        MAPA_CLASE_RIESGO[form.claseRiesgo],
+      tipoCotizante:      MAPA_TIPO_COTIZANTE[form.tipoCotizante],
+      subtipoCotizante:   MAPA_SUBTIPO_COTIZANTE[form.subtipoCotizante],
       nombreArl:          form.arl,
       nombreEps:          form.eps,
       fondoPensionEmp:    form.fondoPensiones,
       cajaCompensacion:   form.cajaCompensacion,
       fondoCesantiasEmp:  form.fondoCesantias,
       estaExnrdParafis:   false,
-      jornadaTrabajoEmp:  form.jornada.toUpperCase(), // enum
+      jornadaTrabajoEmp:  MAPA_JORNADA[form.jornada],
     };
 
     try {
@@ -244,11 +305,13 @@ export default function CrearEmpleadoPage() {
             <div style={styles.selectWrapper}>
               <select name="tipoDocumento" value={form.tipoDocumento} onChange={handleChange} style={selectStyle('tipoDocumento')}>
                 <option value="">Seleccionar opción</option>
-                <option value="RC">Registro Civil de Nacimiento</option>
                 <option value="CC">Cédula de Ciudadanía</option>
                 <option value="CE">Cédula de Extranjería</option>
-                <option value="PA">Pasaporte</option>
+                <option value="TI">Tarjeta de Identidad</option>
+                <option value="PEP">PEP</option>
+                <option value="NIT">NIT</option>
                 <option value="PPT">PPT</option>
+                <option value="PA">Pasaporte</option>
               </select>
               <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
             </div>

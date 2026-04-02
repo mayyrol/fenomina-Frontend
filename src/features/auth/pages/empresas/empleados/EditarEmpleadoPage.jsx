@@ -131,6 +131,14 @@ export default function EditarEmpleadoPage() {
     claseRiesgo: '', fondoCesantias: '', cajaCompensacion: '',
   });
 
+  const MAPA_CLASE_RIESGO_INVERSO = {
+    'CLASE_I':   'I',
+    'CLASE_II':  'II',
+    'CLASE_III': 'III',
+    'CLASE_IV':  'IV',
+    'CLASE_V':   'V',
+  };
+
   useEffect(() => {
     Promise.all([
       empleadosService.getEmpleadoById(empleadoId),
@@ -163,7 +171,7 @@ export default function EditarEmpleadoPage() {
           eps:               emp.nombreEps,
           fondoPensiones:    emp.fondoPensionEmp,
           arl:               emp.nombreArl,
-          claseRiesgo:       emp.claseRiesgo,
+          claseRiesgo: MAPA_CLASE_RIESGO_INVERSO[emp.claseRiesgo] ?? emp.claseRiesgo,
           fondoCesantias:    emp.fondoCesantiasEmp,
           cajaCompensacion:  emp.cajaCompensacion,
         });
@@ -214,6 +222,66 @@ export default function EditarEmpleadoPage() {
   };
 
   const handleSubmit    = () => { if (!validar()) return; setConfirmar(true); };
+
+  const MAPA_TIPO_CONTRATO = {
+    fijo:        'TERMINO_FIJO',
+    indefinido:  'TERMINO_INDEFINIDO',
+    obra:        'OBRA_LABOR',
+    aprendizaje: 'APRENDIZAJE',
+    temporal:    'TEMPORAL_OCASIONAL_ACCIDENTAL',
+    otro:        'OTRO',
+  };
+
+  const MAPA_JORNADA = {
+    unica:    'UNICA',
+    turnos:   'TURNOS',
+    rotativa: 'ROTATIVA',
+  };
+
+  const MAPA_TIPO_COTIZANTE = {
+    '01': 'DEPENDIENTE',
+    '02': 'SERVICIO_DOMESTICO',
+    '03': 'INDEPENDIENTE',
+    '12': 'APRENDIZ_SENA_LECTIVA',
+    '19': 'APRENDIZ_SENA_PRODUCTIVA',
+    '20': 'ESTUDIANTE_LEY_789',
+    '23': 'ESTUDIANTE_SOLO_ARL',
+    '44': 'COTIZANTE_EMERGENCIA_1',
+    '45': 'COTIZANTE_EMERGENCIA_2',
+    '51': 'TIEMPO_PARCIAL',
+    '59': 'INDEPENDIENTE_PRESTACION_SERVICIOS',
+  };
+
+  const MAPA_SUBTIPO_COTIZANTE = {
+    '0':  'CODIGO_0',
+    '1':  'CODIGO_1',
+    '3':  'CODIGO_3',
+    '4':  'CODIGO_4',
+    '5':  'CODIGO_5',
+    '6':  'CODIGO_6',
+    '9':  'CODIGO_9',
+    '11': 'CODIGO_11',
+    '12': 'CODIGO_12',
+  };
+
+  const MAPA_CLASE_RIESGO = {
+    'I':   'CLASE_I',
+    'II':  'CLASE_II',
+    'III': 'CLASE_III',
+    'IV':  'CLASE_IV',
+    'V':   'CLASE_V',
+  };
+  
+  const MAPA_TIPO_DOCUMENTO = {   
+    CC:       'CC',
+    CE:       'CE',
+    TI:       'TI',
+    PEP:       'PEP',
+    NIT:       'NIT',
+    PPT:      'PPT',
+    PA:       'PASAPORTE',
+  };
+
   const handleConfirmar = async () => {
     setConfirmar(false);
 
@@ -224,25 +292,25 @@ export default function EditarEmpleadoPage() {
     };
 
     const empleadoDTO = {
-      tipoDocumento:      form.tipoDocumento,
+      tipoDocumento:      MAPA_TIPO_DOCUMENTO[form.tipoDocumento] ?? form.tipoDocumento,
       documentoEmp:       form.numeroDocumento,
       nombresEmp:         form.nombresEmpleado,
       apellidosEmp:       form.apellidosEmpleado,
       direccionEmp:       form.direccion,
-      tipoContratoEmp:    form.tipoContrato.toUpperCase(),
+      tipoContratoEmp:    MAPA_TIPO_CONTRATO[form.tipoContrato?.toLowerCase().trim()],
       fechaIngresoEmp:    toISO(form.fechaIngreso),
       fechaFinContrato:   toISO(form.fechaFinContrato),
       cargoEmp:           form.cargo,
       salarioBascMensual: parseFloat(form.salario),
-      claseRiesgo:        form.claseRiesgo,
-      tipoCotizante:      form.tipoCotizante,
-      subtipoCotizante:   form.subtipoCotizante,
+      claseRiesgo:        MAPA_CLASE_RIESGO[form.claseRiesgo],
+      tipoCotizante:      MAPA_TIPO_COTIZANTE[form.tipoCotizante],
+      subtipoCotizante:   MAPA_SUBTIPO_COTIZANTE[form.subtipoCotizante],
       nombreArl:          form.arl,
       nombreEps:          form.eps,
       fondoPensionEmp:    form.fondoPensiones,
       cajaCompensacion:   form.cajaCompensacion,
       fondoCesantiasEmp:  form.fondoCesantias,
-      jornadaTrabajoEmp:  form.jornada.toUpperCase(),
+      jornadaTrabajoEmp:  MAPA_JORNADA[form.jornada?.toLowerCase().trim()],
     };
 
     try {
@@ -260,23 +328,22 @@ export default function EditarEmpleadoPage() {
       );
 
       const aEliminar = conceptosOriginales.filter(
-        orig => !idsActuales.has(orig.contratoConceptId)
+        orig => orig.contratoConceptId !== null && !idsActuales.has(orig.contratoConceptId)
       );
 
-      // Conceptos con valor modificado → soft delete + recrear
       const aActualizar = conceptosValidos.filter(c => {
         if (!c.contratoConceptId) return false;
         const orig = conceptosOriginales.find(o => o.contratoConceptId === c.contratoConceptId);
         return orig && orig.valor !== c.valor;
-        });
+      });
 
       // Conceptos nuevos (sin contratoConceptId)
       const aCrear = conceptosValidos.filter(c => !c.contratoConceptId);
 
       // Ejecutar soft deletes
       await Promise.all([
-        ...aEliminar.map(c => contratoConceptoService.eliminarConcepto(c.contratoConceptId)),
-        ...aActualizar.map(c => contratoConceptoService.eliminarConcepto(c.contratoConceptId)),
+        ...aEliminar.filter(c => c.contratoConceptId != null).map(c => contratoConceptoService.eliminarConcepto(c.contratoConceptId)),
+        ...aActualizar.filter(c => c.contratoConceptId != null).map(c => contratoConceptoService.eliminarConcepto(c.contratoConceptId)),
       ]);
 
       // Crear los nuevos y los actualizados (con nuevo valor)

@@ -129,13 +129,11 @@ export default function EmpresasPage() {
 
             {/* Tarjetas empresas */}
             {empresas.map((empresa) => (
-              <div key={empresa.empresaId} onClick={() => navigate(`/empresas/${empresa.empresaId}`)}>
-                {empresa.logoEmpresaUrl
-                  ? <img src={`${import.meta.env.VITE_MASTER_API_URL}${empresa.logoEmpresaUrl}`}
-                          alt="logo" style={{ width: 60, height: 60, objectFit: 'contain' }} />
-                  : <Building2 size={36} color="#0B662A" />
-                }
-                <p>{empresa.nombreEmpresa}</p>
+              <div key={empresa.empresaId} style={styles.gridCard} onClick={() => navigate(`/empresas/${empresa.empresaId}`)}>
+                <Carpeta>
+                  <Building2 size={36} color="#0B662A" />
+                </Carpeta>
+                <p style={styles.cardLabel}>{empresa.nombreEmpresa}</p>
               </div>
             ))}
           </div>

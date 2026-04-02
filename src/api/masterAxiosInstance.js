@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
 const masterAxios = axios.create({
   baseURL: import.meta.env.VITE_MASTER_API_URL,
@@ -16,15 +17,9 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Función helper que obtiene el store solo cuando se necesita
-const getAuthStore = () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return import('../store/authStore').then(m => m.useAuthStore);
-};
-
 masterAxios.interceptors.request.use(
-  async (config) => {
-    const { useAuthStore } = await import('../store/authStore');
+  (config) => {
+    // getState() NO es un hook, es una función estática de Zustand — esto está bien
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -50,7 +45,6 @@ masterAxios.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
       try {
-        const { useAuthStore } = await import('../store/authStore');
         const refreshToken = useAuthStore.getState().refreshToken;
         const { data } = await axios.post(
           `${import.meta.env.VITE_API_URL}/auth/refresh`,
@@ -62,7 +56,6 @@ masterAxios.interceptors.response.use(
         return masterAxios(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        const { useAuthStore } = await import('../store/authStore');
         useAuthStore.getState().logout();
         window.location.href = '/login';
         return Promise.reject(refreshError);

@@ -6,7 +6,7 @@ export default function ConfirmarCambiosModal({
   onCancelar, 
   onConfirmar,
   titulo = '¿Estás seguro de querer guardar estos cambios?',
-  descripcion = 'Recuerda que una vez que hagas un cambio en la información, se actualizarán los datos que harán parte de la gestión de liquidación de conceptos.'
+  descripcion = 'Recuerda que una vez que hagas un cambio en la información, se actualizarán los datos en el sistema.'
 }) {
   const [hoverConfirmar, setHoverConfirmar] = useState(false);
   const [hoverCancelar,  setHoverCancelar]  = useState(false);
