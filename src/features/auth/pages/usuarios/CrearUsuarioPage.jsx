@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, UserRound, CheckCircle2, AlertTriangle } from 'lucide-react';
 import axiosInstance from '../../../../api/axiosInstance';
 import { useAuthStore } from '../../../../store/authStore';
+import { useEmpresasLista } from '../../hooks/useEmpresasLista';
 
 const ROLES = [
   { value: 'SUPER_ADMIN', label: 'Super Admin' },
@@ -18,6 +19,7 @@ const camposVacios = {
 };
 
 export default function CrearUsuarioPage() {
+  const { empresas, cargando: cargandoEmpresas } = useEmpresasLista();
   const navigate = useNavigate();
   const { usuario } = useAuthStore();
   const [form, setForm] = useState(camposVacios);
@@ -42,17 +44,13 @@ export default function CrearUsuarioPage() {
     else if (!/^[a-zA-Z0-9._-]+$/.test(form.userName)) e.userName = 'Solo letras, números, puntos, guiones y guiones bajos.';
     if (!form.nombresUsuario) e.nombresUsuario = 'Los nombres son obligatorios.';
     if (!form.apellidosUsuario) e.apellidosUsuario = 'Los apellidos son obligatorios.';
-    if (!form.numIdentiUsuario) {
-      e.numIdentiUsuario = 'El número de identificación es obligatorio.';
-    } else if (!/^\d{6,15}$/.test(form.numIdentiUsuario)) {
-      e.numIdentiUsuario = 'Debe tener entre 6 y 15 dígitos numéricos.';
-    }
+    if (!form.numIdentiUsuario) e.numIdentiUsuario = 'El número de identificación es obligatorio.';
     if (!form.cargoUsuario) e.cargoUsuario = 'El cargo es obligatorio.';
     if (!form.rolUsuario) e.rolUsuario = 'El rol es obligatorio.';
     if (!form.contrasenaUsuario) e.contrasenaUsuario = 'La contraseña es obligatoria.';
     else if (form.contrasenaUsuario.length < 8) e.contrasenaUsuario = 'Mínimo 8 caracteres.';
     else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(form.contrasenaUsuario))
-      e.contrasenaUsuario = 'Debe tener mayúscula, minúscula y número.';
+      e.contrasenaUsuario = 'Debe tener al menos una mayúscula y un número.';
     return e;
   };
 
@@ -165,7 +163,30 @@ export default function CrearUsuarioPage() {
             </select>
             {errores.rolUsuario && <span style={styles.errorTexto}>{errores.rolUsuario}</span>}
           </div>
-          <Campo label="ID Empresa (opcional)" name="fkIdEmpresa" placeholder="Dejar vacío para acceso total" value={form.fkIdEmpresa} onChange={handleChange} error={errores.fkIdEmpresa} type="number" />
+          <div>
+            <label style={styles.label}>Empresa (opcional)</label>
+            <select
+              name="fkIdEmpresa"
+              value={form.fkIdEmpresa}
+              onChange={handleChange}
+              style={{
+                ...styles.input,
+                borderColor: errores.fkIdEmpresa ? '#e53e3e' : '#D0D0D0',
+                color: form.fkIdEmpresa ? '#272525' : '#A3A3A3',
+              }}
+            >
+              <option value="">Dejar vacío para acceso total</option>
+              {cargandoEmpresas
+                ? <option disabled>Cargando empresas...</option>
+                : empresas.map(e => (
+                    <option key={e.empresaId} value={e.empresaId}>
+                      {e.nombreEmpresa}
+                    </option>
+                  ))
+              }
+            </select>
+            {errores.fkIdEmpresa && <span style={styles.errorTexto}>{errores.fkIdEmpresa}</span>}
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,8 @@ import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, ChevronLeft, ChevronRight, ChevronDown, Calendar } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
+import { UserCircle } from 'lucide-react';
+
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -132,7 +134,9 @@ export default function GenerarReportePage() {
           </div>
         </div>
         <div style={styles.perfilBox}>
-          <div style={styles.avatar}>{inicial}</div>
+          <div style={styles.avatar}>
+            <UserCircle size={28} color="#555" />
+          </div>
           <div>
             <p style={styles.perfilNombre}>{nombre}</p>
             <p style={styles.perfilCargo}>{cargo}</p>

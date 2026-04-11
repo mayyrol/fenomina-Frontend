@@ -3,6 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
 import { Building2, Camera, ChevronDown } from 'lucide-react';
 import MensajeModal from '../../../../components/MensajeModal';
+import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal';
+import empresasService from '../../../../services/empresasService';
+import { UserCircle } from 'lucide-react';
+
+
+// ── CAMBIO 1: solo números en NIT ──
+const soloNumeros = (e) => {
+  if (!/[0-9]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+  }
+};
 
 export default function CrearEmpresaPage() {
   const navigate    = useNavigate();
@@ -14,10 +25,14 @@ export default function CrearEmpresaPage() {
 
   const [foto, setFoto]               = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
+  const [hoverLogo, setHoverLogo]     = useState(false); // ── CAMBIO 2: hover logo
   const [modal, setModal]             = useState(null);
+  const [mensajeError, setMensajeError] = useState(''); // ── CAMBIO 3: mensaje error personalizado
   const [errores, setErrores]         = useState({});
+  const [mensajeGeneral, setMensajeGeneral] = useState(''); // ── CAMBIO 4: mensaje faltan campos
   const [hoverCrear, setHoverCrear]   = useState(false);
   const [hoverRegresar, setHoverRegresar] = useState(false);
+  const [modalCampos, setModalCampos] = useState(false);
 
   const [form, setForm] = useState({
     nitEmpresa:        '',
@@ -32,6 +47,7 @@ export default function CrearEmpresaPage() {
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setErrores({ ...errores, [e.target.name]: '' });
+    setMensajeGeneral('');
   };
 
   const handleFoto = (e) => {
@@ -39,6 +55,13 @@ export default function CrearEmpresaPage() {
     if (!file) return;
     setFoto(file);
     setFotoPreview(URL.createObjectURL(file));
+  };
+
+  // ── CAMBIO 2: eliminar logo ──
+  const handleEliminarLogo = (e) => {
+    e.preventDefault();
+    setFoto(null);
+    setFotoPreview(null);
   };
 
   const validar = () => {
@@ -54,14 +77,51 @@ export default function CrearEmpresaPage() {
     });
 
     setErrores(nuevosErrores);
-    return Object.keys(nuevosErrores).length === 0;
+
+    // ── CAMBIO 4: mensaje general si faltan campos ──
+    if (Object.keys(nuevosErrores).length > 0) {
+      setModalCampos(true);
+      return false;
+    }
+
+    setMensajeGeneral('');
+    return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validar()) return;
-    console.log('Form:', form);
-    console.log('Foto:', foto);
-    setModal('exito');
+
+    const empresaDTO = {
+      empresaNit:         form.nitEmpresa,
+      razonSocial:        form.razonSocial,
+      nombreEmpresa:      form.nombreEmpresa,
+      esExoneradaLey1607: form.ley1607 === 'SI',
+      aplicaNomina:       form.reportesNomina    === 'SI',
+      aplicaPrima:        form.reportesPrimas    === 'SI',
+      aplicaCesantias:    form.reportesCesantias === 'SI',
+    };
+
+    try {
+      await empresasService.crearEmpresa(empresaDTO, foto);
+      setModal('exito');
+    } catch (err) {
+      const data   = err.response?.data ?? {};
+      const msg    = data.message ?? '';
+      const errors = data.errors ?? {};
+
+      if (msg.toLowerCase().includes('nit')) {
+        setMensajeError('Ya existe una empresa registrada con este NIT. El NIT debe ser único.');
+      } else if (msg.toLowerCase().includes('razón') || msg.toLowerCase().includes('razon') || msg.toLowerCase().includes('social')) {
+        setMensajeError('Ya existe una empresa registrada con esta Razón Social. La Razón Social debe ser única.');
+      } else if (Object.keys(errors).length > 0) {
+        setMensajeError(Object.values(errors)[0]);
+      } else if (msg.length > 0) {
+        setMensajeError(msg);
+      } else {
+        setMensajeError('Ocurrió un error al crear la empresa. Verifica los datos e intenta de nuevo.');
+      }
+      setModal('error');
+    }
   };
 
   return (
@@ -77,7 +137,9 @@ export default function CrearEmpresaPage() {
           </div>
         </div>
         <div style={styles.perfilBox}>
-          <div style={styles.avatar}>{inicial}</div>
+          <div style={styles.avatar}>
+            <UserCircle size={28} color="#555" />
+          </div>
           <div>
             <p style={styles.perfilNombre}>{nombre}</p>
             <p style={styles.perfilCargo}>{cargo}</p>
@@ -92,10 +154,12 @@ export default function CrearEmpresaPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>NIT Empresa<span style={styles.req}>*</span></label>
+            {/* ── CAMBIO 1: solo números en NIT ── */}
             <input
               name="nitEmpresa"
               value={form.nitEmpresa}
               onChange={handleChange}
+              onKeyDown={soloNumeros}
               placeholder="Ingresar número"
               style={{ ...styles.input, ...(errores.nitEmpresa ? styles.inputError : {}) }}
             />
@@ -156,22 +220,36 @@ export default function CrearEmpresaPage() {
         <div style={styles.card}>
           <p style={styles.seccionTitulo}>Logo Empresa</p>
           <div style={styles.logoBox}>
-            <label style={styles.fotoCirculo} htmlFor="fotoInput">
-              {fotoPreview
-                ? <img src={fotoPreview} alt="logo" style={styles.fotoImg} />
-                : <>
-                    <Camera size={32} color="#A3A3A3" />
-                    <span style={styles.fotoLabel}>Subir foto</span>
-                  </>
-              }
-              <input
-                id="fotoInput"
-                type="file"
-                accept=".jpg,.webp,.png"
-                onChange={handleFoto}
-                style={{ display: 'none' }}
-              />
-            </label>
+            {/* ── CAMBIO 2: hover con opciones eliminar/cambiar ── */}
+            <div
+              style={{ position: 'relative', flexShrink: 0 }}
+              onMouseEnter={() => setHoverLogo(true)}
+              onMouseLeave={() => setHoverLogo(false)}
+            >
+              <label htmlFor="fotoInput" style={styles.fotoCirculo}>
+                {fotoPreview
+                  ? <img src={fotoPreview} alt="logo" style={{ ...styles.fotoImg, opacity: hoverLogo ? 0.4 : 1 }} />
+                  : <>
+                      <Camera size={32} color="#A3A3A3" />
+                      <span style={styles.fotoLabel}>Subir foto</span>
+                    </>
+                }
+                <input
+                  id="fotoInput"
+                  type="file"
+                  accept=".jpg,.webp,.png"
+                  onChange={handleFoto}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              {/* Opciones al hacer hover sobre el logo */}
+              {fotoPreview && hoverLogo && (
+                <div style={styles.logoOpciones}>
+                  <button style={styles.btnLogoOpc} onClick={handleEliminarLogo}>Eliminar</button>
+                  <label htmlFor="fotoInput" style={styles.btnLogoOpc}>Cambiar</label>
+                </div>
+              )}
+            </div>
             <div style={styles.fotoInfo}>
               <p style={styles.fotoInfoTitulo}>Formato permitido</p>
               <p style={styles.fotoInfoTexto}>JPG, WEBP, y PNG</p>
@@ -245,14 +323,19 @@ export default function CrearEmpresaPage() {
         </div>
       </div>
 
+      {/* ── CAMBIO 4: Mensaje general faltan campos ── */}
+      {mensajeGeneral && (
+        <p style={{ textAlign: 'center', color: '#E53E3E', fontSize: '13px', fontWeight: '600', margin: '0' }}>
+          {mensajeGeneral}
+        </p>
+      )}
+
       {/* ── Botones ── */}
       <div style={styles.botonesRow}>
         <button
           style={{
             ...styles.btnCrear,
-            background: hoverCrear
-              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
-              : '#0B662A',
+            background: hoverCrear ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
             transition: 'background 0.3s ease',
           }}
           onMouseEnter={() => setHoverCrear(true)}
@@ -264,9 +347,7 @@ export default function CrearEmpresaPage() {
         <button
           style={{
             ...styles.btnRegresar,
-            background: hoverRegresar
-              ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'
-              : '#fff',
+            background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff',
             transition: 'background 0.3s ease',
           }}
           onMouseEnter={() => setHoverRegresar(true)}
@@ -277,8 +358,24 @@ export default function CrearEmpresaPage() {
         </button>
       </div>
 
-      {/* Modal */}
-      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
+      {/* ── CAMBIO 3: Modal con mensaje personalizado ── */}
+      <MensajeModal
+        tipo={modal}
+        mensaje={modal === 'error' ? mensajeError : modal === 'exito' ? 'La empresa fue creada exitosamente.' : ''}
+        onClose={() => {
+          setModal(null);
+          if (modal === 'exito') navigate('/empresas');
+        }}
+      />
+      {/* ── Modal faltan campos ── */}
+      <ConfirmarCambiosModal
+        visible={modalCampos}
+        tipo="error"
+        onCancelar={() => setModalCampos(false)}
+        onConfirmar={() => setModalCampos(false)}
+        titulo="Faltan campos obligatorios"
+        descripcion="Por favor completa todos los campos marcados con * antes de continuar."
+      />
 
     </div>
   );
@@ -306,12 +403,14 @@ const styles = {
   inputError:      { border: '1px solid #E53E3E' },
   errorMsg:        { fontSize: '12px', color: '#E53E3E', margin: '2px 0 0 0' },
   selectWrapper:   { position: 'relative' },
-  select:          { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', backgroundColor: '#fff', color: '#A3A3A3', cursor: 'pointer', boxSizing: 'border-box' },
+  select:          { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundColor: '#fff', color: '#A3A3A3', cursor: 'pointer', boxSizing: 'border-box', backgroundImage: 'none' },
   selectIcon:      { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
   logoBox:         { display: 'flex', alignItems: 'center', gap: '24px' },
-  fotoCirculo:     { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#EFEFEF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '6px', flexShrink: 0 },
-  fotoImg:         { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover' },
+  fotoCirculo:     { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#EFEFEF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '6px', flexShrink: 0, position: 'relative', overflow: 'hidden' },
+  fotoImg:         { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', transition: 'opacity 0.2s ease' },
   fotoLabel:       { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
+  logoOpciones:    { position: 'absolute', top: 0, left: 0, width: '100px', height: '100px', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', zIndex: 2 },
+  btnLogoOpc:      { backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', fontWeight: '600' },
   fotoInfo:        { display: 'flex', flexDirection: 'column', gap: '2px' },
   fotoInfoTitulo:  { fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 },
   fotoInfoTexto:   { fontSize: '12px', color: '#A3A3A3', margin: '0 0 8px 0' },

@@ -4,6 +4,7 @@ import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, ChevronDown, ChevronLeft, ChevronRight, Plus, Trash2, Calendar } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
+import { UserCircle } from 'lucide-react';
 
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error }) {
   const [abierto, setAbierto] = useState(false);
@@ -183,7 +184,9 @@ export default function NovedadesPage() {
           </div>
         </div>
         <div style={styles.perfilBox}>
-          <div style={styles.avatar}>{inicial}</div>
+          <div style={styles.avatar}>
+            <UserCircle size={28} color="#555" />
+          </div>
           <div>
             <p style={styles.perfilNombre}>{nombre}</p>
             <p style={styles.perfilCargo}>{cargo}</p>

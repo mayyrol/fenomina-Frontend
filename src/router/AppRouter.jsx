@@ -1,3 +1,4 @@
+// --- TODOS LOS IMPORTS ARRIBA ---
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import LoginPage from '../features/auth/pages/LoginPage';

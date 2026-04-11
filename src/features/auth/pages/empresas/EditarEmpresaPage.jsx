@@ -1,40 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
-import { useEmpresas } from '../../hooks/useEmpresas';
 import { Building2, Camera, ChevronDown } from 'lucide-react';
 import MensajeModal from '../../../../components/MensajeModal';
 import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal';
+import empresasService from '../../../../services/empresasService';
+import { UserCircle } from 'lucide-react';
+
 
 export default function EditarEmpresaPage() {
-  const navigate           = useNavigate();
-  const { id }             = useParams();
-  const { usuario }        = useAuthStore();
-  const { getEmpresaById } = useEmpresas();
+  const navigate    = useNavigate();
+  const { id }      = useParams();
+  const { usuario } = useAuthStore();
 
-  const empresa = getEmpresaById(id);
+  const [empresa,        setEmpresa]        = useState(null);
+  const [cargando,       setCargando]       = useState(true);
+  const [fotoPreview,    setFotoPreview]    = useState(null);
+  const [foto,           setFoto]           = useState(null);
+  const [modal,          setModal]          = useState(null);
+  const [modalConfirmar, setModalConfirmar] = useState(false);
+  const [errores,        setErrores]        = useState({});
+  const [hoverGuardar,   setHoverGuardar]   = useState(false);
+  const [hoverRegresar,  setHoverRegresar]  = useState(false);
+  const [form,           setForm]           = useState({
+    nitEmpresa: '', razonSocial: '', nombreEmpresa: '',
+    ley1607: '', reportesNomina: '', reportesPrimas: '', reportesCesantias: '',
+  });
+
+  useEffect(() => {
+    empresasService.getEmpresaById(id)
+      .then(({ data }) => {
+        setEmpresa(data);
+        setFotoPreview(
+          data.logoEmpresaUrl
+            ? `${import.meta.env.VITE_MASTER_API_URL}${data.logoEmpresaUrl}`
+            : null
+        );
+        setForm({
+          nitEmpresa:        data.empresaNit,
+          razonSocial:       data.razonSocial,
+          nombreEmpresa:     data.nombreEmpresa,
+          ley1607:           data.esExoneradaLey1607 ? 'SI' : 'NO',
+          reportesNomina:    data.aplicaNomina    ? 'SI' : 'NO',
+          reportesPrimas:    data.aplicaPrima     ? 'SI' : 'NO',
+          reportesCesantias: data.aplicaCesantias ? 'SI' : 'NO',
+        });
+      })
+      .catch(() => setEmpresa(null))
+      .finally(() => setCargando(false));
+  }, [id]);
+
+  if (cargando) return <p>Cargando...</p>;
+  if (!empresa) return <p>Empresa no encontrada.</p>;
 
   const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
   const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo   = usuario?.cargoUsuario ?? '';
-
-  const [fotoPreview, setFotoPreview]       = useState(empresa?.logo ?? null);
-  const [foto, setFoto]                     = useState(null);
-  const [modal, setModal]                   = useState(null);
-  const [modalConfirmar, setModalConfirmar] = useState(false);
-  const [errores, setErrores]               = useState({});
-  const [hoverGuardar, setHoverGuardar]     = useState(false);
-  const [hoverRegresar, setHoverRegresar]   = useState(false);
-
-  const [form, setForm] = useState({
-    nitEmpresa:        empresa?.nitEmpresa        ?? '',
-    razonSocial:       empresa?.razonSocial       ?? '',
-    nombreEmpresa:     empresa?.nombre            ?? '',
-    ley1607:           empresa?.ley1607           ?? '',
-    reportesNomina:    empresa?.reportesNomina    ?? '',
-    reportesPrimas:    empresa?.reportesPrimas    ?? '',
-    reportesCesantias: empresa?.reportesCesantias ?? '',
-  });
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -65,9 +86,25 @@ export default function EditarEmpresaPage() {
   };
 
   const handleSubmit   = () => { if (!validar()) return; setModalConfirmar(true); };
-  const handleConfirmar = () => { setModalConfirmar(false); setModal('exito'); };
-
-  if (!empresa) return <p>Empresa no encontrada.</p>;
+  const handleConfirmar = async () => {
+    setModalConfirmar(false);
+    const empresaDTO = {
+      empresaNit:         form.nitEmpresa,
+      razonSocial:        form.razonSocial,
+      nombreEmpresa:      form.nombreEmpresa,
+      esExoneradaLey1607: form.ley1607 === 'SI',
+      aplicaNomina:       form.reportesNomina    === 'SI',
+      aplicaPrima:        form.reportesPrimas    === 'SI',
+      aplicaCesantias:    form.reportesCesantias === 'SI',
+    };
+    try {
+      await empresasService.actualizarEmpresa(id, empresaDTO, foto);
+      setModal('exito');
+    } catch (err) {
+      setModal('error');
+      console.error(err.response?.data?.message ?? 'Error al actualizar');
+    }
+  };
 
   return (
     <div style={styles.container}>
@@ -82,7 +119,9 @@ export default function EditarEmpresaPage() {
           </div>
         </div>
         <div style={styles.perfilBox}>
-          <div style={styles.avatar}>{inicial}</div>
+          <div style={styles.avatar}>
+            <UserCircle size={28} color="#555" />
+          </div>
           <div>
             <p style={styles.perfilNombre}>{nombre}</p>
             <p style={styles.perfilCargo}>{cargo}</p>

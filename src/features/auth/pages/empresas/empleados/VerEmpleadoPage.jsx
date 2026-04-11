@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from "../../../../../store/authStore";
 import { Users, ChevronDown, Calendar } from 'lucide-react';
-
+import empleadosService from '../../../../../services/empleadosService';
+import { UserCircle } from 'lucide-react';
 
 export default function VerEmpleadoPage() {
   const navigate    = useNavigate();
@@ -16,19 +17,25 @@ export default function VerEmpleadoPage() {
   const [hoverEditar,   setHoverEditar]   = useState(false);
   const [hoverRegresar, setHoverRegresar] = useState(false);
 
-  const empleado = {
-    tipoDocumento:    'Cedula de Ciudadania',
-    numeroDocumento:  '10758963',
-    nombresEmpleado:  'Mario Andrés',
-    apellidosEmpleado:'Rodriguez Vanegas',
-    direccion:        'Crra. 13 #4B-15',
-    cargo:            '', tipoContrato:     '', jornada:          '',
-    fechaIngreso:     '', fechaFinContrato: '', tipoCotizante:    '',
-    subtipoCotizante: '', fechaRetiro:      '', salario:          '',
-    auxTransporte:    '', eps:              '', fondoPensiones:   '',
-    arl:              '', claseRiesgo:      '', fondoCesantias:   '',
-    cajaCompensacion: '', conceptos: [{ nombre: '', valor: '' }],
-  };
+  const [empleado, setEmpleado] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [conceptos, setConceptos] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      empleadosService.getEmpleadoById(empleadoId),
+      empleadosService.getConceptosEmpleado(empleadoId),
+    ])
+      .then(([{ data: emp }, { data: conc }]) => {
+        setEmpleado(emp);
+        setConceptos(conc);
+      })
+      .catch(() => setEmpleado(null))
+      .finally(() => setCargando(false));
+  }, [empleadoId]);
+
+  if (cargando) return <p>Cargando...</p>;
+  if (!empleado) return <p>Empleado no encontrado.</p>;
 
   return (
     <div style={styles.container}>
@@ -43,7 +50,9 @@ export default function VerEmpleadoPage() {
           </div>
         </div>
         <div style={styles.perfilBox}>
-          <div style={styles.avatar}>{inicial}</div>
+          <div style={styles.avatar}>
+            <UserCircle size={28} color="#555" />
+          </div>
           <div>
             <p style={styles.perfilNombre}>{nombre}</p>
             <p style={styles.perfilCargo}>{cargo}</p>
@@ -62,21 +71,21 @@ export default function VerEmpleadoPage() {
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Número de documento<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.numeroDocumento} style={styles.inputRO} />
+            <input readOnly value={empleado.documentoEmp} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Nombre(s) Empleado<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.nombresEmpleado} style={styles.inputRO} />
+            <input readOnly value={empleado.nombresEmp} style={styles.inputRO} />
           </div>
         </div>
         <div style={{ ...styles.fila3, marginTop: '20px' }}>
           <div style={styles.campo}>
             <label style={styles.label}>Apellidos Empleado<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.apellidosEmpleado} style={styles.inputRO} />
+            <input readOnly value={empleado.apellidosEmp} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Dirección Empleado</label>
-            <input readOnly value={empleado.direccion} style={styles.inputRO} />
+            <input readOnly value={empleado.direccionEmp} style={styles.inputRO} />
           </div>
           <div />
         </div>
@@ -88,12 +97,12 @@ export default function VerEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>Cargo</label>
-            <input readOnly value={empleado.cargo} placeholder="Ingresar cargo" style={styles.inputRO} />
+            <input readOnly value={empleado.cargoEmp} placeholder="Ingresar cargo" style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Tipo de contrato</label>
             <div style={styles.selectWrapper}>
-              <select disabled value={empleado.tipoContrato} style={styles.selectRO}>
+              <select disabled value={empleado.tipoContratoEmp} style={styles.selectRO}>
                 <option value="">Seleccionar opción</option>
                 <option value="fijo">Término Fijo</option>
                 <option value="indefinido">Término Indefinido</option>
@@ -108,7 +117,7 @@ export default function VerEmpleadoPage() {
           <div style={styles.campo}>
             <label style={styles.label}>Jornada</label>
             <div style={styles.selectWrapper}>
-              <select disabled value={empleado.jornada} style={styles.selectRO}>
+              <select disabled value={empleado.jornadaTrabajoEmp} style={styles.selectRO}>
                 <option value="">Seleccionar opción</option>
                 <option value="unica">Única</option>
                 <option value="turnos">Turnos</option>
@@ -122,8 +131,8 @@ export default function VerEmpleadoPage() {
           <div style={styles.campo}>
             <label style={styles.label}>Fecha de ingreso<span style={styles.req}>*</span></label>
             <div style={styles.inputRO}>
-              <span style={{ color: empleado.fechaIngreso ? '#272525' : '#A3A3A3', fontSize: '13px' }}>
-                {empleado.fechaIngreso || 'DD/MM/YYYY'}
+              <span style={{ color: empleado.fechaIngresoEmp ? '#272525' : '#A3A3A3', fontSize: '13px' }}>
+                {empleado.fechaIngresoEmp || 'DD/MM/YYYY'}
               </span>
               <Calendar size={16} color="#A3A3A3" />
             </div>
@@ -180,8 +189,8 @@ export default function VerEmpleadoPage() {
           <div style={styles.campo}>
             <label style={styles.label}>Fecha de retiro</label>
             <div style={styles.inputRO}>
-              <span style={{ color: empleado.fechaRetiro ? '#272525' : '#A3A3A3', fontSize: '13px' }}>
-                {empleado.fechaRetiro || 'DD/MM/YYYY'}
+              <span style={{ color: empleado.fechaRetiroEmp ? '#272525' : '#A3A3A3', fontSize: '13px' }}>
+                {empleado.fechaRetiroEmp || 'DD/MM/YYYY'}
               </span>
               <Calendar size={16} color="#A3A3A3" />
             </div>
@@ -196,12 +205,12 @@ export default function VerEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>Salario básico mensual</label>
-            <input readOnly value={empleado.salario} placeholder="Ingresar valor" style={styles.inputRO} />
+            <input readOnly value={empleado.salarioBascMensual} placeholder="Ingresar valor" style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Auxilio de transporte<span style={styles.req}>*</span></label>
             <div style={styles.selectWrapper}>
-              <select disabled value={empleado.auxTransporte} style={styles.selectRO}>
+              <select disabled value={empleado.tieneAuxTransporte ? 'SI' : 'NO'} style={styles.selectRO}>
                 <option value="">Seleccionar opción</option>
                 <option value="SI">SI</option>
                 <option value="NO">NO</option>
@@ -219,15 +228,15 @@ export default function VerEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>EPS (Entidad Promotora de Salud)<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.eps} placeholder="Ingresar dato" style={styles.inputRO} />
+            <input readOnly value={empleado.nombreEps} placeholder="Ingresar dato" style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Fondo de pensiones<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.fondoPensiones} placeholder="Ingresar dato" style={styles.inputRO} />
+            <input readOnly value={empleado.fondoPensionEmp} placeholder="Ingresar dato" style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>ARL (Administradora de Riesgos Laborales)<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.arl} placeholder="Ingresar dato" style={styles.inputRO} />
+            <input readOnly value={empleado.nombreArl} placeholder="Ingresar dato" style={styles.inputRO} />
           </div>
         </div>
         <div style={{ ...styles.fila3, marginTop: '20px' }}>
@@ -247,7 +256,7 @@ export default function VerEmpleadoPage() {
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Fondo de cesantías<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.fondoCesantias} placeholder="Ingresar dato" style={styles.inputRO} />
+            <input readOnly value={empleado.fondoCesantiasEmp} placeholder="Ingresar dato" style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Caja de compensación<span style={styles.req}>*</span></label>
@@ -256,37 +265,39 @@ export default function VerEmpleadoPage() {
         </div>
       </div>
 
-      {/* ── Sección 5: Conceptos ── */}
-      <div style={styles.card}>
-        <p style={styles.seccionTitulo}>Conceptos de Liquidación de Nómina Permanentes</p>
-        <p style={styles.textoDescripcion}>
-          Tenga en cuenta que los conceptos que seleccione e ingrese en el siguiente espacio, harán parte
-          de los cálculos internos para reportes de nómina que genere mes a mes o quincenalmente para dicho empleado.
-        </p>
-        {empleado.conceptos.map((c, i) => (
-          <div key={i} style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', marginBottom: '16px' }}>
-            <div style={{ ...styles.campo, flex: 1 }}>
-              {i === 0 && <label style={styles.label}>Nombre concepto</label>}
-              <div style={styles.selectWrapper}>
-                <select disabled value={c.nombre} style={styles.selectRO}>
-                  <option value="">Seleccionar opción</option>
-                  <option value="beneficio">Beneficio o Extralegal</option>
-                  <option value="bonificacion">Bonificaciones Habituales</option>
-                  <option value="viaticos">Viáticos Permanentes</option>
-                  <option value="constituyen">Otros pagos que constituyen salario</option>
-                  <option value="no_constituyen">Otros pagos que no constituyen salario</option>
-                </select>
-                <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
+      {/* ── Sección 5: Conceptos — CAMBIO: solo se muestra si hay conceptos registrados ── */}
+      {conceptos && conceptos.length > 0 && (
+        <div style={styles.card}>
+          <p style={styles.seccionTitulo}>Conceptos de Liquidación de Nómina Permanentes</p>
+          <p style={styles.textoDescripcion}>
+            Tenga en cuenta que los conceptos que seleccione e ingrese en el siguiente espacio, harán parte
+            de los cálculos internos para reportes de nómina que genere mes a mes o quincenalmente para dicho empleado.
+          </p>
+          {conceptos.map((c, i) => (
+            <div key={i} style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', marginBottom: '16px' }}>
+              <div style={{ ...styles.campo, flex: 1 }}>
+                {i === 0 && <label style={styles.label}>Nombre concepto</label>}
+                <div style={styles.selectWrapper}>
+                  <select disabled value={c.nombre} style={styles.selectRO}>
+                    <option value="">Seleccionar opción</option>
+                    <option value="beneficio">Beneficio o Extralegal</option>
+                    <option value="bonificacion">Bonificaciones Habituales</option>
+                    <option value="viaticos">Viáticos Permanentes</option>
+                    <option value="constituyen">Otros pagos que constituyen salario</option>
+                    <option value="no_constituyen">Otros pagos que no constituyen salario</option>
+                  </select>
+                  <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
+                </div>
               </div>
+              <div style={{ ...styles.campo, flex: 1 }}>
+                {i === 0 && <label style={styles.label}>Valor neto (mensual)</label>}
+                <input readOnly value={c.valor} placeholder="Ingresar valor" style={styles.inputRO} />
+              </div>
+              <div style={{ width: '88px' }} />
             </div>
-            <div style={{ ...styles.campo, flex: 1 }}>
-              {i === 0 && <label style={styles.label}>Valor neto (mensual)</label>}
-              <input readOnly value={c.valor} placeholder="Ingresar valor" style={styles.inputRO} />
-            </div>
-            <div style={{ width: '88px' }} />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Botones ── */}
       <div style={styles.botonesRow}>

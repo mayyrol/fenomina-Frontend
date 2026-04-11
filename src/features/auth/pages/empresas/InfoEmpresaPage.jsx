@@ -1,25 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
-import { useEmpresas } from '../../hooks/useEmpresas';
-import { Building2, ChevronDown } from 'lucide-react';
+import { Building2 } from 'lucide-react';
+import empresasService from '../../../../services/empresasService';
 
 export default function InfoEmpresaPage() {
   const navigate    = useNavigate();
   const { id }      = useParams();
   const { usuario } = useAuthStore();
-  const { getEmpresaById } = useEmpresas();
 
-  const empresa = getEmpresaById(id);
+  const [empresa, setEmpresa]   = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [hoverEditar,   setHoverEditar]   = useState(false);
+  const [hoverRegresar, setHoverRegresar] = useState(false);
+
+  useEffect(() => {
+    empresasService.getEmpresaById(id)
+      .then(({ data }) => setEmpresa(data))
+      .catch(() => setEmpresa(null))
+      .finally(() => setCargando(false));
+  }, [id]);
+
+  if (cargando) return <p>Cargando...</p>;
+  if (!empresa) return <p>Empresa no encontrada.</p>;
 
   const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
   const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo   = usuario?.cargoUsuario ?? '';
-
-  const [hoverEditar,   setHoverEditar]   = useState(false);
-  const [hoverRegresar, setHoverRegresar] = useState(false);
-
-  if (!empresa) return <p>Empresa no encontrada.</p>;
 
   return (
     <div style={styles.container}>
@@ -49,15 +56,15 @@ export default function InfoEmpresaPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>NIT Empresa<span style={styles.req}>*</span></label>
-            <input readOnly value={empresa.nitEmpresa} style={styles.inputReadOnly} />
+            <input readOnly value={empresa.empresaNit ?? ''} style={styles.inputReadOnly} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Razón Social<span style={styles.req}>*</span></label>
-            <input readOnly value={empresa.razonSocial} style={styles.inputReadOnly} />
+            <input readOnly value={empresa.razonSocial ?? ''} style={styles.inputReadOnly} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Nombre Empresa<span style={styles.req}>*</span></label>
-            <input readOnly value={empresa.nombre} style={styles.inputReadOnly} />
+            <input readOnly value={empresa.nombreEmpresa ?? ''} style={styles.inputReadOnly} />
           </div>
         </div>
       </div>
@@ -72,13 +79,8 @@ export default function InfoEmpresaPage() {
             Indique si el aportante ha sido marcado como exonerado de pago de aporte de parafiscales
             y salud conforme a la Ley 1607 de 2012 (campo 33 del archivo tipo 1 de la PILA)<span style={styles.req}>*</span>
           </p>
-          <div style={styles.selectWrapper}>
-            <select disabled value={empresa.ley1607} style={styles.selectReadOnly}>
-              <option value="SI">SI</option>
-              <option value="NO">NO</option>
-            </select>
-            <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
-          </div>
+          {/* ── CAMBIO: input readOnly en vez de select disabled ── */}
+          <input readOnly value={empresa.esExoneradaLey1607 ? 'SI' : 'NO'} style={styles.inputReadOnly} />
         </div>
 
         {/* Logo Empresa */}
@@ -87,7 +89,7 @@ export default function InfoEmpresaPage() {
           <div style={styles.logoBox}>
             <div style={styles.fotoCirculo}>
               {empresa.logo
-                ? <img src={empresa.logo} alt="logo" style={styles.fotoImg} />
+                ? <img src={`${import.meta.env.VITE_MASTER_API_URL}${empresa.logoEmpresaUrl}`} alt="logo" style={styles.fotoImg} />
                 : <Building2 size={32} color="#A3A3A3" />
               }
             </div>
@@ -112,33 +114,18 @@ export default function InfoEmpresaPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>Reportes de Nómina Empleados (Desprendibles)<span style={styles.req}>*</span></label>
-            <div style={styles.selectWrapper}>
-              <select disabled value={empresa.reportesNomina} style={styles.selectReadOnly}>
-                <option value="SI">SI</option>
-                <option value="NO">NO</option>
-              </select>
-              <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
-            </div>
+            {/* ── CAMBIO: input readOnly en vez de select disabled ── */}
+            <input readOnly value={empresa.aplicaNomina ? 'SI' : 'NO'} style={styles.inputReadOnly} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Reportes de Primas Empleados (Desprendibles)<span style={styles.req}>*</span></label>
-            <div style={styles.selectWrapper}>
-              <select disabled value={empresa.reportesPrimas} style={styles.selectReadOnly}>
-                <option value="SI">SI</option>
-                <option value="NO">NO</option>
-              </select>
-              <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
-            </div>
+            {/* ── CAMBIO: input readOnly en vez de select disabled ── */}
+            <input readOnly value={empresa.aplicaPrima ? 'SI' : 'NO'} style={styles.inputReadOnly} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Reportes de Cesantías e Intereses Empleados (Desprendibles)<span style={styles.req}>*</span></label>
-            <div style={styles.selectWrapper}>
-              <select disabled value={empresa.reportesCesantias} style={styles.selectReadOnly}>
-                <option value="SI">SI</option>
-                <option value="NO">NO</option>
-              </select>
-              <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
-            </div>
+            {/* ── CAMBIO: input readOnly en vez de select disabled ── */}
+            <input readOnly value={empresa.aplicaCesantias ? 'SI' : 'NO'} style={styles.inputReadOnly} />
           </div>
         </div>
       </div>
@@ -148,9 +135,7 @@ export default function InfoEmpresaPage() {
         <button
           style={{
             ...styles.btnRegresar,
-            background: hoverRegresar
-              ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'
-              : '#fff',
+            background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff',
             transition: 'background 0.3s ease',
           }}
           onMouseEnter={() => setHoverRegresar(true)}
@@ -162,9 +147,7 @@ export default function InfoEmpresaPage() {
         <button
           style={{
             ...styles.btnEditar,
-            background: hoverEditar
-              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
-              : '#0B662A',
+            background: hoverEditar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
             transition: 'background 0.3s ease',
           }}
           onMouseEnter={() => setHoverEditar(true)}
@@ -197,10 +180,8 @@ const styles = {
   campo:           { display: 'flex', flexDirection: 'column', gap: '8px' },
   label:           { fontSize: '13px', fontWeight: '600', color: '#272525' },
   req:             { color: '#E53E3E', marginLeft: '2px' },
-  inputReadOnly:   { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff', textAlign: 'center' },
-  selectWrapper:   { position: 'relative' },
-  selectReadOnly:  { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', backgroundColor: '#fff', color: '#272525', textAlign: 'center', boxSizing: 'border-box' },
-  selectIcon:      { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
+  // ── CAMBIO: fondo gris claro y cursor default para indicar que es solo lectura ──
+  inputReadOnly:   { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box', backgroundColor: '#F7F7F7', cursor: 'default' },
   logoBox:         { display: 'flex', alignItems: 'center', gap: '24px' },
   fotoCirculo:     { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#EFEFEF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', flexShrink: 0 },
   fotoImg:         { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover' },

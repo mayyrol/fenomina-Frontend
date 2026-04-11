@@ -1,6 +1,6 @@
 import { CheckCircle, AlertCircle } from 'lucide-react';
 
-export default function MensajeModal({ tipo, onClose }) {
+export default function MensajeModal({ tipo, mensaje, onClose }) {
   if (!tipo) return null;
 
   const exitoso = tipo === 'exito';
@@ -9,7 +9,6 @@ export default function MensajeModal({ tipo, onClose }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
 
-        {/* Ícono */}
         <div style={{ ...styles.iconoCirculo, backgroundColor: exitoso ? '#E8F5E9' : '#FFF8E1' }}>
           {exitoso
             ? <CheckCircle size={48} color="#0B662A" strokeWidth={1.5} />
@@ -17,20 +16,20 @@ export default function MensajeModal({ tipo, onClose }) {
           }
         </div>
 
-        {/* Título */}
         <p style={styles.titulo}>
           {exitoso ? '¡Perfecto!' : '¡Ups!'}
         </p>
 
-        {/* Mensaje */}
+        {/* ── CAMBIO: usa la prop mensaje si viene, si no usa el texto por defecto ── */}
         <p style={styles.mensaje}>
-          {exitoso
-            ? 'La información ha sido guardada exitosamente.'
-            : 'Algo ha salido mal. Intentalo de nuevo.'
+          {mensaje
+            ? mensaje
+            : exitoso
+              ? 'La información ha sido guardada exitosamente.'
+              : 'Algo ha salido mal. Intentalo de nuevo.'
           }
         </p>
 
-        {/* Botón */}
         <button style={styles.btn} onClick={onClose}>Ok</button>
 
       </div>

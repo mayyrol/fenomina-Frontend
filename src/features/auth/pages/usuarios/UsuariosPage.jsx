@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
 import { Search, ChevronDown, UserRound, CheckCircle2, AlertTriangle, Eye } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAccionesUsuario } from '../../hooks/useAccionesUsuario';
+import { useEmpresasLista } from '../../hooks/useEmpresasLista';
 
 function Modal({ tipo, mensaje, onAceptar, onCancelar }) {
   const esConfirmacion = tipo === 'confirmacion';
@@ -43,7 +44,7 @@ export default function UsuariosPage() {
     SUPER_ADMIN: 'Super Admin', RRHH: 'Recursos Humanos',
     AUDITOR: 'Auditor', CLIENTE_EMPRESA: 'Cliente Empresa',
   };
-  const [tabActiva, setTabActiva] = useState('activos'); // MANTENER
+  const [tabActiva, setTabActiva] = useState('activos');
   const [dropdownAbierto, setDropdownAbierto] = useState(null);
   const [modal, setModal] = useState(null);
   const [paginaActual, setPaginaActual] = useState(1);
@@ -52,14 +53,19 @@ export default function UsuariosPage() {
   const dropdownRef = useRef(null);
 
   const { ejecutar } = useAccionesUsuario(
-    () => {
-      setModal({ tipo: 'exito', mensaje: 'El estado del usuario ha sido actualizado exitosamente.' });
-    },
+    () => { setModal({ tipo: 'exito', mensaje: 'El estado del usuario ha sido actualizado exitosamente.' }); },
     () => setModal({ tipo: 'error', mensaje: 'No se pudo cambiar el estado. Intenta de nuevo.' })
   );
 
   const { usuarios, cargando, error, recargar } = useUsuarios();
   const { usuario } = useAuthStore();
+  const { empresas } = useEmpresasLista();
+
+  const mapaEmpresas = useMemo(() => {
+    const mapa = {};
+    empresas.forEach(e => { mapa[e.empresaId] = e.nombreEmpresa; });
+    return mapa;
+  }, [empresas]);
 
   useEffect(() => {
     const handleClickFuera = (e) => {
@@ -71,17 +77,18 @@ export default function UsuariosPage() {
     return () => document.removeEventListener('mousedown', handleClickFuera);
   }, []);
 
-  // MODIFICAR LA LÓGICA DE FILTRADO
   const usuariosFiltrados = usuarios.filter((u) => {
     const textoBusqueda = busqueda.toLowerCase();
 
     const coincideBusqueda =
-      u.nombresUsuario.toLowerCase().includes(textoBusqueda) ||
-      u.apellidosUsuario.toLowerCase().includes(textoBusqueda) ||
-      u.userName.toLowerCase().includes(textoBusqueda) ||
+      u.nombresUsuario?.toLowerCase().includes(textoBusqueda) ||
+      u.apellidosUsuario?.toLowerCase().includes(textoBusqueda) ||
+      u.userName?.toLowerCase().includes(textoBusqueda) ||
       u.numIdentiUsuario?.toLowerCase().includes(textoBusqueda) ||
       (LABEL_ROL[u.rolUsuario] || '').toLowerCase().includes(textoBusqueda) ||
-      u.rolUsuario?.toLowerCase().includes(textoBusqueda);
+      u.rolUsuario?.toLowerCase().includes(textoBusqueda) ||
+      u.cargoUsuario?.toLowerCase().includes(textoBusqueda) ||
+      (u.fkIdEmpresa ? (mapaEmpresas[u.fkIdEmpresa] ?? '').toLowerCase().includes(textoBusqueda) : false);
 
     const coincideFecha = fechaBusqueda
       ? (() => {
@@ -96,7 +103,6 @@ export default function UsuariosPage() {
         })()
       : true;
 
-    // NUEVA LÓGICA DE FILTRADO POR TAB
     let coincideTab;
     if (tabActiva === 'activos') {
       coincideTab = u.estadoUsuario === true && u.bloqueadoLogin === false;
@@ -113,7 +119,6 @@ export default function UsuariosPage() {
   const inicio = (paginaActual - 1) * resultadosPorPagina;
   const usuariosPagina = usuariosFiltrados.slice(inicio, inicio + resultadosPorPagina);
 
-  // MODIFICAR getEstadoEstilo - ya no muestra "Bloqueado" aquí
   const getEstadoEstilo = (u) => {
     if (u.estadoUsuario === true) return { label: 'Activo', color: '#0B662A' };
     return { label: 'Inactivo', color: '#e53e3e' };
@@ -167,11 +172,12 @@ export default function UsuariosPage() {
       {/* Total + búsqueda */}
       <div style={styles.panelSuperior}>
         <div style={styles.barraAcciones}>
-          <div>
+          <div style={{ flexShrink: 0 }}>
             <span style={styles.totalLabel}>{usuariosFiltrados.length}</span>
             <p style={styles.totalSub}>Total usuarios</p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* ── CAMBIO responsive: flex-wrap para que los filtros bajen en pantallas chicas ── */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <div style={styles.searchWrapper}>
               <Search size={16} color="#A3A3A3" style={styles.searchIcon} />
               <input type="text" placeholder="Buscar usuario por palabra clave"
@@ -194,16 +200,14 @@ export default function UsuariosPage() {
           onMouseLeave={() => setHoverCrear(false)}
           style={{
             ...styles.btnCrear,
-            background: hoverCrear
-              ? 'linear-gradient(135deg, #0B662A 0%, #20B445 100%)'
-              : '#0B662A',
+            background: hoverCrear ? 'linear-gradient(135deg, #0B662A 0%, #20B445 100%)' : '#0B662A',
           }}
         >
           Crear usuario
         </button>
       </div>
 
-      {/* MODIFICAR TABS - Agregar tercera pestaña */}
+      {/* Tabs */}
       <div style={styles.tabs}>
         {['activos', 'inactivos', 'bloqueados'].map((tab) => (
           <button key={tab} onClick={() => { setTabActiva(tab); setPaginaActual(1); }}
@@ -235,129 +239,109 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      {/* TABLA - Modificar headers según tab */}
+      {/* Tabla — ── CAMBIO responsive: overflowX auto para scroll horizontal ── */}
       <div style={styles.tablaWrapper}>
         <h2 style={styles.tablaTitulo}>Todos los Usuarios</h2>
-        <table style={styles.tabla}>
-          <thead>
-            <tr>
-              {tabActiva === 'bloqueados' ? (
-                // Headers para tab bloqueados
-                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acceso login', 'Acciones'].map((col) => (
-                  <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: '12px 16px' }}>{col}</th>
-                ))
+        <div style={{ overflowX: 'auto', width: '100%' }}>
+          <table style={styles.tabla}>
+            <thead>
+              <tr>
+                {tabActiva === 'bloqueados' ? (
+                  ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'Empresa', 'Fecha registro', 'Estado', 'Acceso login', 'Acciones'].map((col) => (
+                    <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: '12px 16px' }}>{col}</th>
+                  ))
+                ) : (
+                  ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
+                    <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: col === 'Acciones' ? '12px 16px' : col === 'Estado' ? '12px 10px' : '12px 16px' }}>{col}</th>
+                  ))
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {usuariosPagina.length === 0 ? (
+                <tr><td colSpan={tabActiva === 'bloqueados' ? 12 : 11} style={styles.sinResultados}>No se encontraron usuarios.</td></tr>
               ) : (
-                // Headers para tabs activos/inactivos
-                ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'ID Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
-                  <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: col === 'Acciones' ? '12px 16px' : col === 'Estado' ? '12px 10px' : '12px 16px' }}>{col}</th>
-                ))
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {usuariosPagina.length === 0 ? (
-              <tr><td colSpan={tabActiva === 'bloqueados' ? 12 : 11} style={styles.sinResultados}>No se encontraron usuarios.</td></tr>
-            ) : (
-              usuariosPagina.map((u, index) => (
-                <tr key={u.usuarioId} style={styles.tr}>
-                  <td style={styles.td}>{String(inicio + index + 1).padStart(2, '0')}</td>
-                  <td style={styles.td}>{u.nombresUsuario}</td>
-                  <td style={styles.td}>{u.apellidosUsuario}</td>
-                  <td style={styles.td}>{u.cargoUsuario}</td>
-                  <td style={styles.td}>{u.numIdentiUsuario}</td>
-                  <td style={styles.td}>{u.userName}</td>
-                  <td style={styles.td}>{u.rolUsuario || '—'}</td>
-                  <td style={styles.td}>{u.fkIdEmpresa ?? 'Todas'}</td>                  
-                  <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
-                  
-                  {/* COLUMNA ESTADO */}
-                  <td style={{ ...styles.td, position: 'relative', padding: '12px 16px' }}>
-                    {tabActiva === 'bloqueados' ? (
-                      // En tab bloqueados: estado sin dropdown
-                      <div style={{
-                        ...styles.estadoBadge,
-                        color: getEstadoEstilo(u).color,
-                        cursor: 'default'
-                      }}>
-                        <span>{getEstadoEstilo(u).label}</span>
-                      </div>
-                    ) : (
-                      // En tabs activos/inactivos: estado con dropdown
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
-                        <button
-                          onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
-                          style={{ ...styles.estadoBadge, color: getEstadoEstilo(u).color }}
-                        >
-                          <span>{getEstadoEstilo(u).label}</span>
-                          <ChevronDown size={14} color="#A3A3A3" />
-                        </button>
-                        {dropdownAbierto === u.usuarioId && (
-                          <div style={styles.dropdown}>
-                            <button
-                              style={{
-                                ...styles.dropdownItem,
-                                color: '#0B662A',
-                                backgroundColor: u.estadoUsuario === true ? '#f5fbf7' : 'transparent',
-                              }}
-                              onClick={() => u.estadoUsuario === false && solicitarAccion('activar', u.usuarioId)}
-                            >
-                              <span>Activo</span>
-                              {u.estadoUsuario === true && (
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                  <path d="M2 7L5.5 10.5L12 3.5" stroke="#0B662A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              style={{
-                                ...styles.dropdownItem,
-                                color: '#e53e3e',
-                                backgroundColor: u.estadoUsuario === false ? '#fff5f5' : 'transparent',
-                              }}
-                              onClick={() => u.estadoUsuario === true && solicitarAccion('inactivar', u.usuarioId)}
-                            >
-                              <span>Inactivo</span>
-                              {u.estadoUsuario === false && (
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                  <path d="M2 7L5.5 10.5L12 3.5" stroke="#e53e3e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </td>
+                usuariosPagina.map((u, index) => (
+                  <tr key={u.usuarioId} style={styles.tr}>
+                    <td style={styles.td}>{String(inicio + index + 1).padStart(2, '0')}</td>
+                    <td style={styles.td}>{u.nombresUsuario}</td>
+                    <td style={styles.td}>{u.apellidosUsuario}</td>
+                    <td style={styles.td}>{u.cargoUsuario}</td>
+                    <td style={styles.td}>{u.numIdentiUsuario}</td>
+                    <td style={styles.td}>{u.userName}</td>
+                    <td style={styles.td}>{u.rolUsuario || '—'}</td>
+                    <td style={styles.td}>{u.fkIdEmpresa ? (mapaEmpresas[u.fkIdEmpresa] ?? `Empresa ID: ${u.fkIdEmpresa}`) : 'Todas'}</td>
+                    <td style={styles.td}>{formatearFecha(u.createdAt)}</td>
 
-                  {/* COLUMNA ACCESO LOGIN (solo en tab bloqueados) */}
-                  {tabActiva === 'bloqueados' && (
-                    <td style={{ ...styles.td, padding: '12px 16px' }}>
-                      <button
-                        onClick={() => solicitarAccion('desbloquear-login', u.usuarioId)}
-                        style={{
-                          ...styles.estadoBadge,
-                          color: '#b45309',
-                          cursor: 'pointer',
-                          border: '1px solid #fbbf24',
-                          backgroundColor: '#fef3c7'
-                        }}
-                      >
-                        <span>Bloqueado</span>
+                    {/* COLUMNA ESTADO */}
+                    <td style={{ ...styles.td, position: 'relative', padding: '12px 16px' }}>
+                      {tabActiva === 'bloqueados' ? (
+                        <div style={{ ...styles.estadoBadge, color: getEstadoEstilo(u).color, cursor: 'default' }}>
+                          <span>{getEstadoEstilo(u).label}</span>
+                        </div>
+                      ) : (
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                          <button
+                            onClick={() => setDropdownAbierto(dropdownAbierto === u.usuarioId ? null : u.usuarioId)}
+                            style={{ ...styles.estadoBadge, color: getEstadoEstilo(u).color }}
+                          >
+                            <span>{getEstadoEstilo(u).label}</span>
+                            <ChevronDown size={14} color="#A3A3A3" />
+                          </button>
+                          {dropdownAbierto === u.usuarioId && (
+                            <div style={styles.dropdown}>
+                              <button
+                                style={{ ...styles.dropdownItem, color: '#0B662A', backgroundColor: u.estadoUsuario === true ? '#f5fbf7' : 'transparent' }}
+                                onClick={() => u.estadoUsuario === false && solicitarAccion('activar', u.usuarioId)}
+                              >
+                                <span>Activo</span>
+                                {u.estadoUsuario === true && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M2 7L5.5 10.5L12 3.5" stroke="#0B662A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                style={{ ...styles.dropdownItem, color: '#e53e3e', backgroundColor: u.estadoUsuario === false ? '#fff5f5' : 'transparent' }}
+                                onClick={() => u.estadoUsuario === true && solicitarAccion('inactivar', u.usuarioId)}
+                              >
+                                <span>Inactivo</span>
+                                {u.estadoUsuario === false && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M2 7L5.5 10.5L12 3.5" stroke="#e53e3e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* COLUMNA ACCESO LOGIN (solo en tab bloqueados) */}
+                    {tabActiva === 'bloqueados' && (
+                      <td style={{ ...styles.td, padding: '12px 16px' }}>
+                        <button
+                          onClick={() => solicitarAccion('desbloquear-login', u.usuarioId)}
+                          style={{ ...styles.estadoBadge, color: '#b45309', cursor: 'pointer', border: '1px solid #fbbf24', backgroundColor: '#fef3c7' }}
+                        >
+                          <span>Bloqueado</span>
+                        </button>
+                      </td>
+                    )}
+
+                    {/* COLUMNA ACCIONES */}
+                    <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
+                      <button onClick={() => navigate(`/usuarios/${u.usuarioId}`)} style={styles.btnAccion} title="Ver detalle">
+                        <Eye size={17} color="#777777" />
                       </button>
                     </td>
-                  )}
-
-                  {/* COLUMNA ACCIONES */}
-                  <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
-                    <button onClick={() => navigate(`/usuarios/${u.usuarioId}`)} style={styles.btnAccion} title="Ver detalle">
-                      <Eye size={17} color="#777777" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Paginación */}
@@ -379,156 +363,57 @@ export default function UsuariosPage() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  mensaje: { textAlign: 'center', padding: '40px', color: '#A3A3A3' },
-  mensajeError: { textAlign: 'center', padding: '40px', color: '#e53e3e' },
-  encabezado: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  titulo: { fontSize: '20px', fontWeight: '800', color: '#272525' },
-  subtitulo: { fontSize: '12px', color: '#A3A3A3', marginTop: '2px' },
-  panelSuperior: {
-    backgroundColor: '#ffffff', borderRadius: '10px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px 24px',
-  },
-  barraAcciones: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: '28px', fontWeight: '800', color: '#272525' },
-  totalSub: { fontSize: '12px', color: '#A3A3A3' },
-  searchWrapper: { position: 'relative', display: 'flex', alignItems: 'center', width: '420px' },
-  searchIcon: { position: 'absolute', left: '12px' },
-  searchInput: {
-    width: '100%', padding: '9px 12px 9px 36px',
-    border: '1.5px solid #0B662A', borderRadius: '8px',
-    fontSize: '13px', color: '#272525', outline: 'none',
-    fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB',
-  },
-  filaBotones: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '10px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-  },
-  creaLabel: { fontSize: '14px', fontWeight: '800', color: '#272525' },
-  btnCrear: {
-    color: '#ffffff', border: 'none', borderRadius: '8px',
-    padding: '10px 60px', fontSize: '13px', fontWeight: '400',
-    cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
-    transition: 'background 0.3s ease',
-  },
-  tabs: {
-    display: 'flex', gap: '24px', backgroundColor: '#ffffff',
-    padding: '0 24px', borderRadius: '10px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: '52px', alignItems: 'center',
-  },
-  tab: {
-    background: 'none', border: 'none', padding: '16px 0',
-    fontSize: '13px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
-  },
-  controlesTabla: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '0 4px',
-  },
-  showingText: { fontSize: '12px', color: '#A3A3A3' },
-  selectorWrapper: { display: 'flex', alignItems: 'center', gap: '8px' },
-  selectorLabel: { fontSize: '12px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif' },
-  selector: {
-    padding: '6px 32px 6px 12px',
-    border: '1px solid #D0D0D0',
-    borderRadius: '8px',
-    fontSize: '13px',
-    fontFamily: 'Nunito, sans-serif',
-    color: '#272525',
-    outline: 'none',
-    cursor: 'pointer',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-  },
-  tablaWrapper: {
-    backgroundColor: '#ffffff', borderRadius: '10px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-  },
-  tablaTitulo: {
-    fontSize: '14px', fontWeight: '700', color: '#272525',
-    padding: '16px 20px', borderBottom: '1px solid #D0D0D0',
-  },
-  tabla: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    textAlign: 'left', padding: '12px 16px', fontSize: '12px',
-    fontWeight: '700', color: '#A3A3A3', borderBottom: '1px solid #D0D0D0',
-  },
-  td: { padding: '12px 16px', fontSize: '13px', color: '#272525', borderBottom: '1px solid #f0f0f0' },
-  tr: { transition: 'background-color 0.15s' },
-  sinResultados: { textAlign: 'center', padding: '32px', color: '#A3A3A3', fontSize: '13px' },
-  estadoBadge: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between',
-    gap: '8px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px',
-    fontWeight: '400', backgroundColor: '#ffffff',
-    border: '1px solid #D0D0D0', cursor: 'pointer', minWidth: '95px',
-  },
-  dropdown: {
-    position: 'absolute', top: '110%', left: 0,
-    backgroundColor: '#ffffff', border: '1px solid #D0D0D0',
-    borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-    zIndex: 999, width: '110px', padding: '4px 0',
-  },
-  dropdownItem: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    width: '100%', padding: '10px 14px', background: 'none', border: 'none',
-    textAlign: 'left', fontSize: '13px', fontWeight: '400',
-    fontFamily: 'Nunito, sans-serif', cursor: 'pointer',
-  },
-  paginacion: {
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
-    gap: '6px', paddingTop: '8px',
-  },
-  pageBtn: {
-    width: '34px', height: '34px', borderRadius: '6px',
-    border: '1px solid #D0D0D0', background: '#ffffff',
-    fontSize: '13px', fontWeight: '600', color: '#272525',
-    cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
-  },
-  pageBtnActivo: { backgroundColor: '#0B662A', color: '#ffffff', border: '1px solid #0B662A' },
-  userInfo: { display: 'flex', alignItems: 'center', gap: '10px' },
-  userAvatar: {
-    width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e0e0e0',
-    color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontWeight: '700', fontSize: '15px',
-  },
-  userName: { fontSize: '13px', fontWeight: '700', color: '#272525', lineHeight: 1.2 },
-  userCargo: { fontSize: '11px', color: '#A3A3A3' },
-  modalOverlay: {
-    position: 'fixed', inset: 0,
-    backgroundColor: 'rgba(14, 78, 30, 0.15)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-  },
-  modalBox: {
-    backgroundColor: '#ffffff', borderRadius: '16px',
-    padding: '36px 32px', maxWidth: '380px', width: '90%',
-    textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-  },
-  modalIconCircle: {
-    width: '72px', height: '72px', borderRadius: '50%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    margin: '0 auto 16px',
-  },
-  modalTitulo: { fontSize: '16px', fontWeight: '800', color: '#272525', marginBottom: '10px' },
-  modalMensaje: { fontSize: '13px', color: '#555', marginBottom: '24px', lineHeight: 1.6 },
-  modalBotones: { display: 'flex', justifyContent: 'center', gap: '12px' },
-  btnCancelar: {
-    padding: '10px 24px', backgroundColor: '#ffffff', color: '#272525',
-    border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px',
-    fontWeight: '600', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
-  },
-  btnConfirmar: {
-    padding: '10px 24px', backgroundColor: '#0B662A', color: '#ffffff',
-    border: 'none', borderRadius: '8px', fontSize: '13px',
-    fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
-  },
-  btnAccion: {
-    background: 'none', border: 'none', cursor: 'pointer',
-    padding: '6px', borderRadius: '6px', display: 'inline-flex',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  inputFecha: {
-    padding: '9px 12px', border: '1.5px solid #0B662A', borderRadius: '8px',
-    fontSize: '13px', color: '#272525', outline: 'none',
-    fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', cursor: 'pointer',
-  },
+  // ── CAMBIO responsive: width 100%, boxSizing border-box, minWidth 0 ──
+  container:      { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box', minWidth: 0 },
+  mensaje:        { textAlign: 'center', padding: '40px', color: '#A3A3A3' },
+  mensajeError:   { textAlign: 'center', padding: '40px', color: '#e53e3e' },
+  encabezado:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
+  titulo:         { fontSize: '20px', fontWeight: '800', color: '#272525' },
+  subtitulo:      { fontSize: '12px', color: '#A3A3A3', marginTop: '2px' },
+  panelSuperior:  { backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px 24px', width: '100%', boxSizing: 'border-box' },
+  barraAcciones:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
+  totalLabel:     { fontSize: '28px', fontWeight: '800', color: '#272525' },
+  totalSub:       { fontSize: '12px', color: '#A3A3A3' },
+  // ── CAMBIO responsive: searchWrapper con width flexible ──
+  searchWrapper:  { position: 'relative', display: 'flex', alignItems: 'center', width: '320px', minWidth: '180px' },
+  searchIcon:     { position: 'absolute', left: '12px' },
+  searchInput:    { width: '100%', padding: '9px 12px 9px 36px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', boxSizing: 'border-box' },
+  filaBotones:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
+  creaLabel:      { fontSize: '14px', fontWeight: '800', color: '#272525' },
+  btnCrear:       { color: '#ffffff', border: 'none', borderRadius: '8px', padding: '10px 60px', fontSize: '13px', fontWeight: '400', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', transition: 'background 0.3s ease' },
+  tabs:           { display: 'flex', gap: '24px', backgroundColor: '#ffffff', padding: '0 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: '52px', alignItems: 'center', flexWrap: 'wrap', boxSizing: 'border-box' },
+  tab:            { background: 'none', border: 'none', padding: '16px 0', fontSize: '13px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  controlesTabla: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', flexWrap: 'wrap', gap: '8px' },
+  showingText:    { fontSize: '12px', color: '#A3A3A3' },
+  selectorWrapper:{ display: 'flex', alignItems: 'center', gap: '8px' },
+  selectorLabel:  { fontSize: '12px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif' },
+  selector:       { padding: '6px 32px 6px 12px', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', color: '#272525', outline: 'none', cursor: 'pointer', backgroundColor: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
+  // ── CAMBIO responsive: overflow hidden en wrapper, scroll horizontal en tabla ──
+  tablaWrapper:   { backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' },
+  tablaTitulo:    { fontSize: '14px', fontWeight: '700', color: '#272525', padding: '16px 20px', borderBottom: '1px solid #D0D0D0' },
+  tabla:          { width: '100%', borderCollapse: 'collapse', minWidth: '1000px' },
+  th:             { textAlign: 'left', padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#A3A3A3', borderBottom: '1px solid #D0D0D0', whiteSpace: 'nowrap' },
+  td:             { padding: '12px 16px', fontSize: '13px', color: '#272525', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' },
+  tr:             { transition: 'background-color 0.15s' },
+  sinResultados:  { textAlign: 'center', padding: '32px', color: '#A3A3A3', fontSize: '13px' },
+  estadoBadge:    { display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '400', backgroundColor: '#ffffff', border: '1px solid #D0D0D0', cursor: 'pointer', minWidth: '95px' },
+  dropdown:       { position: 'absolute', top: '110%', left: 0, backgroundColor: '#ffffff', border: '1px solid #D0D0D0', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 999, width: '110px', padding: '4px 0' },
+  dropdownItem:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: '400', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  paginacion:     { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', paddingTop: '8px', flexWrap: 'wrap' },
+  pageBtn:        { width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #D0D0D0', background: '#ffffff', fontSize: '13px', fontWeight: '600', color: '#272525', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  pageBtnActivo:  { backgroundColor: '#0B662A', color: '#ffffff', border: '1px solid #0B662A' },
+  userInfo:       { display: 'flex', alignItems: 'center', gap: '10px' },
+  userAvatar:     { width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e0e0e0', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px' },
+  userName:       { fontSize: '13px', fontWeight: '700', color: '#272525', lineHeight: 1.2 },
+  userCargo:      { fontSize: '11px', color: '#A3A3A3' },
+  modalOverlay:   { position: 'fixed', inset: 0, backgroundColor: 'rgba(14, 78, 30, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modalBox:       { backgroundColor: '#ffffff', borderRadius: '16px', padding: '36px 32px', maxWidth: '380px', width: '90%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
+  modalIconCircle:{ width: '72px', height: '72px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' },
+  modalTitulo:    { fontSize: '16px', fontWeight: '800', color: '#272525', marginBottom: '10px' },
+  modalMensaje:   { fontSize: '13px', color: '#555', marginBottom: '24px', lineHeight: 1.6 },
+  modalBotones:   { display: 'flex', justifyContent: 'center', gap: '12px' },
+  btnCancelar:    { padding: '10px 24px', backgroundColor: '#ffffff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  btnConfirmar:   { padding: '10px 24px', backgroundColor: '#0B662A', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  btnAccion:      { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  inputFecha:     { padding: '9px 12px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', cursor: 'pointer' },
 };
