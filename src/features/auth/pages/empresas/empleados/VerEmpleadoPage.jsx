@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from "../../../../../store/authStore";
-import { Users, ChevronDown, Calendar , UserRound} from 'lucide-react';
+import { Users, UserRound } from 'lucide-react';
 import empleadosService from '../../../../../services/empleadosService';
 
 export default function VerEmpleadoPage() {
@@ -9,9 +9,8 @@ export default function VerEmpleadoPage() {
   const { id, empleadoId } = useParams();
   const { usuario } = useAuthStore();
 
-  const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
-  const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
-  const cargo   = usuario?.cargoUsuario ?? '';
+  const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
+  const cargo  = usuario?.cargoUsuario ?? '';
 
   const [hoverEditar,   setHoverEditar]   = useState(false);
   const [hoverRegresar, setHoverRegresar] = useState(false);
@@ -46,9 +45,7 @@ export default function VerEmpleadoPage() {
   };
 
   const LABEL_JORNADA = {
-    'UNICA':    'Única',
-    'TURNOS':   'Turnos',
-    'ROTATIVA': 'Rotativa',
+    'UNICA': 'Única', 'TURNOS': 'Turnos', 'ROTATIVA': 'Rotativa',
   };
 
   const LABEL_TIPO_COTIZANTE = {
@@ -78,11 +75,7 @@ export default function VerEmpleadoPage() {
   };
 
   const LABEL_CLASE_RIESGO = {
-    'CLASE_I':   'I',
-    'CLASE_II':  'II',
-    'CLASE_III': 'III',
-    'CLASE_IV':  'IV',
-    'CLASE_V':   'V',
+    'CLASE_I':'I', 'CLASE_II':'II', 'CLASE_III':'III', 'CLASE_IV':'IV', 'CLASE_V':'V',
   };
 
   const formatearFecha = (fecha) => {
@@ -94,7 +87,7 @@ export default function VerEmpleadoPage() {
   return (
     <div style={styles.container}>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Users size={18} color="#0B662A" />
@@ -121,25 +114,25 @@ export default function VerEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>Tipo de documento<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.tipoDocumento} style={styles.inputRO} />
+            <input readOnly value={empleado.tipoDocumento ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Número de documento<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.documentoEmp} style={styles.inputRO} />
+            <input readOnly value={empleado.documentoEmp ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Nombre(s) Empleado<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.nombresEmp} style={styles.inputRO} />
+            <input readOnly value={empleado.nombresEmp ?? ''} style={styles.inputRO} />
           </div>
         </div>
         <div style={{ ...styles.fila3, marginTop: '20px' }}>
           <div style={styles.campo}>
             <label style={styles.label}>Apellidos Empleado<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.apellidosEmp} style={styles.inputRO} />
+            <input readOnly value={empleado.apellidosEmp ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Dirección Empleado</label>
-            <input readOnly value={empleado.direccionEmp} style={styles.inputRO} />
+            <input readOnly value={empleado.direccionEmp ?? ''} style={styles.inputRO} />
           </div>
           <div />
         </div>
@@ -151,7 +144,7 @@ export default function VerEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>Cargo</label>
-            <input readOnly value={empleado.cargoEmp} placeholder="Ingresar cargo" style={styles.inputRO} />
+            <input readOnly value={empleado.cargoEmp ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Tipo de contrato</label>
@@ -195,10 +188,10 @@ export default function VerEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>Salario básico mensual</label>
-            <input readOnly value={empleado.salarioBascMensual} placeholder="Ingresar valor" style={styles.inputRO} />
+            <input readOnly value={empleado.salarioBascMensual ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
-            <label style={styles.label}>Auxilio de transporte<span style={styles.req}>*</span></label>
+            <label style={styles.label}>Auxilio de transporte</label>
             <input readOnly value={empleado.tieneAuxTransporte ? 'SI' : 'NO'} style={styles.inputRO} />
           </div>
           <div />
@@ -210,35 +203,35 @@ export default function VerEmpleadoPage() {
         <p style={styles.seccionTitulo}>Seguridad Social, Riesgos Laborales y Prestaciones Sociales</p>
         <div style={styles.fila3}>
           <div style={styles.campo}>
-            <label style={styles.label}>EPS (Entidad Promotora de Salud)<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.nombreEps} placeholder="Ingresar dato" style={styles.inputRO} />
+            <label style={styles.label}>EPS (Entidad Promotora de Salud)</label>
+            <input readOnly value={empleado.nombreEps ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
-            <label style={styles.label}>Fondo de pensiones<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.fondoPensionEmp} placeholder="Ingresar dato" style={styles.inputRO} />
+            <label style={styles.label}>Fondo de pensiones</label>
+            <input readOnly value={empleado.fondoPensionEmp ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
-            <label style={styles.label}>ARL (Administradora de Riesgos Laborales)<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.nombreArl} placeholder="Ingresar dato" style={styles.inputRO} />
+            <label style={styles.label}>ARL (Administradora de Riesgos Laborales)</label>
+            <input readOnly value={empleado.nombreArl ?? ''} style={styles.inputRO} />
           </div>
         </div>
         <div style={{ ...styles.fila3, marginTop: '20px' }}>
           <div style={styles.campo}>
-            <label style={styles.label}>Clase de Riesgo<span style={styles.req}>*</span></label>
+            <label style={styles.label}>Clase de Riesgo</label>
             <input readOnly value={LABEL_CLASE_RIESGO[empleado.claseRiesgo] ?? '—'} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
-            <label style={styles.label}>Fondo de cesantías<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.fondoCesantiasEmp} placeholder="Ingresar dato" style={styles.inputRO} />
+            <label style={styles.label}>Fondo de cesantías</label>
+            <input readOnly value={empleado.fondoCesantiasEmp ?? ''} style={styles.inputRO} />
           </div>
           <div style={styles.campo}>
-            <label style={styles.label}>Caja de compensación<span style={styles.req}>*</span></label>
-            <input readOnly value={empleado.cajaCompensacion} placeholder="Ingresar dato" style={styles.inputRO} />
+            <label style={styles.label}>Caja de compensación</label>
+            <input readOnly value={empleado.cajaCompensacion ?? ''} style={styles.inputRO} />
           </div>
         </div>
       </div>
 
-      {/* ── Sección 5: Conceptos — CAMBIO: solo se muestra si hay conceptos registrados ── */}
+      {/* ── Sección 5: Conceptos — solo visible si el empleado tiene conceptos ── */}
       {conceptos && conceptos.length > 0 && (
         <div style={styles.card}>
           <p style={styles.seccionTitulo}>Conceptos de Liquidación de Nómina Permanentes</p>
@@ -250,21 +243,11 @@ export default function VerEmpleadoPage() {
             <div key={i} style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', marginBottom: '16px' }}>
               <div style={{ ...styles.campo, flex: 1 }}>
                 {i === 0 && <label style={styles.label}>Nombre concepto</label>}
-                <div style={styles.selectWrapper}>
-                  <select disabled value={c.nombre} style={styles.selectRO}>
-                    <option value="">Seleccionar opción</option>
-                    <option value="beneficio">Beneficio o Extralegal</option>
-                    <option value="bonificacion">Bonificaciones Habituales</option>
-                    <option value="viaticos">Viáticos Permanentes</option>
-                    <option value="constituyen">Otros pagos que constituyen salario</option>
-                    <option value="no_constituyen">Otros pagos que no constituyen salario</option>
-                  </select>
-                  <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
-                </div>
+                <input readOnly value={c.conceptoNombre ?? ''} style={styles.inputRO} />
               </div>
               <div style={{ ...styles.campo, flex: 1 }}>
                 {i === 0 && <label style={styles.label}>Valor neto (mensual)</label>}
-                <input readOnly value={c.valor} placeholder="Ingresar valor" style={styles.inputRO} />
+                <input readOnly value={c.valorFijo ?? ''} style={styles.inputRO} />
               </div>
               <div style={{ width: '88px' }} />
             </div>
@@ -275,25 +258,17 @@ export default function VerEmpleadoPage() {
       {/* ── Botones ── */}
       <div style={styles.botonesRow}>
         <button
-          style={{
-            ...styles.btnRegresar,
-            background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff',
-            transition: 'background 0.3s ease',
-          }}
+          style={{ ...styles.btnRegresar, background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverRegresar(true)}
           onMouseLeave={() => setHoverRegresar(false)}
           onClick={() => navigate(-1)}
         >
           Regresar
         </button>
-        
+
         {usuario?.rolUsuario !== 'CLIENTE_EMPRESA' && usuario?.rolUsuario !== 'AUDITOR' && (
           <button
-            style={{
-              ...styles.btnEditar,
-              background: hoverEditar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
-              transition: 'background 0.3s ease',
-            }}
+            style={{ ...styles.btnEditar, background: hoverEditar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
             onMouseEnter={() => setHoverEditar(true)}
             onMouseLeave={() => setHoverEditar(false)}
             onClick={() => navigate(`/empresas/${id}/empleados/${empleadoId}/editar`)}
@@ -301,7 +276,6 @@ export default function VerEmpleadoPage() {
             Editar Información
           </button>
         )}
-        
       </div>
 
     </div>
@@ -314,7 +288,7 @@ const styles = {
   titulo:           { fontSize: '18px', fontWeight: '800', color: '#272525', margin: 0 },
   subtitulo:        { fontSize: '12px', color: '#A3A3A3', margin: 0 },
   perfilBox:        { display: 'flex', alignItems: 'center', gap: '10px' },
-  avatar:           { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', color: '#272525', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 },
+  avatar:           { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre:     { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:      { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
   formTitulo:       { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 34px 0' },
@@ -325,10 +299,7 @@ const styles = {
   campo:            { display: 'flex', flexDirection: 'column', gap: '8px' },
   label:            { fontSize: '13px', fontWeight: '600', color: '#272525' },
   req:              { color: '#E53E3E', marginLeft: '2px' },
-  inputRO:          { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  selectWrapper:    { position: 'relative' },
-  selectRO:         { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundColor: '#fff', color: '#272525', boxSizing: 'border-box', backgroundImage: 'none' },
-  selectIcon:       { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
+  inputRO:          { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff' },
   botonesRow:       { display: 'flex', gap: '16px', justifyContent: 'center', paddingBottom: '16px' },
   btnRegresar:      { color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   btnEditar:        { color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
