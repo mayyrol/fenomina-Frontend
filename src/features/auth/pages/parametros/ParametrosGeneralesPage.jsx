@@ -1,9 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
 import { Settings2, ChevronDown, Plus, Trash2, UserRound } from 'lucide-react';
 import MensajeModal from '../../../../components/MensajeModal';
 import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal';
+import parametrosService from '../../../../services/parametrosService';
+
+const MAPA_PARAMETRO_NOMBRE = {
+  // Valores Base
+  'SMMLV (SALARIO MÍNIMO)':                    'SMMLV',
+  'AUXILIO DE TRANSPORTE':                     'AUXILIO_TRANSPORTE',
+  'VALOR UVT (UNIDAD DE VALOR TRIBUTARIO)':    'VALOR_UVT',
+  'SANCIÓN MÍNIMA DIAN (10 UVT)':              'SANCION_MINIMA_DIAN',
+  'TOPE DE COTIZACIÓN (IBC MÁXIMO)':           'TOPE_COTIZACION',
+  'SALARIO INTEGRAL MÍNIMO':                   'SALARIO_INTEGRAL_MINIMO',
+
+  // Jornada
+  'JORNADA MÁXIMA SEMANAL':                    'JORNADA_MAXIMA_SEMANAL',
+  'HORAS TRABAJADAS AL MES':                   'HORAS_TRABAJADAS_MES',
+  'VALOR HORA ORDINARIA':                      'VALOR_HORA_ORDINARIA',
+  'HORA EXTRA DIURNA':                         'EXTRA_DIURNA',
+  'HORA EXTRA NOCTURNA':                       'EXTRA_NOCTURNA',
+  'HORA EXTRA DIURNA DOMINICAL/FESTIVA':       'EXTRA_DIURNA_DOMINICAL',
+  'HORA EXTRA NOCTURNA DOMINICAL/FESTIVA':     'EXTRA_NOCTURNA_DOMINICAL',
+  'RECARGO NOCTURNO ORDINARIO':                'RECARGO_NOCTURNO',
+  'RECARGO DIURNO DOMINICAL O FESTIVO':        'RECARGO_DIURNO_DOMINICAL',
+  'RECARGO NOCTURNO DOMINICAL O FESTIVO':      'RECARGO_NOCTURNO_DOMINICAL',
+
+  // Seguridad Social
+  'SALUD (DEDUCCIÓN EMPLEADO)':                'SALUD_EMPLEADO',
+  'SALUD (DEDUCCIÓN EMPLEADOR)':               'SALUD_EMPLEADOR',
+  'PENSIÓN (DEDUCCIÓN EMPLEADO)':              'PENSION_EMPLEADO',
+  'PENSIÓN (DEDUCCIÓN EMPLEADOR)':             'PENSION_EMPLEADOR',
+  'FONDO DE SOLIDARIDAD PENSIONAL >=4 A <16':  'FONDO_SOLIDARIDAD_PENSIONAL_1',
+  'FONDO DE SOLIDARIDAD PENSIONAL >=16 A 17':  'FONDO_SOLIDARIDAD_PENSIONAL_2',
+  'FONDO DE SOLIDARIDAD PENSIONAL DE 17 A 18': 'FONDO_SOLIDARIDAD_PENSIONAL_3',
+  'FONDO DE SOLIDARIDAD PENSIONAL DE 18 A 19': 'FONDO_SOLIDARIDAD_PENSIONAL_4',
+  'FONDO DE SOLIDARIDAD PENSIONAL DE 19 A 20': 'FONDO_SOLIDARIDAD_PENSIONAL_5',
+  'FONDO DE SOLIDARIDAD PENSIONAL >20':        'FONDO_SOLIDARIDAD_PENSIONAL_6',
+  'ARL EMPLEADOR CLASE I':                     'ARL_EMPLEADOR_I',
+  'ARL EMPLEADOR CLASE II':                    'ARL_EMPLEADOR_II',
+  'ARL EMPLEADOR CLASE III':                   'ARL_EMPLEADOR_III',
+  'ARL EMPLEADOR CLASE IV':                    'ARL_EMPLEADOR_IV',
+  'ARL EMPLEADOR CLASE V':                     'ARL_EMPLEADOR_V',
+
+  // Parafiscales
+  'CAJA DE COMPENSACIÓN':                      'CAJA_COMPENSACION',
+  'SENA':                                      'SENA',
+  'ICBF':                                      'ICBF',
+
+  // Prestaciones
+  'PRIMA DE SERVICIOS':                        'PRIMA_SERVICIOS',
+  'CESANTÍAS':                                 'CESANTIAS',
+  'INTERESES SOBRE CESANTÍAS':                 'INTERESES_CESANTIAS',
+  'VACACIONES':                                'VACACIONES',
+};
+
+
+const PARAMETROS_TIPO_VALOR = new Set([
+  'SMMLV', 'AUXILIO_TRANSPORTE', 'VALOR_UVT', 'SANCION_MINIMA_DIAN',
+  'TOPE_COTIZACION', 'SALARIO_INTEGRAL_MINIMO',
+  'JORNADA_MAXIMA_SEMANAL', 'HORAS_TRABAJADAS_MES', 'VALOR_HORA_ORDINARIA',
+]);
 
 // ─── Opciones por sección ───────────────────────────────────────────────────
 const OPCIONES = {
@@ -32,8 +90,17 @@ const OPCIONES = {
     'SALUD (DEDUCCIÓN EMPLEADOR)',
     'PENSIÓN (DEDUCCIÓN EMPLEADO)',
     'PENSIÓN (DEDUCCIÓN EMPLEADOR)',
-    'FONDO DE SOLIDARIDAD PENSIONAL (DEDUCCIÓN EMPLEADO)',
-    'ARL (DEDUCCIÓN EMPLEADOR)',
+    'FONDO DE SOLIDARIDAD PENSIONAL >=4 A <16',
+    'FONDO DE SOLIDARIDAD PENSIONAL >=16 A 17',
+    'FONDO DE SOLIDARIDAD PENSIONAL DE 17 A 18',
+    'FONDO DE SOLIDARIDAD PENSIONAL DE 18 A 19',
+    'FONDO DE SOLIDARIDAD PENSIONAL DE 19 A 20',
+    'FONDO DE SOLIDARIDAD PENSIONAL >20',
+    'ARL EMPLEADOR CLASE I',
+    'ARL EMPLEADOR CLASE II',
+    'ARL EMPLEADOR CLASE III',
+    'ARL EMPLEADOR CLASE IV',
+    'ARL EMPLEADOR CLASE V',
   ],
   parafiscales: [
     'CAJA DE COMPENSACIÓN',
@@ -69,7 +136,10 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
                 ...styles.selectBtn,
                 color: fila.nombre ? '#272525' : '#A3A3A3',
               }}
-              onClick={() => setOpenDropdown(isOpen ? null : dropKey)}
+              onClick={(e) => {
+                e.stopPropagation(); // ← agrega esto
+                setOpenDropdown(isOpen ? null : dropKey);
+              }}
             >
               <span style={{ fontSize: '13px', fontFamily: 'Nunito, sans-serif' }}>
                 {fila.nombre || 'Seleccionar opción'}
@@ -87,7 +157,11 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
                     }}
                     onMouseEnter={e => { if (fila.nombre !== op) e.currentTarget.style.backgroundColor = '#fafafa'; }}
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = fila.nombre === op ? '#f0f9f4' : '#fff'; }}
-                    onClick={() => { onChange(index, 'nombre', op); setOpenDropdown(null); }}
+                    onClick={(e) => {
+                      e.stopPropagation(); // ← agrega esto también
+                      onChange(index, 'nombre', op);
+                      setOpenDropdown(null);
+                    }}
                   >
                     <span>{op}</span>
                     {fila.nombre === op && <span style={{ color: '#0B662A', fontWeight: '700' }}>✓</span>}
@@ -124,7 +198,7 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
       {/* Fila inferior: Porcentaje | Descripción | + 🗑 */}
       <div style={styles.filaInferior}>
         <div style={{ ...styles.campo, width: '220px', flexShrink: 0 }}>
-          <label style={styles.label}>Porcentaje</label>
+          <label style={styles.label}>Porcentaje (Ej: 4% = 0.04)</label>
           <input
             style={styles.input}
             placeholder="Ingresar número"
@@ -167,7 +241,7 @@ function SeccionParametros({ titulo, descripcion, opciones, filas, setter, secci
     });
   };
   const addRow    = () => setter(prev => [...prev, filaVacia()]);
-  const removeRow = (index) => setter(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== index));
+  const removeRow = (index) => setter(prev => prev.length === 1 ? [filaVacia()] : prev.filter((_, i) => i !== index));
 
   return (
     <div style={styles.seccionBloque}>
@@ -195,6 +269,13 @@ function SeccionParametros({ titulo, descripcion, opciones, filas, setter, secci
 export default function ParametrosGeneralesPage() {
   const navigate    = useNavigate();
   const { usuario } = useAuthStore();
+  const rol = usuario?.rolUsuario;
+
+  useEffect(() => {
+    if (rol && rol !== 'SUPER_ADMIN') {
+      navigate('/inicio');
+    }
+  }, [rol]);
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
@@ -216,6 +297,10 @@ export default function ParametrosGeneralesPage() {
     const secciones = [valoresBase, jornada, seguridadSocial, parafiscales, prestaciones];
     for (const seccion of secciones) {
       for (const fila of seccion) {
+        // Solo valida filas que el usuario haya empezado a llenar
+        const tocada = fila.nombre || fila.fecha || fila.valor || fila.porcentaje || fila.descripcion;
+        if (!tocada) continue; // fila vacía → la ignora
+
         if (!fila.nombre || !fila.fecha || !fila.descripcion) {
           setModalCampos(true);
           return false;
@@ -224,13 +309,59 @@ export default function ParametrosGeneralesPage() {
     }
     return true;
   };
+  
 
   const handleGuardar = async () => {
     if (!validar()) return;
-    const payload = { valoresBase, jornada, seguridadSocial, parafiscales, prestaciones };
+
+    // Construir lista de DTOs para enviar al backend
+    const todasLasFilas = [
+      ...valoresBase,
+      ...jornada,
+      ...seguridadSocial,
+      ...parafiscales,
+      ...prestaciones,
+    ];
+
+    // Filtrar filas que tengan nombre y fecha
+    const filasValidas = todasLasFilas.filter(f => f.nombre && f.fecha && f.descripcion);
+
+    if (filasValidas.length === 0) {
+      setMensajeError('Debes ingresar al menos un parámetro antes de guardar.');
+      setModal('error');
+      return;
+    }
+    // Validar que cada fila tenga valor O porcentaje pero no ambos ni ninguno
+    for (const fila of filasValidas) {
+      const tieneValor      = fila.valor      !== '' && fila.valor      != null;
+      const tienePorcentaje = fila.porcentaje !== '' && fila.porcentaje != null;
+      if ((tieneValor && tienePorcentaje) || (!tieneValor && !tienePorcentaje)) {
+        setMensajeError(`El parámetro "${fila.nombre}" debe tener exactamente un valor o un porcentaje, no ambos ni ninguno.`);
+        setModal('error');
+        return;
+      }
+    }
+
+    // Construir los DTOs
+    const dtos = filasValidas.map(fila => {
+      const enumNombre      = MAPA_PARAMETRO_NOMBRE[fila.nombre];
+      const tieneValor      = fila.valor !== '' && fila.valor != null;
+      const tienePorcentaje = fila.porcentaje !== '' && fila.porcentaje != null;
+
+      return {
+        nombreParamGeneral:    enumNombre,
+        descripcionParam:      fila.descripcion || null,
+        fechaParamGeneral:     fila.fecha,           // ya está en formato YYYY-MM-DD por el input type="date"
+        valorParamGeneral:     tieneValor      ? parseFloat(fila.valor)      : null,
+        porcentajeParamGeneral: tienePorcentaje ? parseFloat(fila.porcentaje) : null,
+      };
+    });
+
     try {
-      console.log('Guardar parámetros:', payload);
-      // TODO: await parametrosService.guardar(payload);
+      // Enviar cada parámetro individualmente al backend
+      await Promise.all(
+        dtos.map(dto => parametrosService.crearParametro(dto))
+      );
       setModal('exito');
     } catch (err) {
       const msg = err.response?.data?.message ?? '';
@@ -271,7 +402,7 @@ export default function ParametrosGeneralesPage() {
       <div style={styles.card}>
         <h3 style={styles.formTitulo}>Parámetros Generales</h3>
         <p style={styles.textoDescripcion}>
-          En este apartado, podrá definir los valores de referencia y las variables maestras que rigen el motor de cálculos de su nómina.
+          En este apartado, podrás definir los valores de referencia y las variables maestras que rigen el motor de cálculos de su nómina.
           Estos parámetros (como el Salario Mínimo Legal Vigente, el Auxilio de Transporte y los porcentajes de ley) actúan como la base
           técnica para las fórmulas de liquidación en Colombia. Al configurar estos datos, el sistema aplicará automáticamente las reglas
           de seguridad social, prestaciones sociales y deducciones parafiscales, garantizando que cada pago sea preciso, esté actualizado
@@ -293,7 +424,8 @@ export default function ParametrosGeneralesPage() {
       <div style={styles.card}>
         <SeccionParametros
           titulo="Parámetros de Jornada y Recargos (Suplementarios)"
-          descripcion="Establece la duración de la jornada laboral legal y los porcentajes adicionales por trabajo extra, nocturno, dominical o festivo."
+          descripcion="Establece la duración de la jornada laboral legal y los porcentajes adicionales por trabajo extra, nocturno, dominical o festivo.
+          (Ingrese el valor decimal. Ej: 4% = 0.04, 8.5% = 0.085)"
           opciones={OPCIONES.jornada}
           filas={jornada}
           setter={setJornada}
@@ -306,7 +438,7 @@ export default function ParametrosGeneralesPage() {
       <div style={styles.card}>
         <SeccionParametros
           titulo="Parámetros de Seguridad Social"
-          descripcion="Configura los porcentajes de aporte obligatorio a Salud, Pensión y Riesgos Laborales (ARL) tanto para el empleador como para el trabajador."
+          descripcion="Configura los porcentajes de aporte obligatorio a Salud, Pensión y Riesgos Laborales (ARL) tanto para el empleador como para el trabajador. Ingrese el valor decimal. Ej: 4% = 0.04, 8.5% = 0.085)*"
           opciones={OPCIONES.seguridadSocial}
           filas={seguridadSocial}
           setter={setSeguridadSocial}
@@ -381,7 +513,7 @@ export default function ParametrosGeneralesPage() {
         }
         onClose={() => {
           setModal(null);
-          if (modal === 'exito') navigate(-1);
+          if (modal === 'exito') navigate('/inicio');
         }}
       />
       <ConfirmarCambiosModal

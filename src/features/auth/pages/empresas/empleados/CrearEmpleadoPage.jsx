@@ -183,7 +183,10 @@ export default function CrearEmpleadoPage() {
     }
   };
   const handleConcepto = (i, campo, valor) => {
-    const n = [...conceptos]; n[i][campo] = valor; setConceptos(n);
+    const n = conceptos.map((c, idx) =>
+      idx === i ? { ...c, [campo]: valor } : c
+    );
+    setConceptos(n);
   };
 
   const validar = () => {

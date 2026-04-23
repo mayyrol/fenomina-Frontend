@@ -67,6 +67,8 @@ export default function AppRouter() {
               <Route path="/usuarios/crear" element={<CrearUsuarioPage />} />
               <Route path="/usuarios/:id" element={<VerUsuarioPage />} />
               <Route path="/usuarios/:id/editar" element={<EditarUsuarioPage />} />
+              {/* Parámetros */}
+              <Route path="/parametros" element={<ParametrosGeneralesPage />} />  
             </Route>
 
             {/* Empresas */}
@@ -104,14 +106,7 @@ export default function AppRouter() {
             <Route path="/empresas/:id/cesantias/ver-cesantia/:empleadoId" element={<VerCesantiaPage />} />
             <Route path="/empresas/:id/cesantias/:cesantiaId/desprendibles" element={<DesprendiblesCesantiasPage />} />
             <Route path="/empresas/:id/cesantias/:cesantiaId/liquidar" element={<LiquidarCesantiasPage />} />
-            <Route path="/empresas/:id/cesantias/:cesantiaId/resultado" element={<ResultadoCesantiasPage />} />
-
-
-
-            {/* Parámetros */}
-            <Route path="/parametros" element={<ParametrosGeneralesPage />} />
-
-            
+            <Route path="/empresas/:id/cesantias/:cesantiaId/resultado" element={<ResultadoCesantiasPage />} />            
 
           </Route>
         </Route>
