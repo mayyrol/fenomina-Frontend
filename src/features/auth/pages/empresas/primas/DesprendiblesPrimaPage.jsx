@@ -1,34 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { CreditCard, ChevronLeft, UserRound, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { CreditCard, ChevronLeft, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-
-const MOCK_PROCESO = {
-  nombreEmpresa: 'PRIIGO SAS',
-  nit: '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo: 'Diciembre de 2026',
-  semestre: 'Segundo semestre',
-  estadoProceso: 'Borrador',
-  logoUrl: null,
-};
-
-const MOCK_EMPLEADOS = [
-  {
-    id: 1, nombre: 'Juan Pérez', documento: '123456', cargo: 'Contador', salario: 2500000, diasLaborados: 180,
-    novedades: [
-      { id: 1, tipo: 'Recargo nocturno de lunes a sábado', detalle: '$40.000' },
-      { id: 2, tipo: 'Recargo nocturno un domingo o festivo', detalle: '$35.000' },
-    ],
-  },
-  { id: 2, nombre: 'María López', documento: '789012', cargo: 'Asistente', salario: 1500000, diasLaborados: 180, novedades: [] },
-  { id: 3, nombre: 'Carlos Martínez', documento: '345678', cargo: 'Analista', salario: 2000000, diasLaborados: 177, novedades: [] },
-];
+import { usePrimaStore } from '../../../../../store/usePrimaStore';
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
 
 const formatMiles = (valor) => '$' + String(Math.round(valor)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
@@ -39,22 +19,16 @@ export default function DesprendiblesPrimaPage() {
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
-
-  const [empleados, setEmpleados]                               = useState(MOCK_EMPLEADOS);
-  const [busqueda, setBusqueda]                                 = useState('');
-  const [expandidos, setExpandidos]                             = useState({});
   const [modal, setModal]                                       = useState(null);
-  const [confirmarEliminarNovedad, setConfirmarEliminarNovedad] = useState(false);
   const [confirmarCerrar, setConfirmarCerrar]                   = useState(false);
   const [confirmarAnular, setConfirmarAnular]                   = useState(false);
   const [confirmarEliminar, setConfirmarEliminar]               = useState(false);
-  const [novedadEliminar, setNovedadEliminar]                   = useState(null);
   const [hoverCerrar, setHoverCerrar]                           = useState(false);
   const [hoverAnular, setHoverAnular]                           = useState(false);
   const [hoverEliminar, setHoverEliminar]                       = useState(false);
   const [hoverPDF, setHoverPDF]                                 = useState(false);
   const [descargando, setDescargando]                           = useState(false);
-  const [fueAnulado, setFueAnulado]                             = useState(false);
+
 
   const empleadosFiltrados = empleados.filter(e =>
     e.nombre.toLowerCase().includes(busqueda.toLowerCase()) || e.documento.includes(busqueda)
@@ -62,51 +36,61 @@ export default function DesprendiblesPrimaPage() {
 
   const toggleExpandido = (empId) => setExpandidos(prev => ({ ...prev, [empId]: !prev[empId] }));
 
-  const handleEliminarNovedad = (empId, novedadId) => { setNovedadEliminar({ empId, novedadId }); setConfirmarEliminarNovedad(true); };
-
-  const handleConfirmarEliminarNovedad = () => {
-    setEmpleados(empleados.map(e =>
-      e.id === novedadEliminar.empId ? { ...e, novedades: e.novedades.filter(n => n.id !== novedadEliminar.novedadId) } : e
-    ));
-    setConfirmarEliminarNovedad(false);
-    setModal('exito');
-  };
+  const [proceso,  setProceso]  = useState(null);
+  const [empresa,  setEmpresa]  = useState(null);
+  const [cargando, setCargando] = useState(false);
 
   const handleDescargarPDF = () => {
+    const doc = new jsPDF();
+    let y = 14;
+
+    if (empresa?.logoEmpresaUrl) {
+      doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, y, 30, 30);
+      y += 34;
+    }
+
+    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+    doc.text('Desprendibles Prima — Borrador', 14, y); y += 8;
+    doc.setFontSize(10); doc.setFont(undefined, 'normal');
+    doc.text(`Empresa: ${empresa?.nombreEmpresa ?? ''}`, 14, y); y += 6;
+    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 14, y); y += 6;
+    doc.text(
+      `Periodo: ${proceso?.fechaInicioPeriodo} - ${proceso?.fechaFinPeriodo}`,
+      14, y
+    ); y += 6;
+    doc.text(
+      `Semestre: ${proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre'}`,
+      14, y
+    ); y += 6;
+    doc.text(`Estado: ${proceso?.estadoProcNomina ?? ''}`, 14, y); y += 10;
+
+    doc.text('Vista previa generada antes de liquidar.', 14, y);
+
     setDescargando(true);
     setTimeout(() => {
-      const doc = new jsPDF();
-      let y = 14;
-
-      if (MOCK_PROCESO.logoUrl) { doc.addImage(MOCK_PROCESO.logoUrl, 'PNG', 14, y, 30, 30); y += 34; }
-
-      doc.setFontSize(14); doc.setFont(undefined, 'bold');
-      doc.text('Desprendibles Prima', 14, y); y += 8;
-      doc.setFontSize(10); doc.setFont(undefined, 'normal');
-      doc.text(`Empresa: ${MOCK_PROCESO.nombreEmpresa}`, 14, y); y += 6;
-      doc.text(`NIT: ${MOCK_PROCESO.nit}`, 14, y); y += 6;
-      doc.text(`Semestre: ${MOCK_PROCESO.semestre}`, 14, y); y += 6;
-      doc.text(`Estado: ${MOCK_PROCESO.estadoProceso}`, 14, y); y += 10;
-
-      const filas = empleados.flatMap(e => {
-        const base = [e.nombre, e.documento, e.cargo, formatMiles(e.salario), String(e.diasLaborados)];
-        if (e.novedades.length === 0) return [[...base, '-', '-']];
-        return e.novedades.map(n => [...base, n.tipo, n.detalle]);
-      });
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Nombre', 'Documento', 'Cargo', 'Salario', 'Días', 'Tipo novedad', 'Detalle']],
-        body: filas,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-      });
-
-      doc.save(`desprendibles_prima_${MOCK_PROCESO.semestre.replace(/ /g, '_')}.pdf`);
+      doc.save(`borrador_prima_${primaId}.pdf`);
       setDescargando(false);
     }, 100);
   };
+
+  useEffect(() => {
+    if (!primaId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      payrollService.getProcesosPrima(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(primaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [primaId, id]);
 
   return (
     <div style={styles.container}>
@@ -135,12 +119,12 @@ export default function DesprendiblesPrimaPage() {
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Desprendibles Prima</h3>
         <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Semestre:</span><span style={styles.infoValor}>{MOCK_PROCESO.semestre}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{MOCK_PROCESO.estadoProceso}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Semestre:</span><span style={styles.infoValor}>{proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre'}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
         </div>
       </div>
 
@@ -150,7 +134,7 @@ export default function DesprendiblesPrimaPage() {
         <button
           style={{ ...styles.btnCerrar, background: hoverCerrar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverCerrar(true)} onMouseLeave={() => setHoverCerrar(false)}
-          onClick={() => navigate(`/empresas/${id}/primas/${primaId}/liquidar`)}
+          onClick={() => setConfirmarCerrar(true)}
         >
           Cerrar proceso
         </button>
@@ -159,11 +143,60 @@ export default function DesprendiblesPrimaPage() {
       </div>
 
       {/* Modales */}
-      <ConfirmarCambiosModal visible={confirmarEliminarNovedad} onCancelar={() => setConfirmarEliminarNovedad(false)} onConfirmar={handleConfirmarEliminarNovedad} titulo="¿Deseas eliminar este pago?" descripcion="El pago será removido del desprendible de este empleado." />
-      <ConfirmarCambiosModal visible={confirmarCerrar} onCancelar={() => setConfirmarCerrar(false)} onConfirmar={() => { setConfirmarCerrar(false); setModal('exito'); }} titulo="¿Deseas cerrar este proceso de prima?" descripcion="Al cerrar el proceso, el estado cambiará a Cerrado y no podrá editarse." />
-      <ConfirmarCambiosModal visible={confirmarAnular} onCancelar={() => setConfirmarAnular(false)} onConfirmar={() => { setConfirmarAnular(false); setFueAnulado(true); setModal('exito'); }} titulo="¿Estás seguro de que deseas anular este proceso?" descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo." tipo="error" />
-      <ConfirmarCambiosModal visible={confirmarEliminar} onCancelar={() => setConfirmarEliminar(false)} onConfirmar={() => { setConfirmarEliminar(false); navigate(-1); }} titulo="¿Deseas eliminar este proceso de prima?" descripcion="Esta acción registrará la fecha de eliminación y el proceso dejará de mostrarse en la lista." />
-      <MensajeModal tipo={modal} onClose={() => { setModal(null); if (fueAnulado) navigate(-1); }} />
+      <ConfirmarCambiosModal
+        visible={confirmarCerrar}
+        onCancelar={() => setConfirmarCerrar(false)}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(primaId, 'CERRADO');
+            setConfirmarCerrar(false);
+            navigate(`/empresas/${id}/primas/${primaId}/liquidar`);
+          } catch {
+            setConfirmarCerrar(false);
+            setModal('error');
+          }
+        }}
+        titulo="¿Deseas cerrar este proceso de prima?"
+        descripcion="Al cerrar el proceso, el estado cambiará a Cerrado y no podrá editarse."
+      />
+
+      <ConfirmarCambiosModal
+        visible={confirmarAnular}
+        onCancelar={() => setConfirmarAnular(false)}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(primaId, 'ANULADO');
+            usePrimaStore.getState().limpiarProceso();
+            setConfirmarAnular(false);
+            navigate(-1);
+          } catch {
+            setConfirmarAnular(false);
+            setModal('error');
+          }
+        }}
+        titulo="¿Estás seguro de que deseas anular este proceso?"
+        descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo."
+        tipo="error"
+      />
+
+      <ConfirmarCambiosModal
+        visible={confirmarEliminar}
+        onCancelar={() => setConfirmarEliminar(false)}
+        onConfirmar={async () => {
+          try {
+            await payrollService.eliminarProceso(primaId);
+            usePrimaStore.getState().limpiarProceso();
+            setConfirmarEliminar(false);
+            navigate(-1);
+          } catch {
+            setConfirmarEliminar(false);
+            setModal('error');
+          }
+        }}
+        titulo="¿Deseas eliminar este proceso de prima?"
+        descripcion="Esta acción eliminará el proceso de prima."
+      />
+      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
     </div>
   );
 }
@@ -203,7 +236,6 @@ const styles = {
   novedadTipo:        { fontSize: '12px', fontWeight: '700', color: '#272525', margin: '0 0 2px 0' },
   novedadDetalle:     { fontSize: '12px', color: '#A3A3A3', margin: 0 },
   btnAccionNovedad:   { fontSize: '11px', fontWeight: '700', color: '#0B662A', backgroundColor: '#F0FAF4', border: '1px solid #C3E6CC', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
-  btnEliminarNovedad: { color: '#E53E3E', backgroundColor: '#FFF5F5', border: '1px solid #FEB2B2' },
   btnAgregarNovedad:  { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: '1px dashed #0B662A', borderRadius: '8px', padding: '7px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: '700', color: '#0B662A', fontFamily: 'Nunito, sans-serif' },
   btnIconoVerde:      { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   iconBtn:            { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },

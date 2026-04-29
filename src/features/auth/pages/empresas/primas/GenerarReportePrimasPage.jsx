@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, ChevronLeft, ChevronRight, UserRound, Calendar, ChevronDown, Eye } from 'lucide-react';
 import MensajeModal from '../../../../../components/MensajeModal';
-
+import { usePrimaStore } from '../../../../../store/usePrimaStore';
+import payrollService from '../../../../../services/payrollService';
 
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY' }) {
   const [abierto, setAbierto] = useState(false);
@@ -70,6 +71,10 @@ function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY' }) {
 }
 
 const SEMESTRES = ['Primer semestre', 'Segundo semestre'];
+const SEMESTRE_A_PERIODO = {
+  'Primer semestre': 1,
+  'Segundo semestre': 2,
+};
 
 function SelectSemestre({ value, onChange }) {
   return (
@@ -82,14 +87,6 @@ function SelectSemestre({ value, onChange }) {
     </div>
   );
 }
-
-const MOCK_EMPLEADOS = [
-  { id: 1, nombres: 'Pepito',          apellidos: 'Perez',            fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 2, nombres: 'Carlos Andres',   apellidos: 'Rodriguez Ochoa',  fechaIngreso: '30/12/2023', documento: '10528967' },
-  { id: 3, nombres: 'Alejandra Maria', apellidos: 'Anibal Leon',       fechaIngreso: '30/11/2022', documento: '10528967' },
-  { id: 4, nombres: 'Carlos Alberto',  apellidos: 'Domingo Rodriguez', fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 5, nombres: 'Samuel',          apellidos: 'Martinez Ramos',    fechaIngreso: '30/01/2023', documento: '10528967' },
-];
 
 export default function GenerarReportePrimasPage() {
   const navigate    = useNavigate();
@@ -106,26 +103,61 @@ export default function GenerarReportePrimasPage() {
   const [modal, setModal]                 = useState(null);
   const [hoverSeguir, setHoverSeguir]     = useState(false);
 
-  const todosSeleccionados = seleccionados.length === MOCK_EMPLEADOS.length;
+  const todosSeleccionados =
+    seleccionados.length === empleados.length && empleados.length > 0;
 
   const toggleTodos = () => {
     if (todosSeleccionados) setSeleccionados([]);
-    else setSeleccionados(MOCK_EMPLEADOS.map(e => e.id));
+    else setSeleccionados(empleados.map(e => e.empleadoId));
   };
 
   const toggleEmpleado = (empId) => {
     setSeleccionados(prev =>
-      prev.includes(empId) ? prev.filter(i => i !== empId) : [...prev, empId]
+      prev.includes(empId)
+        ? prev.filter(i => i !== empId)
+        : [...prev, empId]
     );
   };
 
   const camposCompletos = fechaInicio && fechaFin && semestre && seleccionados.length > 0;
 
-  const handleSeguir = () => {
+  const handleSeguir = async () => {
     if (!camposCompletos) { setModal('error'); return; }
-    const primaId = Date.now();
-    navigate(`/empresas/${id}/primas/${primaId}/desprendibles`);
+
+    try {
+      const [diaInicio, mesInicio, anioInicio] = fechaInicio.split('/');
+      const [diaFin,    mesFin,    anioFin]    = fechaFin.split('/');
+
+      const payload = {
+        empresaId:   Number(id),
+        tipoProceso: 'PRIMA_SEMESTRAL',
+        anio:        Number(anioInicio),
+        periodo:     SEMESTRE_A_PERIODO[semestre],
+        fechaInicio: `${anioInicio}-${mesInicio}-${diaInicio}`,
+        fechaFin:    `${anioFin}-${mesFin}-${diaFin}`,
+      };
+
+      const { data } = await payrollService.crearProceso(payload);
+      usePrimaStore.getState().setProcesoActual(data);
+      usePrimaStore.getState().setEmpleadosSeleccionados(seleccionados);
+      navigate(`/empresas/${id}/primas/${data.procesoLiquiId}/desprendibles`);
+    } catch {
+      setModal('error');
+    }
   };
+
+  const [empleados,   setEmpleados]   = useState([]);
+  const [cargandoEmp, setCargandoEmp] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    setCargandoEmp(true);
+    payrollService.getEmpleadosActivos(id)
+      .then(({ data }) => setEmpleados(data))
+      .catch(() => {})
+      .finally(() => setCargandoEmp(false));
+  }, [id]);
+
 
   return (
     <div style={styles.container}>
@@ -202,23 +234,37 @@ export default function GenerarReportePrimasPage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_EMPLEADOS.map((emp, i) => (
-                <tr key={emp.id} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombres}</td>
-                  <td style={styles.td}>{emp.apellidos}</td>
-                  <td style={styles.td}>{emp.fechaIngreso}</td>
-                  <td style={styles.td}>{emp.documento}</td>
+              {cargandoEmp ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
+                    Cargando empleados...
+                  </td>
+                </tr>
+              ) : empleados.map((emp, i) => (
+                <tr key={emp.empleadoId}
+                  style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombresEmp}</td>
+                  <td style={styles.td}>{emp.apellidosEmp}</td>
+                  <td style={styles.td}>{emp.fechaIngresoEmp}</td>
+                  <td style={styles.td}>{emp.documentoEmp}</td>
                   <td style={styles.td}>
                     <button
                       style={styles.iconBtn}
-                      onClick={() => navigate(`/empresas/${id}/primas/ver-prima/${emp.id}`)}
+                      onClick={() => navigate(
+                        `/empresas/${id}/primas/ver-prima/${emp.empleadoId}`
+                      )}
                       title="Ver prima"
                     >
                       <Eye size={16} color="#0B662A" />
                     </button>
                   </td>
                   <td style={styles.td}>
-                    <input type="checkbox" checked={seleccionados.includes(emp.id)} onChange={() => toggleEmpleado(emp.id)} style={styles.checkbox} />
+                    <input
+                      type="checkbox"
+                      checked={seleccionados.includes(emp.empleadoId)}
+                      onChange={() => toggleEmpleado(emp.empleadoId)}
+                      style={styles.checkbox}
+                    />
                   </td>
                 </tr>
               ))}

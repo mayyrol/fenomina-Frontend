@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, ChevronLeft, ChevronRight, UserRound, Calendar, ChevronDown } from 'lucide-react';
 import MensajeModal from '../../../../../components/MensajeModal';
-
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import { useNominaStore } from '../../../../../store/useNominaStore';
 
 // ── Calendario ──────────────────────────────────────────────────────────────
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY' }) {
@@ -89,14 +91,6 @@ function SelectMes({ value, onChange }) {
   );
 }
 
-// ── Mock empleados ────────────────────────────────────────────────────────────
-const MOCK_EMPLEADOS = [
-  { id: 1, nombres: 'Pepito',          apellidos: 'Perez',             fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 2, nombres: 'Carlos Andres',   apellidos: 'Rodriguez Ochoa',   fechaIngreso: '30/12/2023', documento: '10528967' },
-  { id: 3, nombres: 'Alejandra Maria', apellidos: 'Anibal Leon',        fechaIngreso: '30/11/2022', documento: '10528967' },
-  { id: 4, nombres: 'Carlos Alberto',  apellidos: 'Domingo Rodriguez',  fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 5, nombres: 'Samuel',          apellidos: 'Martinez Ramos',     fechaIngreso: '30/01/2023', documento: '10528967' },
-];
 
 export default function GenerarReportePage() {
   const navigate    = useNavigate();
@@ -113,11 +107,11 @@ export default function GenerarReportePage() {
   const [modal, setModal]               = useState(null);
   const [hoverSeguir, setHoverSeguir]   = useState(false);
 
-  const todosSeleccionados = seleccionados.length === MOCK_EMPLEADOS.length;
+  const todosSeleccionados = seleccionados.length === empleados.length && empleados.length > 0;
 
   const toggleTodos = () => {
     if (todosSeleccionados) setSeleccionados([]);
-    else setSeleccionados(MOCK_EMPLEADOS.map(e => e.id));
+    else setSeleccionados(empleados.map(e => e.empleadoId));
   };
 
   const toggleEmpleado = (empId) => {
@@ -128,16 +122,59 @@ export default function GenerarReportePage() {
 
   const camposCompletos = fechaInicio && fechaFin && mesLiquidar && seleccionados.length > 0;
 
-  const handleSeguir = () => {
+  const handleSeguir = async () => {
     if (!camposCompletos) {
       setModal('error');
       return;
     }
-    // Genera un nominaId temporal (en backend vendrá del endpoint)
-    const nominaId = Date.now();
-    navigate(`/empresas/${id}/nominas/${nominaId}/desprendibles`);
+
+    try {
+      const [diaInicio, mesInicio, anioInicio] = fechaInicio.split('/');
+      const [diaFin,    mesFin,    anioFin]    = fechaFin.split('/');
+
+      const MESES_NUM = {
+        'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
+        'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12
+      };
+
+      const mesNum = MESES_NUM[mesLiquidar];
+
+      const payload = {
+        empresaId:   Number(id),
+        tipoProceso: 'NOMINA_MENSUAL',
+        anio:        Number(anioInicio),
+        periodo:     mesNum,
+        fechaInicio: `${anioInicio}-${mesInicio}-${diaInicio}`,
+        fechaFin:    `${anioFin}-${mesFin}-${diaFin}`,
+      };
+
+      const { data } = await payrollService.crearProceso(payload);
+
+      // Guardar en el store para que las siguientes páginas los lean
+      useNominaStore.getState().setProcesoActual(data);
+      useNominaStore.getState().setEmpleadosSeleccionados(seleccionados);
+
+      navigate(`/empresas/${id}/nominas/${data.procesoLiquiId}/desprendibles`);
+    } catch (err) {
+      setModal('error');
+    }
   };
 
+  const [empleados,       setEmpleados]       = useState([]);
+  const [cargandoEmp,     setCargandoEmp]     = useState(false);
+  const [errorEmp,        setErrorEmp]        = useState(null);
+
+  useEffect(() => {
+    if (!id) return;
+    setCargandoEmp(true);
+    masterAxios.get('/api/master/empleados', {
+      params: { empresaId: id, estado: 'ACTIVO' }
+    })
+      .then(({ data }) => setEmpleados(data))
+      .catch((err) => setErrorEmp(err))
+      .finally(() => setCargandoEmp(false));
+  }, [id]);
+  
   return (
     <div style={styles.container}>
 
@@ -221,17 +258,19 @@ export default function GenerarReportePage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_EMPLEADOS.map((emp, i) => (
-                <tr key={emp.id} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombres}</td>
-                  <td style={styles.td}>{emp.apellidos}</td>
-                  <td style={styles.td}>{emp.fechaIngreso}</td>
-                  <td style={styles.td}>{emp.documento}</td>
+              {cargandoEmp ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>Cargando empleados...</td></tr>
+              ) : empleados.map((emp, i) => (
+                <tr key={emp.empleadoId} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombresEmp}</td>
+                  <td style={styles.td}>{emp.apellidosEmp}</td>
+                  <td style={styles.td}>{emp.fechaIngresoEmp}</td>
+                  <td style={styles.td}>{emp.documentoEmp}</td>
                   <td style={styles.td}>
                     <input
                       type="checkbox"
-                      checked={seleccionados.includes(emp.id)}
-                      onChange={() => toggleEmpleado(emp.id)}
+                      checked={seleccionados.includes(emp.empleadoId)}
+                      onChange={() => toggleEmpleado(emp.empleadoId)}
                       style={styles.checkbox}
                     />
                   </td>

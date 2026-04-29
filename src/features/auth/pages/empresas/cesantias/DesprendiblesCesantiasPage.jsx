@@ -1,19 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { Coins, ChevronLeft, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
+import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
 
-
-const MOCK_PROCESO = {
-  nombreEmpresa: 'PRIIGO SAS',
-  nit: '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo: '2025',
-  estadoProceso: 'Borrador',
-  logoUrl: null,
-};
 
 export default function DesprendiblesCesantiasPage() {
   const navigate           = useNavigate();
@@ -24,13 +18,36 @@ export default function DesprendiblesCesantiasPage() {
   const cargo  = usuario?.cargoUsuario ?? '';
 
   const [modal, setModal]                                     = useState(null);
-  const [fueAnulado, setFueAnulado]                           = useState(false);
+  const [setFueAnulado]                           = useState(false);
   const [confirmarCerrar, setConfirmarCerrar]                 = useState(false);
   const [confirmarAnular, setConfirmarAnular]                 = useState(false);
   const [confirmarEliminar, setConfirmarEliminar]             = useState(false);
   const [hoverCerrar, setHoverCerrar]                         = useState(false);
   const [hoverAnular, setHoverAnular]                         = useState(false);
   const [hoverEliminar, setHoverEliminar]                     = useState(false);
+
+  const [proceso,  setProceso]  = useState(null);
+  const [empresa,  setEmpresa]  = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (!cesantiaId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      payrollService.getProcesosCesantias(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(cesantiaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [cesantiaId, id]);
 
   return (
     <div style={styles.container}>
@@ -59,11 +76,11 @@ export default function DesprendiblesCesantiasPage() {
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Desprendibles Cesantías e Intereses de Cesantías</h3>
         <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{MOCK_PROCESO.estadoProceso}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{proceso?.anio ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
         </div>
       </div>
 
@@ -81,7 +98,7 @@ export default function DesprendiblesCesantiasPage() {
           style={{ ...styles.btnAnular, transition: 'background 0.3s ease', ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}) }}
           onMouseEnter={() => setHoverAnular(true)}
           onMouseLeave={() => setHoverAnular(false)}
-          onClick={() => setConfirmarAnular(true)}
+          onClick={() => setConfirmarCerrar(true)}
         >
           Anular
         </button>
@@ -95,30 +112,61 @@ export default function DesprendiblesCesantiasPage() {
         </button>
       </div>
 
-      {/* Modales */}
       <ConfirmarCambiosModal
         visible={confirmarCerrar}
         onCancelar={() => setConfirmarCerrar(false)}
-        onConfirmar={() => { setConfirmarCerrar(false); setModal('exito'); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(cesantiaId, 'CERRADO');
+            setConfirmarCerrar(false);
+            navigate(`/empresas/${id}/cesantias/${cesantiaId}/liquidar`);
+          } catch {
+            setConfirmarCerrar(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas cerrar este proceso?"
         descripcion="Al cerrar el proceso, el estado cambiará a Cerrado y no podrá editarse."
       />
+
       <ConfirmarCambiosModal
         visible={confirmarAnular}
         onCancelar={() => setConfirmarAnular(false)}
-        onConfirmar={() => { setConfirmarAnular(false); setFueAnulado(true); setModal('exito'); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(cesantiaId, 'ANULADO');
+            useCesantiaStore.getState().limpiarProceso();
+            setConfirmarAnular(false);
+            navigate(-1);
+          } catch {
+            setConfirmarAnular(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Estás seguro de que deseas anular este proceso?"
-        descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo."
+        descripcion="Esta acción es irreversible."
         tipo="error"
       />
+
       <ConfirmarCambiosModal
         visible={confirmarEliminar}
         onCancelar={() => setConfirmarEliminar(false)}
-        onConfirmar={() => { setConfirmarEliminar(false); navigate(-1); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.eliminarProceso(cesantiaId);
+            useCesantiaStore.getState().limpiarProceso();
+            setConfirmarEliminar(false);
+            navigate(-1);
+          } catch {
+            setConfirmarEliminar(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas eliminar este proceso?"
-        descripcion="Esta acción registrará la fecha de eliminación y el proceso dejará de mostrarse en la lista."
+        descripcion="Esta acción eliminará el proceso de cesantías."
       />
-      <MensajeModal tipo={modal} onClose={() => { setModal(null); if (fueAnulado) navigate(-1); }} />
+
+      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
 
     </div>
   );

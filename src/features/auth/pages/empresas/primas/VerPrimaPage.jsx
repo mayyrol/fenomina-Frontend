@@ -1,16 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, UserRound } from 'lucide-react';
-
-
-const MOCK_PRIMA = {
-  empleado: 'Juan Pérez',
-  diasLaborados: 180,
-  otrosPagos: [
-    { nombre: 'RECARGO NOCTURNO DE LUNES A SÁBADO', fecha: '03/04/2024', monto: '40.000' },
-    { nombre: 'RECARGO NOCTURNO UN DOMINGO O FESTIVO', fecha: '22/05/2024', monto: '35.000' },
-  ],
-};
+import { useState, useEffect } from 'react';
+import payrollAxios from '../../../../../api/payrollAxiosInstance';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import payrollService from '../../../../../services/payrollService';
 
 export default function VerPrimaPage() {
   const navigate   = useNavigate();
@@ -18,6 +12,55 @@ export default function VerPrimaPage() {
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
+
+  const { id, empleadoId } = useParams();
+  const [empleado,   setEmpleado]   = useState(null);
+  const [novedades,  setNovedades]  = useState([]);
+  const [cargando,   setCargando]   = useState(false);
+
+  const fmt = (v) =>
+    v != null
+      ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+      : '';
+
+  useEffect(() => {
+    if (!empleadoId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      masterAxios.get('/api/master/empleados', {
+        params: { empresaId: id, estado: 'ACTIVO' },
+      }),
+      payrollService.getProcesosPrima(id),
+    ])
+      .then(([{ data: emps }, { data: procesos }]) => {
+        const encontrado = emps.find(
+          e => String(e.empleadoId) === String(empleadoId)
+        );
+        setEmpleado(encontrado ?? null);
+
+        // Procesos pagados del semestre actual
+        const procesosNomina = procesos.filter(
+          p => p.estadoProcNomina === 'PAGADO'
+        );
+
+        // Traer novedades del empleado en cada proceso pagado
+        return Promise.all(
+          procesosNomina.map(p =>
+            payrollAxios
+              .get(`/api/payroll/novedades/proceso/${p.procesoLiquiId}/empleado/${empleadoId}`)
+              .then(({ data }) => data)
+              .catch(() => [])
+          )
+        );
+      })
+      .then((resultados) => {
+        const todas = resultados.flat();
+        setNovedades(todas);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [empleadoId, id]);
 
   return (
     <div style={styles.container}>
@@ -50,7 +93,18 @@ export default function VerPrimaPage() {
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Días laborados <span style={{ color: '#E53E3E' }}>*</span></label>
           <input
-            value={MOCK_PRIMA.diasLaborados}
+            value={empleado?.fechaIngresoEmp
+              ? (() => {
+                  const ingreso = new Date(empleado.fechaIngresoEmp);
+                  const hoy = new Date();
+                  const diffMs = hoy - ingreso;
+                  const dias = Math.min(
+                    Math.floor(diffMs / (1000 * 60 * 60 * 24)),
+                    180
+                  );
+                  return dias;
+                })()
+              : 180}
             readOnly
             style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }}
           />
@@ -64,17 +118,48 @@ export default function VerPrimaPage() {
           Valores adicionales que, por ley o acuerdo, deben sumarse a la base de la prima (como comisiones, recargos o bonificaciones salariales) que no estén reflejados en el sueldo fijo.
         </p>
 
-        {MOCK_PRIMA.otrosPagos.map((p, i) => (
-          <div key={i} style={{ marginBottom: '16px' }}>
+        {cargando ? (
+          <p style={{ color: '#A3A3A3' }}>Cargando novedades...</p>
+        ) : novedades.length === 0 ? (
+          <p style={{ color: '#A3A3A3' }}>
+            No hay novedades registradas en el periodo.
+          </p>
+        ) : novedades.map((nov, i) => (
+          <div key={nov.novedadId ?? i} style={{ marginBottom: '16px' }}>
             <div style={styles.gridFila}>
               <span style={styles.label}>Nombre de novedad</span>
               <span style={styles.label}>Fecha de novedad</span>
-              <span style={styles.label}>Monto (valor del pago o compensación)</span>
+              <span style={styles.label}>Monto / Valor</span>
             </div>
             <div style={styles.gridFila}>
-              <input readOnly value={p.nombre} style={{ ...styles.input, textTransform: 'uppercase', fontSize: '12px', backgroundColor: '#F9F9F9' }} />
-              <input readOnly value={p.fecha}  style={{ ...styles.input, backgroundColor: '#F9F9F9' }} />
-              <input readOnly value={p.monto}  style={{ ...styles.input, textAlign: 'right', backgroundColor: '#F9F9F9' }} />
+              <input
+                readOnly
+                value={nov.observaciones ?? `Novedad ${nov.novedadId}`}
+                style={{
+                  ...styles.input,
+                  textTransform: 'uppercase',
+                  fontSize: '12px',
+                  backgroundColor: '#F9F9F9',
+                }}
+              />
+              <input
+                readOnly
+                value={nov.fechaNovedad ?? nov.fechaInicioAusen ?? ''}
+                style={{ ...styles.input, backgroundColor: '#F9F9F9' }}
+              />
+              <input
+                readOnly
+                value={
+                  nov.valorRefNovedad != null
+                    ? fmt(nov.valorRefNovedad)
+                    : nov.cantidadHorasNovedad != null
+                    ? `${nov.cantidadHorasNovedad} horas`
+                    : nov.cantidadDiasNovedad != null
+                    ? `${nov.cantidadDiasNovedad} días`
+                    : ''
+                }
+                style={{ ...styles.input, textAlign: 'right', backgroundColor: '#F9F9F9' }}
+              />
             </div>
           </div>
         ))}

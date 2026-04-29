@@ -1,24 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
+import { usePrimaStore } from '../../../../../store/usePrimaStore';
+import payrollService from '../../../../../services/payrollService';
 
 
-const MOCK_PERIODOS = [
-  { id: 1,  periodo: '2025-01-15', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-01-20', estado: 'Borrador' },
-  { id: 2,  periodo: '2025-01-15', empleadosIncluidos: 13, totalNeto: 224000, fechaCreacion: '2025-01-20', estado: 'Borrador' },
-  { id: 3,  periodo: '2025-01-15', empleadosIncluidos: 14, totalNeto: 224000, fechaCreacion: '2025-01-21', estado: 'Cerrado' },
-  { id: 4,  periodo: '2025-01-15', empleadosIncluidos: 14, totalNeto: 224000, fechaCreacion: '2025-01-21', estado: 'Borrador' },
-  { id: 5,  periodo: '2025-01-15', empleadosIncluidos: 14, totalNeto: 224000, fechaCreacion: '2025-01-22', estado: 'Pagado' },
-  { id: 6,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-03', estado: 'Borrador' },
-  { id: 7,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-03', estado: 'Borrador' },
-  { id: 8,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-04', estado: 'Cerrado' },
-  { id: 9,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-04', estado: 'Borrador' },
-  { id: 10, periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-05', estado: 'Pendiente por pagar' },
-  { id: 11, periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-05', estado: 'Borrador' },
-];
 
 const TABS = ['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado', 'Anulado'];
 const PAGE_SIZE = 10;
@@ -57,6 +46,22 @@ function EstadoSelect({ valor, onChange }) {
   );
 }
 
+const ESTADO_LABEL = {
+  BORRADOR:       'Borrador',
+  CERRADO:        'Cerrado',
+  PENDIENTE_PAGO: 'Pendiente por pagar',
+  PAGADO:         'Pagado',
+  ANULADO:        'Anulado',
+};
+
+const ESTADO_BACK = {
+  'Borrador':           'BORRADOR',
+  'Cerrado':            'CERRADO',
+  'Pendiente por pagar':'PENDIENTE_PAGO',
+  'Pagado':             'PAGADO',
+  'Anulado':            'ANULADO',
+};
+
 export default function PrimasPage() {
   const navigate    = useNavigate();
   const { id }      = useParams();
@@ -68,7 +73,8 @@ export default function PrimasPage() {
   const [tab, setTab]                           = useState('Borrador');
   const [busqueda, setBusqueda]                 = useState('');
   const [pagina, setPagina]                     = useState(0);
-  const [periodos, setPeriodos]                 = useState(MOCK_PERIODOS);
+  const [periodos,  setPeriodos]  = useState([]);
+  const [cargando,  setCargando]  = useState(false);
   const [modal, setModal]                       = useState(null);
   const [confirmarEstado, setConfirmarEstado]   = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
@@ -77,8 +83,20 @@ export default function PrimasPage() {
   const [periodoEliminar, setPeriodoEliminar]   = useState(null);
   const [hoverLiquidar, setHoverLiquidar]       = useState(false);
 
+  useEffect(() => {
+    if (!id) return;
+    setCargando(true);
+    payrollService.getProcesosPrima(id)
+      .then(({ data }) => setPeriodos(data))
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [id]);
+ 
   const periodosFiltrados = periodos.filter(p =>
-    !p.deletedAt && p.estado === tab && p.periodo.includes(busqueda)
+    !p.deletedAt &&
+    ESTADO_LABEL[p.estadoProcNomina] === tab &&
+    (p.fechaInicioPeriodo?.includes(busqueda) ||
+     p.fechaFinPeriodo?.includes(busqueda))
   );
 
   const totalPaginas   = Math.max(1, Math.ceil(periodosFiltrados.length / PAGE_SIZE));
@@ -90,12 +108,20 @@ export default function PrimasPage() {
     else setConfirmarEstado(true);
   };
 
-  const handleConfirmarEstado = () => {
-    setPeriodos(periodos.map(p =>
-      p.id === cambioEstado.periodoId ? { ...p, estado: cambioEstado.nuevoEstado } : p
-    ));
-    setConfirmarEstado(false);
-    setModal('exito');
+  const handleConfirmarEstado = async () => {
+    try {
+      await payrollService.cambiarEstado(
+        cambioEstado.periodoId,
+        cambioEstado.nuevoEstado
+      );
+      const { data } = await payrollService.getProcesosPrima(id);
+      setPeriodos(data);
+      setConfirmarEstado(false);
+      setModal('exito');
+    } catch {
+      setConfirmarEstado(false);
+      setModal('error');
+    }
   };
 
   const handleEliminar = (periodo) => {
@@ -103,12 +129,17 @@ export default function PrimasPage() {
     setConfirmarEliminar(true);
   };
 
-  const handleConfirmarEliminar = () => {
-    setPeriodos(periodos.map(p =>
-      p.id === periodoEliminar.id ? { ...p, deletedAt: new Date().toISOString() } : p
-    ));
-    setConfirmarEliminar(false);
-    setModal('exito');
+  const handleConfirmarEliminar = async () => {
+    try {
+      await payrollService.eliminarProceso(periodoEliminar.procesoLiquiId);
+      const { data } = await payrollService.getProcesosPrima(id);
+      setPeriodos(data);
+      setConfirmarEliminar(false);
+      setModal('exito');
+    } catch {
+      setConfirmarEliminar(false);
+      setModal('error');
+    }
   };
 
   return (
@@ -203,32 +234,61 @@ export default function PrimasPage() {
                 <tr><td colSpan={tab === 'Borrador' || tab === 'Cerrado' ? 6 : 5} style={{ textAlign: 'center', padding: '20px', color: '#A3A3A3' }}>Sin resultados</td></tr>
               ) : (
                 periodosPagina.map((p, index) => (
-                  <tr key={p.id} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
-                    <td style={styles.td}>{p.periodo}</td>
-                    <td style={styles.td}>{p.empleadosIncluidos}</td>
-                    <td style={styles.td}>{formatMiles(p.totalNeto)}</td>
-                    <td style={styles.td}>{p.fechaCreacion}</td>
+                  <tr key={p.procesoLiquiId} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
                     <td style={styles.td}>
-                      {p.estado === 'Anulado'
-                        ? <span style={styles.estadoTexto}>{p.estado}</span>
-                        : <EstadoSelect valor={p.estado} onChange={(v) => handleEstadoChange(p.id, v)} />
+                      {p.fechaInicioPeriodo} - {p.fechaFinPeriodo}
+                    </td>
+                    <td style={styles.td}>-</td>
+                    <td style={styles.td}>-</td>
+                    <td style={styles.td}>{p.createdAt?.split('T')[0]}</td>
+                    <td style={styles.td}>
+                      {p.estadoProcNomina === 'ANULADO'
+                        ? <span style={styles.estadoTexto}>
+                            {ESTADO_LABEL[p.estadoProcNomina]}
+                          </span>
+                        : <EstadoSelect
+                            valor={ESTADO_LABEL[p.estadoProcNomina]}
+                            onChange={(v) => handleEstadoChange(
+                              p.procesoLiquiId,
+                              ESTADO_BACK[v]
+                            )}
+                          />
                       }
                     </td>
                     {(tab === 'Borrador' || tab === 'Cerrado') && (
                       <td style={styles.td}>
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                          {p.estado === 'Borrador' && (
+                        <div style={{
+                          display: 'flex', gap: '10px',
+                          justifyContent: 'center', alignItems: 'center',
+                        }}>
+                          {p.estadoProcNomina === 'BORRADOR' && (
                             <>
-                              <button style={styles.iconBtn} onClick={() => navigate(`/empresas/${id}/primas/${p.id}/desprendibles`)} title="Editar">
+                              <button
+                                style={styles.iconBtn}
+                                onClick={() => navigate(
+                                  `/empresas/${id}/primas/${p.procesoLiquiId}/desprendibles`
+                                )}
+                                title="Editar"
+                              >
                                 <Pencil size={16} color="#0B662A" />
                               </button>
-                              <button style={styles.iconBtn} onClick={() => handleEliminar(p)} title="Eliminar">
+                              <button
+                                style={styles.iconBtn}
+                                onClick={() => handleEliminar(p)}
+                                title="Eliminar"
+                              >
                                 <Trash2 size={16} color="#E53E3E" />
                               </button>
                             </>
                           )}
-                          {p.estado === 'Cerrado' && (
-                            <button style={styles.iconBtn} onClick={() => navigate(`/empresas/${id}/primas/${p.id}/liquidar`)} title="Liquidar">
+                          {p.estadoProcNomina === 'CERRADO' && (
+                            <button
+                              style={styles.iconBtn}
+                              onClick={() => navigate(
+                                `/empresas/${id}/primas/${p.procesoLiquiId}/liquidar`
+                              )}
+                              title="Liquidar"
+                            >
                               <Upload size={16} color="#0B662A" />
                             </button>
                           )}
@@ -254,7 +314,18 @@ export default function PrimasPage() {
       {/* Modales */}
       <ConfirmarCambiosModal visible={confirmarEstado} onCancelar={() => setConfirmarEstado(false)} onConfirmar={handleConfirmarEstado} titulo="¿Deseas cambiar el estado del proceso?" descripcion="Una vez confirmes, el estado del proceso será actualizado en los registros de información." />
       <ConfirmarCambiosModal visible={confirmarAnulado} onCancelar={() => setConfirmarAnulado(false)}
-        onConfirmar={() => { setPeriodos(periodos.map(p => p.id === cambioEstado.periodoId ? { ...p, estado: 'Anulado' } : p)); setConfirmarAnulado(false); setModal('exito'); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(cambioEstado.periodoId, 'ANULADO');
+            const { data } = await payrollService.getProcesosPrima(id);
+            setPeriodos(data);
+            setConfirmarAnulado(false);
+            setModal('exito');
+          } catch {
+            setConfirmarAnulado(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Estás seguro de que deseas anular este proceso?" descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo." tipo="error" />
       <ConfirmarCambiosModal visible={confirmarEliminar} onCancelar={() => setConfirmarEliminar(false)} onConfirmar={handleConfirmarEliminar} titulo="¿Deseas eliminar este proceso de prima?" descripcion="Esta acción registrará la fecha de eliminación del proceso y dejará de mostrarse en la lista." />
       <MensajeModal tipo={modal} onClose={() => setModal(null)} />

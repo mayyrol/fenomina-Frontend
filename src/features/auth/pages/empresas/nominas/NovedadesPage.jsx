@@ -1,18 +1,25 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { FileText, ChevronDown, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, UserRound } from 'lucide-react';
+import { useNominaStore } from '../../../../../store/useNominaStore';
+import payrollService from '../../../../../services/payrollService';
+import payrollAxios from '../../../../../api/payrollAxiosInstance';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import {
+  FileText, ChevronDown, ChevronLeft, ChevronRight,
+  Plus, Trash2, Calendar, UserRound
+} from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error }) {
   const [abierto, setAbierto] = useState(false);
   const hoy = new Date();
-  const [mes, setMes] = useState(hoy.getMonth());
+  const [mes, setMes]   = useState(hoy.getMonth());
   const [anio, setAnio] = useState(hoy.getFullYear());
 
-  const meses = ['January','February','March','April','May','June',
-                 'July','August','September','October','November','December'];
+  const meses      = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
   const diasSemana = ['S','M','T','W','T','F','S'];
   const primerDia      = new Date(anio, mes, 1).getDay();
   const diasEnMes      = new Date(anio, mes + 1, 0).getDate();
@@ -25,43 +32,77 @@ function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error })
     setAbierto(false);
   };
 
-  const anteriorMes  = () => { if (mes === 0) { setMes(11); setAnio(anio - 1); } else setMes(mes - 1); };
-  const siguienteMes = () => { if (mes === 11) { setMes(0); setAnio(anio + 1); } else setMes(mes + 1); };
+  const anteriorMes  = () => {
+    if (mes === 0) { setMes(11); setAnio(anio - 1); } else setMes(mes - 1);
+  };
+  const siguienteMes = () => {
+    if (mes === 11) { setMes(0); setAnio(anio + 1); } else setMes(mes + 1);
+  };
 
   const diaSeleccionado  = value ? Number(value.split('/')[0]) : null;
   const mesSeleccionado  = value ? Number(value.split('/')[1]) - 1 : null;
   const anioSeleccionado = value ? Number(value.split('/')[2]) : null;
 
   const celdas = [];
-  for (let i = 0; i < primerDia; i++) celdas.push({ dia: diasAnteriores - primerDia + 1 + i, actual: false });
-  for (let i = 1; i <= diasEnMes; i++) celdas.push({ dia: i, actual: true });
-  const restantes = 42 - celdas.length;
-  for (let i = 1; i <= restantes; i++) celdas.push({ dia: i, actual: false });
+  for (let i = 0; i < primerDia; i++)
+    celdas.push({ dia: diasAnteriores - primerDia + 1 + i, actual: false });
+  for (let i = 1; i <= diasEnMes; i++)
+    celdas.push({ dia: i, actual: true });
+  for (let i = 1; i <= 42 - celdas.length; i++)
+    celdas.push({ dia: i, actual: false });
 
   return (
     <div style={{ position: 'relative', flex: 1 }}>
       <div
-        style={{ ...styles.input, border: error ? '1px solid #E53E3E' : '1px solid #D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+        style={{
+          ...styles.input,
+          border: error ? '1px solid #E53E3E' : '1px solid #D0D0D0',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none',
+        }}
         onClick={() => setAbierto(!abierto)}
       >
-        <span style={{ color: value ? '#272525' : '#A3A3A3', fontSize: '13px' }}>{value || placeholder}</span>
+        <span style={{ color: value ? '#272525' : '#A3A3A3', fontSize: '13px' }}>
+          {value || placeholder}
+        </span>
         <Calendar size={16} color="#A3A3A3" />
       </div>
       {abierto && (
         <div style={styles.calendario}>
           <div style={styles.calHeader}>
-            <button style={styles.calBtn} onClick={anteriorMes}><ChevronLeft size={16} /></button>
+            <button style={styles.calBtn} onClick={anteriorMes}>
+              <ChevronLeft size={16} />
+            </button>
             <span style={styles.calMes}>{meses[mes]} {anio}</span>
-            <button style={styles.calBtn} onClick={siguienteMes}><ChevronRight size={16} /></button>
+            <button style={styles.calBtn} onClick={siguienteMes}>
+              <ChevronRight size={16} />
+            </button>
           </div>
           <div style={styles.calGrid}>
-            {diasSemana.map((d, i) => <div key={i} style={styles.calDiaSemana}>{d}</div>)}
+            {diasSemana.map((d, i) => (
+              <div key={i} style={styles.calDiaSemana}>{d}</div>
+            ))}
             {celdas.map((c, i) => {
-              const esSeleccionado = c.actual && c.dia === diaSeleccionado && mes === mesSeleccionado && anio === anioSeleccionado;
-              const esHoy = c.actual && c.dia === hoy.getDate() && mes === hoy.getMonth() && anio === hoy.getFullYear();
+              const esSeleccionado =
+                c.actual && c.dia === diaSeleccionado &&
+                mes === mesSeleccionado && anio === anioSeleccionado;
+              const esHoy =
+                c.actual && c.dia === hoy.getDate() &&
+                mes === hoy.getMonth() && anio === hoy.getFullYear();
               return (
-                <div key={i} onClick={() => c.actual && seleccionarDia(c.dia)}
-                  style={{ ...styles.calDia, color: !c.actual ? '#D0D0D0' : esSeleccionado ? '#fff' : '#272525', backgroundColor: esSeleccionado ? '#0B662A' : 'transparent', border: esHoy && !esSeleccionado ? '1px solid #0B662A' : '1px solid transparent', borderRadius: '50%', cursor: c.actual ? 'pointer' : 'default' }}>
+                <div
+                  key={i}
+                  onClick={() => c.actual && seleccionarDia(c.dia)}
+                  style={{
+                    ...styles.calDia,
+                    color: !c.actual ? '#D0D0D0' : esSeleccionado ? '#fff' : '#272525',
+                    backgroundColor: esSeleccionado ? '#0B662A' : 'transparent',
+                    border: esHoy && !esSeleccionado
+                      ? '1px solid #0B662A' : '1px solid transparent',
+                    borderRadius: '50%',
+                    cursor: c.actual ? 'pointer' : 'default',
+                  }}
+                >
                   {c.dia}
                 </div>
               );
@@ -78,82 +119,161 @@ function SelectWrapper({ value, onChange, options, placeholder = 'Seleccionar op
     <div style={{ position: 'relative', flex: 1 }}>
       <select value={value} onChange={(e) => onChange(e.target.value)} style={styles.select}>
         <option value="">{placeholder}</option>
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
       </select>
       <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
     </div>
   );
 }
 
-const OPCIONES_TIEMPO_LICENCIAS = [
-  'INCAPACIDAD POR ORIGEN COMUN','INCAPACIDAD POR ORIGEN LABORAL',
-  'LICENCIA MATERNIDAD/PATERNIDAD','LICENCIA CALAMIDAD DOMÉSTICA',
-  'LICENCIA POR MATRIMONIO','LICENCIA LEY ISAAC','LICENCIA POR SUFRAGIO',
-  'LICENCIA NO REMUNERADA','CARGOS TRANSITORIOS','CITACIONES JUDICIALES',
-  'OTROS PERMISOS REMUNERADOS PACTADOS','AUSENCIAS NO PACTADAS NI REMUNERADAS',
-];
-
-const OPCIONES_HORAS_EXTRA = [
-  'RECARGO NOCTURNO','RECARGO DOMINICAL O FESTIVO',
-  'RECARGO NOCTURNO EN DOMINICAL O FESTIVO','HORAS EXTRA DIURNAS',
-  'HORAS EXTRA NOCTURNAS','HORAS EXTRA DIURNAS DOMINICALES O FESTIVAS',
-  'HORAS EXTRA NOCTURNAS DOMINICALES O FESTIVAS',
-];
-
-const OPCIONES_PAGOS_EXTRA = [
-  'BENEFICIO O EXTRALEGAL','COMISION',
-  'BONIFICACIONES OCASIONALES O POR MERA LIBERALIDAD',
-  'OTROS PAGOS QUE NO CONSTITUYEN EL SALARIO',
-];
-
-const OPCIONES_VACACIONES = [
-  'VACACIONES DISFRUTADAS','VACACIONES COMPENSADAS EN DINERO',
-];
-
-const filaVacia      = () => ({ nombre: '', fechaInicio: '', fechaFin: '' });
-const filaVaciaHoras = () => ({ nombre: '', fecha: '', cantidad: '' });
-const filaVaciaPagos = () => ({ nombre: '', fecha: '', monto: '' });
-const filaVaciaOtros = () => ({ descripcion: '', monto: '', fecha: '', constituyeSalario: 'si' });
-const filaVaciaReten = () => ({ descripcion: '', monto: '', fecha: '' });
-
 const soloNumeros = (e) => {
-  if (!/[0-9.,]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) {
-    e.preventDefault();
-  }
+  if (
+    !/[0-9.,]/.test(e.key) &&
+    !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)
+  ) e.preventDefault();
 };
+
+const filaVaciaLicencia  = () => ({ concepNominaId: '', fechaInicio: '', fechaFin: '' });
+const filaVaciaHoras     = () => ({ concepNominaId: '', fecha: '', cantidad: '' });
+const filaVaciaPagos     = () => ({ concepNominaId: '', fecha: '', monto: '' });
+const filaVaciaVacacion  = () => ({ concepNominaId: '', fechaInicio: '', fechaFin: '' });
+const filaVaciaOtros     = () => ({ descripcion: '', monto: '', fecha: '', constituyeSalario: 'si' });
+const filaVaciaReten     = () => ({ descripcion: '', monto: '', fecha: '' });
 
 export default function NovedadesPage() {
   const navigate             = useNavigate();
   const { id, nominaId }     = useParams();
+  const [searchParams]       = useSearchParams();
   const { usuario }          = useAuthStore();
 
-  const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
-  const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
-  const cargo   = usuario?.cargoUsuario ?? '';
+  const empleadoId = searchParams.get('empleado');
+  const novedadId  = searchParams.get('novedad');
+  const tipoPre    = searchParams.get('tipo');
 
+  const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
+  const cargo  = usuario?.cargoUsuario ?? '';
+
+  // Datos del empleado y conceptos
+  const [empleado,    setEmpleado]    = useState(null);
+  const [conceptoMap, setConceptoMap] = useState({});
+  const [novedadEdit, setNovedadEdit] = useState(null);
+  const [cargando,    setCargando]    = useState(false);
+
+  // Estado del formulario
   const [diasLaborados, setDiasLaborados] = useState('');
-  const [tiempoLic, setTiempoLic]         = useState([filaVacia()]);
-  const [horasExtra, setHorasExtra]       = useState([filaVaciaHoras()]);
-  const [pagosExtra, setPagosExtra]       = useState([filaVaciaPagos()]);
-  const [vacaciones, setVacaciones]       = useState([filaVacia()]);
-  const [reporteVacaciones, setReporteVacaciones] = useState(false);
-  const [otrosDeveng, setOtrosDeveng]     = useState([filaVaciaOtros()]);
-  const [retencion, setRetencion]         = useState([filaVaciaReten()]);
-  const [otrosDeducir, setOtrosDeducir]   = useState([filaVaciaOtros()]);
+  const [tiempoLic,     setTiempoLic]     = useState([filaVaciaLicencia()]);
+  const [horasExtra,    setHorasExtra]    = useState([filaVaciaHoras()]);
+  const [pagosExtra,    setPagosExtra]    = useState([filaVaciaPagos()]);
+  const [vacaciones,    setVacaciones]    = useState([filaVaciaVacacion()]);
+  const [otrosDeveng,   setOtrosDeveng]   = useState([filaVaciaOtros()]);
+  const [retencion,     setRetencion]     = useState([filaVaciaReten()]);
+  const [otrosDeducir,  setOtrosDeducir]  = useState([filaVaciaOtros()]);
 
-  const [modal, setModal]                         = useState(null);
-  const [confirmarGuardar, setConfirmarGuardar]   = useState(false);
-  const [hoverGuardar, setHoverGuardar]           = useState(false);
-  const [hoverRegresar, setHoverRegresar]         = useState(false);
+  const [modal,           setModal]           = useState(null);
+  const [confirmarGuardar,setConfirmarGuardar] = useState(false);
+  const [hoverGuardar,    setHoverGuardar]    = useState(false);
+  const [hoverRegresar,   setHoverRegresar]   = useState(false);
+
+  // Grupos de conceptos por categoría para los selects
+  const [opcionesLicencias,  setOpcionesLicencias]  = useState([]);
+  const [opcionesHoras,      setOpcionesHoras]       = useState([]);
+  const [opcionesPagos,      setOpcionesPagos]       = useState([]);
+  const [opcionesVacaciones, setOpcionesVacaciones]  = useState([]);
+  const [opcionesSalarial,   setOpcionesSalarial]    = useState([]);
+  const [opcionesNoSalarial, setOpcionesNoSalarial]  = useState([]);
+
+  useEffect(() => {
+    if (!empleadoId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      masterAxios.get('/api/master/empleados', {
+        params: { empresaId: id, estado: 'ACTIVO' },
+      }),
+      payrollService.getConceptosNomina(),
+    ])
+      .then(([{ data: emps }, { data: conceptos }]) => {
+        const encontrado = emps.find(
+          e => String(e.empleadoId) === String(empleadoId)
+        );
+        setEmpleado(encontrado ?? null);
+
+        // Construir mapa nombre -> id y agrupar por tipo
+        const mapa = {};
+        conceptos.forEach(c => { mapa[c.nombreConcepNomina] = c.concepNominaId; });
+        setConceptoMap(mapa);
+
+        const toOpcion = (c) => ({ value: c.concepNominaId, label: c.nombreConcepNomina });
+
+        setOpcionesLicencias(conceptos.filter(c =>
+          c.nombreConcepNomina.toLowerCase().includes('incapacidad') ||
+          c.nombreConcepNomina.toLowerCase().includes('licencia') ||
+          c.nombreConcepNomina.toLowerCase().includes('permiso') ||
+          c.nombreConcepNomina.toLowerCase().includes('cargo') ||
+          c.nombreConcepNomina.toLowerCase().includes('citacion') ||
+          c.nombreConcepNomina.toLowerCase().includes('sufragio') ||
+          c.nombreConcepNomina.toLowerCase().includes('isaac')
+        ).map(toOpcion));
+
+        setOpcionesHoras(conceptos.filter(c =>
+          c.nombreConcepNomina.toLowerCase().includes('hora extra') ||
+          c.nombreConcepNomina.toLowerCase().includes('recargo')
+        ).map(toOpcion));
+
+        setOpcionesPagos(conceptos.filter(c =>
+          c.nombreConcepNomina.toLowerCase().includes('beneficio') ||
+          c.nombreConcepNomina.toLowerCase().includes('comision') ||
+          c.nombreConcepNomina.toLowerCase().includes('bonificacion') ||
+          c.nombreConcepNomina.toLowerCase().includes('viatico')
+        ).map(toOpcion));
+
+        setOpcionesVacaciones(conceptos.filter(c =>
+          c.nombreConcepNomina.toLowerCase().includes('vacacion')
+        ).map(toOpcion));
+
+        setOpcionesSalarial(conceptos.filter(c =>
+          c.nombreConcepNomina.toLowerCase().includes('devenir salarial') ||
+          c.nombreConcepNomina.toLowerCase().includes('constituyen salario')
+        ).map(toOpcion));
+
+        setOpcionesNoSalarial(conceptos.filter(c =>
+          c.nombreConcepNomina.toLowerCase().includes('devenir no salarial') ||
+          c.nombreConcepNomina.toLowerCase().includes('no constituyen salario')
+        ).map(toOpcion));
+
+        // Si viene con días pre-llenados desde el store
+        if (tipoPre === 'dias') {
+          const diasStore = useNominaStore.getState()
+            .diasLaborados[Number(empleadoId)];
+          if (diasStore) setDiasLaborados(String(diasStore));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [empleadoId, id, tipoPre]);
+
+  // Si es edición, cargar la novedad existente
+  useEffect(() => {
+    if (!novedadId) return;
+    payrollAxios.get(`/api/payroll/novedades/${novedadId}`)
+      .then(({ data }) => setNovedadEdit(data))
+      .catch(() => {});
+  }, [novedadId]);
 
   const updateFila = (setter, arr, i, campo, valor) => {
     const n = [...arr]; n[i] = { ...n[i], [campo]: valor }; setter(n);
   };
   const addFila    = (setter, arr, empty) => setter([...arr, empty()]);
-  const removeFila = (setter, arr, i) => arr.length > 1 && setter(arr.filter((_, idx) => idx !== i));
+  const removeFila = (setter, arr, i) =>
+    arr.length > 1 && setter(arr.filter((_, idx) => idx !== i));
 
   const campo = (label, children, i) => (
-    <div style={{ flex: 1, minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{
+      flex: 1, minWidth: '160px',
+      display: 'flex', flexDirection: 'column', gap: '6px',
+    }}>
       {i === 0 && <label style={styles.label}>{label}</label>}
       {children}
     </div>
@@ -161,12 +281,207 @@ export default function NovedadesPage() {
 
   const iconos = (onAdd, onRemove, disabled, i) => (
     <div style={{ ...styles.iconosRow, marginTop: i === 0 ? '22px' : '0' }}>
-      <button style={styles.btnIcono} onClick={onAdd}><Plus size={16} color="#0B662A" /></button>
-      <button style={{ ...styles.btnIcono, opacity: disabled ? 0.4 : 1 }} onClick={onRemove} disabled={disabled}>
+      <button style={styles.btnIcono} onClick={onAdd}>
+        <Plus size={16} color="#0B662A" />
+      </button>
+      <button
+        style={{ ...styles.btnIcono, opacity: disabled ? 0.4 : 1 }}
+        onClick={onRemove}
+        disabled={disabled}
+      >
         <Trash2 size={16} color="#A3A3A3" />
       </button>
     </div>
   );
+
+  const fechaToISO = (fecha) => {
+    if (!fecha) return null;
+    const [d, m, a] = fecha.split('/');
+    return `${a}-${m}-${d}`;
+  };
+
+  const handleGuardar = async () => {
+    setConfirmarGuardar(false);
+    try {
+      const { procesoActual } = useNominaStore.getState();
+      const novedadesAGuardar = [];
+
+      // Días laborados — se guardan en el store
+      if (diasLaborados) {
+        useNominaStore.getState().setDiasEmpleado(
+          Number(empleadoId),
+          Number(diasLaborados)
+        );
+      }
+
+      // Tiempo y licencias
+      tiempoLic.forEach(f => {
+        if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
+          novedadesAGuardar.push({
+            fkEmpleadoId:      Number(empleadoId),
+            fkConcepNominaId:  Number(f.concepNominaId),
+            procesoLiquid:     procesoActual?.procesoLiquiId,
+            anio:              procesoActual?.anio,
+            periodo:           procesoActual?.periodo,
+            fechaInicioAusen:  fechaToISO(f.fechaInicio),
+            fechaFinAusen:     fechaToISO(f.fechaFin),
+            cantidadDiasNovedad: null,
+            cantidadHorasNovedad: null,
+            valorRefNovedad:   null,
+          });
+        }
+      });
+
+      // Horas extra y recargos
+      horasExtra.forEach(f => {
+        if (f.concepNominaId && f.cantidad) {
+          novedadesAGuardar.push({
+            fkEmpleadoId:         Number(empleadoId),
+            fkConcepNominaId:     Number(f.concepNominaId),
+            procesoLiquid:        procesoActual?.procesoLiquiId,
+            anio:                 procesoActual?.anio,
+            periodo:              procesoActual?.periodo,
+            fechaNovedad:         fechaToISO(f.fecha),
+            cantidadHorasNovedad: Number(f.cantidad),
+            cantidadDiasNovedad:  null,
+            valorRefNovedad:      null,
+          });
+        }
+      });
+
+      // Pagos extralegales y compensaciones
+      pagosExtra.forEach(f => {
+        if (f.concepNominaId && f.monto) {
+          novedadesAGuardar.push({
+            fkEmpleadoId:         Number(empleadoId),
+            fkConcepNominaId:     Number(f.concepNominaId),
+            procesoLiquid:        procesoActual?.procesoLiquiId,
+            anio:                 procesoActual?.anio,
+            periodo:              procesoActual?.periodo,
+            fechaNovedad:         fechaToISO(f.fecha),
+            valorRefNovedad:      Number(f.monto),
+            cantidadDiasNovedad:  null,
+            cantidadHorasNovedad: null,
+          });
+        }
+      });
+
+      // Vacaciones
+      vacaciones.forEach(f => {
+        if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
+          novedadesAGuardar.push({
+            fkEmpleadoId:         Number(empleadoId),
+            fkConcepNominaId:     Number(f.concepNominaId),
+            procesoLiquid:        procesoActual?.procesoLiquiId,
+            anio:                 procesoActual?.anio,
+            periodo:              procesoActual?.periodo,
+            fechaInicioAusen:     fechaToISO(f.fechaInicio),
+            fechaFinAusen:        fechaToISO(f.fechaFin),
+            cantidadDiasNovedad:  null,
+            cantidadHorasNovedad: null,
+            valorRefNovedad:      null,
+          });
+        }
+      });
+
+      // Otros conceptos a devengar
+      otrosDeveng.forEach(f => {
+        if (f.monto) {
+          const nombreConcepto = f.constituyeSalario === 'si'
+            ? 'Otro concepto a devenir salarial'
+            : 'Otro concepto a devenir no salarial';
+          const concepId = conceptoMap[nombreConcepto];
+          if (concepId) {
+            novedadesAGuardar.push({
+              fkEmpleadoId:         Number(empleadoId),
+              fkConcepNominaId:     concepId,
+              procesoLiquid:        procesoActual?.procesoLiquiId,
+              anio:                 procesoActual?.anio,
+              periodo:              procesoActual?.periodo,
+              fechaNovedad:         fechaToISO(f.fecha),
+              valorRefNovedad:      Number(f.monto),
+              observaciones:        f.descripcion,
+              cantidadDiasNovedad:  null,
+              cantidadHorasNovedad: null,
+            });
+          }
+        }
+      });
+
+      // Retención en la fuente
+      retencion.forEach(f => {
+        if (f.monto) {
+          const concepId = conceptoMap['Retención en la fuente'];
+          if (concepId) {
+            novedadesAGuardar.push({
+              fkEmpleadoId:         Number(empleadoId),
+              fkConcepNominaId:     concepId,
+              procesoLiquid:        procesoActual?.procesoLiquiId,
+              anio:                 procesoActual?.anio,
+              periodo:              procesoActual?.periodo,
+              fechaNovedad:         fechaToISO(f.fecha),
+              valorRefNovedad:      Number(f.monto),
+              observaciones:        f.descripcion,
+              cantidadDiasNovedad:  null,
+              cantidadHorasNovedad: null,
+            });
+          }
+        }
+      });
+
+      // Otros conceptos a deducir
+      otrosDeducir.forEach(f => {
+        if (f.monto) {
+          const nombreConcepto = f.constituyeSalario === 'si'
+            ? 'Otros conceptos a deducir salariales'
+            : 'Otros conceptos a deducir no salariales';
+          const concepId = conceptoMap[nombreConcepto];
+          if (concepId) {
+            novedadesAGuardar.push({
+              fkEmpleadoId:         Number(empleadoId),
+              fkConcepNominaId:     concepId,
+              procesoLiquid:        procesoActual?.procesoLiquiId,
+              anio:                 procesoActual?.anio,
+              periodo:              procesoActual?.periodo,
+              fechaNovedad:         fechaToISO(f.fecha),
+              valorRefNovedad:      Number(f.monto),
+              observaciones:        f.descripcion,
+              cantidadDiasNovedad:  null,
+              cantidadHorasNovedad: null,
+            });
+          }
+        }
+      });
+
+      // Si es edición, hacer PUT; si es creación, hacer POST
+      if (novedadId && novedadesAGuardar.length === 1) {
+        await payrollAxios.put(
+          `/api/payroll/novedades/${novedadId}`,
+          novedadesAGuardar[0]
+        );
+      } else {
+        await Promise.all(
+          novedadesAGuardar.map(n =>
+            payrollAxios.post('/api/payroll/novedades', n)
+          )
+        );
+      }
+
+      setModal('exito');
+    } catch {
+      setModal('error');
+    }
+  };
+
+  if (cargando) {
+    return (
+      <div style={styles.container}>
+        <p style={{ textAlign: 'center', color: '#A3A3A3', marginTop: '40px' }}>
+          Cargando...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -177,13 +492,15 @@ export default function NovedadesPage() {
           <FileText size={18} color="#0B662A" />
           <div>
             <h2 style={styles.titulo}>Novedades</h2>
-            <p style={styles.subtitulo}>Llena el formulario de novedades que registró el empleado dentro del periodo a liquidar</p>
+            <p style={styles.subtitulo}>
+              {empleado
+                ? `${empleado.nombresEmp} ${empleado.apellidosEmp} — ${empleado.documentoEmp}`
+                : 'Cargando empleado...'}
+            </p>
           </div>
         </div>
         <div style={styles.perfilBox}>
-          <div style={styles.avatar}>
-            <UserRound size={22} color="#A3A3A3" />
-          </div>
+          <div style={styles.avatar}><UserRound size={22} color="#A3A3A3" /></div>
           <div>
             <p style={styles.perfilNombre}>{nombre}</p>
             <p style={styles.perfilCargo}>{cargo}</p>
@@ -191,13 +508,12 @@ export default function NovedadesPage() {
         </div>
       </div>
 
-      {/* ── Card 1: Base de Liquidación ── */}
+      {/* Card 1: Días laborados */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Novedades</h3>
         <p style={styles.seccionTitulo}>Base de Liquidación</p>
         <p style={styles.descripcion}>
-          Ingrese el número de días efectivamente trabajados en el periodo (máximo 30).{' '}
-          <strong>Recuerde que si el empleado trabaja bajo una jornada por horas, cuenta con el espacio para registrar dicha novedad.</strong>
+          Ingrese el número de días efectivamente trabajados en el periodo (máximo 30).
         </p>
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Días laborados</label>
@@ -207,119 +523,212 @@ export default function NovedadesPage() {
             onKeyDown={soloNumeros}
             placeholder="Ingresar número"
             style={styles.input}
+            max={30}
           />
         </div>
       </div>
 
-      {/* ── Card 2: Novedades de Tiempo y Licencias ── */}
+      {/* Card 2: Tiempo y licencias */}
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Novedades de Tiempo y Licencias</p>
         <p style={styles.descripcion}>
-          Registre aquí cualquier situación que haya afectado la jornada laboral normal del trabajador, ya sea por motivos de salud, legales o permisos personales.
+          Registre situaciones que hayan afectado la jornada laboral del trabajador.
         </p>
         {tiempoLic.map((f, i) => (
           <div key={i} style={styles.filaRow}>
-            {campo('Nombre de novedad', <SelectWrapper value={f.nombre} onChange={(v) => updateFila(setTiempoLic, tiempoLic, i, 'nombre', v)} options={OPCIONES_TIEMPO_LICENCIAS} />, i)}
-            {campo('Fecha de inicio de la novedad', <CalendarioInput value={f.fechaInicio} onChange={(v) => updateFila(setTiempoLic, tiempoLic, i, 'fechaInicio', v)} />, i)}
-            {campo('Fecha de fin de la novedad', <CalendarioInput value={f.fechaFin} onChange={(v) => updateFila(setTiempoLic, tiempoLic, i, 'fechaFin', v)} />, i)}
-            {iconos(() => addFila(setTiempoLic, tiempoLic, filaVacia), () => removeFila(setTiempoLic, tiempoLic, i), tiempoLic.length === 1, i)}
+            {campo('Nombre de novedad',
+              <SelectWrapper
+                value={f.concepNominaId}
+                onChange={(v) => updateFila(setTiempoLic, tiempoLic, i, 'concepNominaId', v)}
+                options={opcionesLicencias}
+              />, i)}
+            {campo('Fecha de inicio',
+              <CalendarioInput
+                value={f.fechaInicio}
+                onChange={(v) => updateFila(setTiempoLic, tiempoLic, i, 'fechaInicio', v)}
+              />, i)}
+            {campo('Fecha de fin',
+              <CalendarioInput
+                value={f.fechaFin}
+                onChange={(v) => updateFila(setTiempoLic, tiempoLic, i, 'fechaFin', v)}
+              />, i)}
+            {iconos(
+              () => addFila(setTiempoLic, tiempoLic, filaVaciaLicencia),
+              () => removeFila(setTiempoLic, tiempoLic, i),
+              tiempoLic.length === 1, i
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Card 3: Horas Extra y Recargos ── */}
+      {/* Card 3: Horas extra y recargos */}
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Horas Extra y Recargos</p>
         <p style={styles.descripcion}>
-          Indique la cantidad de horas adicionales laboradas fuera de la jornada ordinaria o en horarios especiales para el cálculo de sus respectivos recargos.
+          Indique la cantidad de horas adicionales laboradas fuera de la jornada ordinaria.
         </p>
         {horasExtra.map((f, i) => (
           <div key={i} style={styles.filaRow}>
-            {campo('Nombre de novedad', <SelectWrapper value={f.nombre} onChange={(v) => updateFila(setHorasExtra, horasExtra, i, 'nombre', v)} options={OPCIONES_HORAS_EXTRA} />, i)}
-            {campo('Fecha de novedad', <CalendarioInput value={f.fecha} onChange={(v) => updateFila(setHorasExtra, horasExtra, i, 'fecha', v)} />, i)}
-            {campo('Cantidad de horas o recargos',
-              <input value={f.cantidad} onChange={(e) => updateFila(setHorasExtra, horasExtra, i, 'cantidad', e.target.value)} onKeyDown={soloNumeros} placeholder="Ingresar número" style={styles.input} />, i)}
-            {iconos(() => addFila(setHorasExtra, horasExtra, filaVaciaHoras), () => removeFila(setHorasExtra, horasExtra, i), horasExtra.length === 1, i)}
+            {campo('Nombre de novedad',
+              <SelectWrapper
+                value={f.concepNominaId}
+                onChange={(v) => updateFila(setHorasExtra, horasExtra, i, 'concepNominaId', v)}
+                options={opcionesHoras}
+              />, i)}
+            {campo('Fecha de novedad',
+              <CalendarioInput
+                value={f.fecha}
+                onChange={(v) => updateFila(setHorasExtra, horasExtra, i, 'fecha', v)}
+              />, i)}
+            {campo('Cantidad de horas',
+              <input
+                value={f.cantidad}
+                onChange={(e) => updateFila(setHorasExtra, horasExtra, i, 'cantidad', e.target.value)}
+                onKeyDown={soloNumeros}
+                placeholder="Ingresar número"
+                style={styles.input}
+              />, i)}
+            {iconos(
+              () => addFila(setHorasExtra, horasExtra, filaVaciaHoras),
+              () => removeFila(setHorasExtra, horasExtra, i),
+              horasExtra.length === 1, i
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Card 4: Pagos Extralegales y Compensaciones ── */}
+      {/* Card 4: Pagos extralegales */}
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Pagos Extralegales y Compensaciones</p>
         <p style={styles.descripcion}>
-          Ingrese los montos correspondientes a incentivos, premios o beneficios adicionales pactados que deba recibir el colaborador en este periodo.
+          Ingrese montos de incentivos, premios o beneficios adicionales del periodo.
         </p>
         {pagosExtra.map((f, i) => (
           <div key={i} style={styles.filaRow}>
-            {campo('Nombre de novedad', <SelectWrapper value={f.nombre} onChange={(v) => updateFila(setPagosExtra, pagosExtra, i, 'nombre', v)} options={OPCIONES_PAGOS_EXTRA} />, i)}
-            {campo('Fecha de novedad', <CalendarioInput value={f.fecha} onChange={(v) => updateFila(setPagosExtra, pagosExtra, i, 'fecha', v)} />, i)}
-            {campo('Monto (valor del pago o compensación)',
-              <input value={f.monto} onChange={(e) => updateFila(setPagosExtra, pagosExtra, i, 'monto', e.target.value)} onKeyDown={soloNumeros} placeholder="Ingresar monto" style={styles.input} />, i)}
-            {iconos(() => addFila(setPagosExtra, pagosExtra, filaVaciaPagos), () => removeFila(setPagosExtra, pagosExtra, i), pagosExtra.length === 1, i)}
+            {campo('Nombre de novedad',
+              <SelectWrapper
+                value={f.concepNominaId}
+                onChange={(v) => updateFila(setPagosExtra, pagosExtra, i, 'concepNominaId', v)}
+                options={opcionesPagos}
+              />, i)}
+            {campo('Fecha de novedad',
+              <CalendarioInput
+                value={f.fecha}
+                onChange={(v) => updateFila(setPagosExtra, pagosExtra, i, 'fecha', v)}
+              />, i)}
+            {campo('Monto',
+              <input
+                value={f.monto}
+                onChange={(e) => updateFila(setPagosExtra, pagosExtra, i, 'monto', e.target.value)}
+                onKeyDown={soloNumeros}
+                placeholder="Ingresar monto"
+                style={styles.input}
+              />, i)}
+            {iconos(
+              () => addFila(setPagosExtra, pagosExtra, filaVaciaPagos),
+              () => removeFila(setPagosExtra, pagosExtra, i),
+              pagosExtra.length === 1, i
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Card 5: Vacaciones ── */}
-        <div style={styles.card}>
+      {/* Card 5: Vacaciones */}
+      <div style={styles.card}>
         <p style={styles.seccionTitulo}>Vacaciones</p>
         <p style={styles.descripcion}>
-            Reporte si el trabajador tomó días de descanso remunerado o si se realizó el pago en dinero de un periodo de vacaciones pendiente.
+          Reporte días de descanso remunerado o pago en dinero de vacaciones pendientes.
         </p>
         {vacaciones.map((f, i) => (
-            <div key={i} style={styles.filaRow}>
-            {campo('Nombre de novedad', <SelectWrapper value={f.nombre} onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'nombre', v)} options={OPCIONES_VACACIONES} />, i)}
-            {campo('Fecha de inicio de la novedad', <CalendarioInput value={f.fechaInicio} onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaInicio', v)} />, i)}
-            {campo('Fecha de fin de la novedad', <CalendarioInput value={f.fechaFin} onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaFin', v)} />, i)}
-            {iconos(() => addFila(setVacaciones, vacaciones, filaVacia), () => removeFila(setVacaciones, vacaciones, i), vacaciones.length === 1, i)}
-            </div>
+          <div key={i} style={styles.filaRow}>
+            {campo('Tipo de vacación',
+              <SelectWrapper
+                value={f.concepNominaId}
+                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'concepNominaId', v)}
+                options={opcionesVacaciones}
+              />, i)}
+            {campo('Fecha de inicio',
+              <CalendarioInput
+                value={f.fechaInicio}
+                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaInicio', v)}
+              />, i)}
+            {campo('Fecha de fin',
+              <CalendarioInput
+                value={f.fechaFin}
+                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaFin', v)}
+              />, i)}
+            {iconos(
+              () => addFila(setVacaciones, vacaciones, filaVaciaVacacion),
+              () => removeFila(setVacaciones, vacaciones, i),
+              vacaciones.length === 1, i
+            )}
+          </div>
         ))}
+      </div>
 
-        {/* Checkbox reporte desprendible */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginTop: '8px' }}>
-            <input
-            type="checkbox"
-            checked={reporteVacaciones}
-            onChange={(e) => setReporteVacaciones(e.target.checked)}
-            style={{ width: '18px', height: '18px', accentColor: '#0B662A', cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#272525' }}>
-            Ver reporte de vacaciones en el desprendible
-            </span>
-        </label>
-        </div>
-
-      {/* ── Card 6: Otros Conceptos a Devengar ── */}
+      {/* Card 6: Otros conceptos a devengar */}
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Otros Conceptos a Devengar</p>
         <p style={styles.descripcion}>
-          Registre cualquier otro ingreso a favor del trabajador no incluido en las secciones anteriores.
+          Registre cualquier otro ingreso a favor del trabajador no incluido anteriormente.
         </p>
         {otrosDeveng.map((f, i) => (
           <div key={i} style={styles.filaRow}>
             {campo('Descripción concepto',
-              <input value={f.descripcion} onChange={(e) => updateFila(setOtrosDeveng, otrosDeveng, i, 'descripcion', e.target.value)} placeholder="Ingresar breve descripción" style={styles.input} />, i)}
-            {campo('Monto/Valor del concepto a devenir',
-              <input value={f.monto} onChange={(e) => updateFila(setOtrosDeveng, otrosDeveng, i, 'monto', e.target.value)} onKeyDown={soloNumeros} placeholder="Ingresar monto" style={styles.input} />, i)}
-            {campo('Fecha de la novedad', <CalendarioInput value={f.fecha} onChange={(v) => updateFila(setOtrosDeveng, otrosDeveng, i, 'fecha', v)} />, i)}
+              <input
+                value={f.descripcion}
+                onChange={(e) => updateFila(setOtrosDeveng, otrosDeveng, i, 'descripcion', e.target.value)}
+                placeholder="Breve descripción"
+                style={styles.input}
+              />, i)}
+            {campo('Monto',
+              <input
+                value={f.monto}
+                onChange={(e) => updateFila(setOtrosDeveng, otrosDeveng, i, 'monto', e.target.value)}
+                onKeyDown={soloNumeros}
+                placeholder="Ingresar monto"
+                style={styles.input}
+              />, i)}
+            {campo('Fecha',
+              <CalendarioInput
+                value={f.fecha}
+                onChange={(v) => updateFila(setOtrosDeveng, otrosDeveng, i, 'fecha', v)}
+              />, i)}
             <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {i === 0 && <label style={styles.label}>¿Constituye salario?</label>}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', height: '43px' }}>
                 <label style={styles.radioLabel}>
-                  <input type="radio" name={`deveng-sal-${i}`} value="si" checked={f.constituyeSalario === 'si'} onChange={() => updateFila(setOtrosDeveng, otrosDeveng, i, 'constituyeSalario', 'si')} style={styles.radio} /> Sí
+                  <input
+                    type="radio"
+                    name={`deveng-sal-${i}`}
+                    value="si"
+                    checked={f.constituyeSalario === 'si'}
+                    onChange={() => updateFila(setOtrosDeveng, otrosDeveng, i, 'constituyeSalario', 'si')}
+                    style={styles.radio}
+                  /> Sí
                 </label>
                 <label style={styles.radioLabel}>
-                  <input type="radio" name={`deveng-sal-${i}`} value="no" checked={f.constituyeSalario === 'no'} onChange={() => updateFila(setOtrosDeveng, otrosDeveng, i, 'constituyeSalario', 'no')} style={styles.radio} /> No
+                  <input
+                    type="radio"
+                    name={`deveng-sal-${i}`}
+                    value="no"
+                    checked={f.constituyeSalario === 'no'}
+                    onChange={() => updateFila(setOtrosDeveng, otrosDeveng, i, 'constituyeSalario', 'no')}
+                    style={styles.radio}
+                  /> No
                 </label>
               </div>
             </div>
-            {iconos(() => addFila(setOtrosDeveng, otrosDeveng, filaVaciaOtros), () => removeFila(setOtrosDeveng, otrosDeveng, i), otrosDeveng.length === 1, i)}
+            {iconos(
+              () => addFila(setOtrosDeveng, otrosDeveng, filaVaciaOtros),
+              () => removeFila(setOtrosDeveng, otrosDeveng, i),
+              otrosDeveng.length === 1, i
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Card 7: Retención en la Fuente ── */}
+      {/* Card 7: Retención en la fuente */}
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Retención en la Fuente</p>
         <p style={styles.descripcion}>
@@ -327,57 +736,123 @@ export default function NovedadesPage() {
         </p>
         {retencion.map((f, i) => (
           <div key={i} style={styles.filaRow}>
-            {campo('Descripción concepto',
-              <input value={f.descripcion} onChange={(e) => updateFila(setRetencion, retencion, i, 'descripcion', e.target.value)} placeholder="Ingresar breve descripción" style={styles.input} />, i)}
-            {campo('Monto/Valor de retención',
-              <input value={f.monto} onChange={(e) => updateFila(setRetencion, retencion, i, 'monto', e.target.value)} onKeyDown={soloNumeros} placeholder="Ingresar monto" style={styles.input} />, i)}
-            {campo('Fecha de la novedad', <CalendarioInput value={f.fecha} onChange={(v) => updateFila(setRetencion, retencion, i, 'fecha', v)} />, i)}
-            {iconos(() => addFila(setRetencion, retencion, filaVaciaReten), () => removeFila(setRetencion, retencion, i), retencion.length === 1, i)}
+            {campo('Descripción',
+              <input
+                value={f.descripcion}
+                onChange={(e) => updateFila(setRetencion, retencion, i, 'descripcion', e.target.value)}
+                placeholder="Breve descripción"
+                style={styles.input}
+              />, i)}
+            {campo('Monto de retención',
+              <input
+                value={f.monto}
+                onChange={(e) => updateFila(setRetencion, retencion, i, 'monto', e.target.value)}
+                onKeyDown={soloNumeros}
+                placeholder="Ingresar monto"
+                style={styles.input}
+              />, i)}
+            {campo('Fecha',
+              <CalendarioInput
+                value={f.fecha}
+                onChange={(v) => updateFila(setRetencion, retencion, i, 'fecha', v)}
+              />, i)}
+            {iconos(
+              () => addFila(setRetencion, retencion, filaVaciaReten),
+              () => removeFila(setRetencion, retencion, i),
+              retencion.length === 1, i
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Card 8: Otros Conceptos a Deducir ── */}
+      {/* Card 8: Otros conceptos a deducir */}
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Otros Conceptos a Deducir</p>
         <p style={styles.descripcion}>
-          Descuentos manuales como préstamos, fondos de empleados o ajustes negativos.
+          Descuentos como préstamos, fondos de empleados o ajustes negativos.
         </p>
         {otrosDeducir.map((f, i) => (
           <div key={i} style={styles.filaRow}>
             {campo('Descripción concepto',
-              <input value={f.descripcion} onChange={(e) => updateFila(setOtrosDeducir, otrosDeducir, i, 'descripcion', e.target.value)} placeholder="Ingresar breve descripción" style={styles.input} />, i)}
-            {campo('Monto/Valor del concepto a devenir',
-              <input value={f.monto} onChange={(e) => updateFila(setOtrosDeducir, otrosDeducir, i, 'monto', e.target.value)} onKeyDown={soloNumeros} placeholder="Ingresar monto" style={styles.input} />, i)}
-            {campo('Fecha de la novedad', <CalendarioInput value={f.fecha} onChange={(v) => updateFila(setOtrosDeducir, otrosDeducir, i, 'fecha', v)} />, i)}
+              <input
+                value={f.descripcion}
+                onChange={(e) => updateFila(setOtrosDeducir, otrosDeducir, i, 'descripcion', e.target.value)}
+                placeholder="Breve descripción"
+                style={styles.input}
+              />, i)}
+            {campo('Monto',
+              <input
+                value={f.monto}
+                onChange={(e) => updateFila(setOtrosDeducir, otrosDeducir, i, 'monto', e.target.value)}
+                onKeyDown={soloNumeros}
+                placeholder="Ingresar monto"
+                style={styles.input}
+              />, i)}
+            {campo('Fecha',
+              <CalendarioInput
+                value={f.fecha}
+                onChange={(v) => updateFila(setOtrosDeducir, otrosDeducir, i, 'fecha', v)}
+              />, i)}
             <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {i === 0 && <label style={styles.label}>¿Constituye salario?</label>}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', height: '43px' }}>
                 <label style={styles.radioLabel}>
-                  <input type="radio" name={`deducir-sal-${i}`} value="si" checked={f.constituyeSalario === 'si'} onChange={() => updateFila(setOtrosDeducir, otrosDeducir, i, 'constituyeSalario', 'si')} style={styles.radio} /> Sí
+                  <input
+                    type="radio"
+                    name={`deducir-sal-${i}`}
+                    value="si"
+                    checked={f.constituyeSalario === 'si'}
+                    onChange={() => updateFila(setOtrosDeducir, otrosDeducir, i, 'constituyeSalario', 'si')}
+                    style={styles.radio}
+                  /> Sí
                 </label>
                 <label style={styles.radioLabel}>
-                  <input type="radio" name={`deducir-sal-${i}`} value="no" checked={f.constituyeSalario === 'no'} onChange={() => updateFila(setOtrosDeducir, otrosDeducir, i, 'constituyeSalario', 'no')} style={styles.radio} /> No
+                  <input
+                    type="radio"
+                    name={`deducir-sal-${i}`}
+                    value="no"
+                    checked={f.constituyeSalario === 'no'}
+                    onChange={() => updateFila(setOtrosDeducir, otrosDeducir, i, 'constituyeSalario', 'no')}
+                    style={styles.radio}
+                  /> No
                 </label>
               </div>
             </div>
-            {iconos(() => addFila(setOtrosDeducir, otrosDeducir, filaVaciaOtros), () => removeFila(setOtrosDeducir, otrosDeducir, i), otrosDeducir.length === 1, i)}
+            {iconos(
+              () => addFila(setOtrosDeducir, otrosDeducir, filaVaciaOtros),
+              () => removeFila(setOtrosDeducir, otrosDeducir, i),
+              otrosDeducir.length === 1, i
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Botones finales ── */}
+      {/* Botones */}
       <div style={styles.botonesRow}>
         <button
-          style={{ ...styles.btnGuardarCerrar, background: hoverGuardar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverGuardar(true)} onMouseLeave={() => setHoverGuardar(false)}
+          style={{
+            ...styles.btnGuardarCerrar,
+            background: hoverGuardar
+              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
+              : '#0B662A',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverGuardar(true)}
+          onMouseLeave={() => setHoverGuardar(false)}
           onClick={() => setConfirmarGuardar(true)}
         >
           Guardar
         </button>
         <button
-          style={{ ...styles.btnRegresar, background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverRegresar(true)} onMouseLeave={() => setHoverRegresar(false)}
+          style={{
+            ...styles.btnRegresar,
+            background: hoverRegresar
+              ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'
+              : '#fff',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverRegresar(true)}
+          onMouseLeave={() => setHoverRegresar(false)}
           onClick={() => navigate(-1)}
         >
           Regresar
@@ -387,12 +862,18 @@ export default function NovedadesPage() {
       <ConfirmarCambiosModal
         visible={confirmarGuardar}
         onCancelar={() => setConfirmarGuardar(false)}
-        onConfirmar={() => { setConfirmarGuardar(false); setModal('exito'); }}
-        titulo="¿Deseas guardar y cerrar el proceso?"
-        descripcion="Una vez confirmes, el proceso será cerrado y los datos guardados definitivamente."
+        onConfirmar={handleGuardar}
+        titulo="¿Deseas guardar las novedades?"
+        descripcion="Las novedades registradas quedarán asociadas al proceso de liquidación."
       />
-      <MensajeModal tipo={modal} onClose={() => { setModal(null); if (modal === 'exito') navigate(-1); }} />
 
+      <MensajeModal
+        tipo={modal}
+        onClose={() => {
+          setModal(null);
+          if (modal === 'exito') navigate(-1);
+        }}
+      />
     </div>
   );
 }

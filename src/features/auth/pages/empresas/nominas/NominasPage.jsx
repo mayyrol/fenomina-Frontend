@@ -4,21 +4,8 @@ import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
-
-
-const MOCK_PERIODOS = [
-  { id: 1,  periodo: '2025-01-15', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-01-20', estado: 'Borrador' },
-  { id: 2,  periodo: '2025-01-15', empleadosIncluidos: 13, totalNeto: 224000, fechaCreacion: '2025-01-20', estado: 'Borrador' },
-  { id: 3,  periodo: '2025-01-15', empleadosIncluidos: 14, totalNeto: 224000, fechaCreacion: '2025-01-21', estado: 'Cerrado' },
-  { id: 4,  periodo: '2025-01-15', empleadosIncluidos: 14, totalNeto: 224000, fechaCreacion: '2025-01-21', estado: 'Borrador' },
-  { id: 5,  periodo: '2025-01-15', empleadosIncluidos: 14, totalNeto: 224000, fechaCreacion: '2025-01-22', estado: 'Pagado' },
-  { id: 6,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-03', estado: 'Borrador' },
-  { id: 7,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-03', estado: 'Borrador' },
-  { id: 8,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-04', estado: 'Cerrado' },
-  { id: 9,  periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-04', estado: 'Borrador' },
-  { id: 10, periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-05', estado: 'Pendiente por pagar' },
-  { id: 11, periodo: '2025-01-30', empleadosIncluidos: 15, totalNeto: 224000, fechaCreacion: '2025-02-05', estado: 'Borrador' },
-];
+import { useNominas } from '../../../../../hooks/useNominas';
+import payrollService from '../../../../../services/payrollService';
 
 const TABS = ['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado', 'Anulado'];
 const PAGE_SIZE = 10;
@@ -68,7 +55,8 @@ export default function NominasPage() {
   const [tab, setTab]                           = useState('Borrador');
   const [busqueda, setBusqueda]                 = useState('');
   const [pagina, setPagina]                     = useState(0);
-  const [periodos, setPeriodos]                 = useState(MOCK_PERIODOS);
+  const { procesos, cargando, error, recargar } = useNominas(id);
+  const [periodos, setPeriodos] = useState([]);
   const [modal, setModal]                       = useState(null);
   const [confirmarEstado, setConfirmarEstado]     = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
@@ -77,10 +65,14 @@ export default function NominasPage() {
   const [periodoEliminar, setPeriodoEliminar]   = useState(null);
   const [hoverLiquidar, setHoverLiquidar]       = useState(false);
 
+  useEffect(() => {
+    setPeriodos(procesos);
+  }, [procesos]);
+
   const periodosFiltrados = periodos.filter(p =>
-    !p.deletedAt &&
-    p.estado === tab &&
-    p.periodo.includes(busqueda)
+    ESTADO_LABEL[p.estadoProcNomina] === tab &&
+    (p.fechaInicioPeriodo?.includes(busqueda) ||
+    p.fechaFinPeriodo?.includes(busqueda))
   );
 
   const totalPaginas   = Math.max(1, Math.ceil(periodosFiltrados.length / PAGE_SIZE));
@@ -95,12 +87,19 @@ export default function NominasPage() {
     }
   };
 
-  const handleConfirmarEstado = () => {
-    setPeriodos(periodos.map(p =>
-      p.id === cambioEstado.periodoId ? { ...p, estado: cambioEstado.nuevoEstado } : p
-    ));
-    setConfirmarEstado(false);
-    setModal('exito');
+  const handleConfirmarEstado = async () => {
+    try {
+      await payrollService.cambiarEstado(
+        cambioEstado.periodoId,
+        cambioEstado.nuevoEstado.toUpperCase().replace(/ /g, '_')
+      );
+      await recargar();
+      setConfirmarEstado(false);
+      setModal('exito');
+    } catch (err) {
+      setConfirmarEstado(false);
+      setModal('error');
+    }
   };
 
   const handleEliminar = (periodo) => {
@@ -108,13 +107,32 @@ export default function NominasPage() {
     setConfirmarEliminar(true);
   };
 
-  const handleConfirmarEliminar = () => {
-    const ahora = new Date().toISOString();
-    setPeriodos(periodos.map(p =>
-      p.id === periodoEliminar.id ? { ...p, deletedAt: ahora } : p
-    ));
-    setConfirmarEliminar(false);
-    setModal('exito');
+  const handleConfirmarEliminar = async () => {
+    try {
+      await payrollService.eliminarProceso(periodoEliminar.id);
+      await recargar();
+      setConfirmarEliminar(false);
+      setModal('exito');
+    } catch (err) {
+      setConfirmarEliminar(false);
+      setModal('error');
+    }
+  };
+
+  const ESTADO_LABEL = {
+    BORRADOR:         'Borrador',
+    CERRADO:          'Cerrado',
+    PENDIENTE_PAGO:   'Pendiente por pagar',
+    PAGADO:           'Pagado',
+    ANULADO:          'Anulado',
+  };
+
+  const ESTADO_BACK = {
+    'Borrador':           'BORRADOR',
+    'Cerrado':            'CERRADO',
+    'Pendiente por pagar':'PENDIENTE_PAGO',
+    'Pagado':             'PAGADO',
+    'Anulado':            'ANULADO',
   };
 
   return (
@@ -221,15 +239,18 @@ export default function NominasPage() {
                 </tr>
               ) : (
                 periodosPagina.map((p, index) => (
-                  <tr key={p.id} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
-                    <td style={styles.td}>{p.periodo}</td>
-                    <td style={styles.td}>{p.empleadosIncluidos}</td>
-                    <td style={styles.td}>{formatMiles(p.totalNeto)}</td>
-                    <td style={styles.td}>{p.fechaCreacion}</td>
+                  <tr key={p.procesoLiquiId} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
+                    <td style={styles.td}>{p.fechaInicioPeriodo} - {p.fechaFinPeriodo}</td>
+                    <td style={styles.td}>{'-'}</td>
+                    <td style={styles.td}>{'-'}</td>
+                    <td style={styles.td}>{p.createdAt?.split('T')[0]}</td>
                     <td style={styles.td}>
-                      {p.estado === 'Anulado'
-                        ? <span style={styles.estadoTexto}>{p.estado}</span>
-                        : <EstadoSelect valor={p.estado} onChange={(v) => handleEstadoChange(p.id, v)} />
+                      {p.estadoProcNomina === 'ANULADO'
+                        ? <span style={styles.estadoTexto}>{ESTADO_LABEL[p.estadoProcNomina]}</span>
+                        : <EstadoSelect
+                            valor={ESTADO_LABEL[p.estadoProcNomina]}
+                            onChange={(v) => handleEstadoChange(p.procesoLiquiId, ESTADO_BACK[v])}
+                          />
                       }
                     </td>
                     {['Borrador', 'Cerrado'].includes(tab) && (
@@ -239,7 +260,7 @@ export default function NominasPage() {
                             <>
                               <button
                                 style={styles.iconBtn}
-                                onClick={() => navigate(`/empresas/${id}/nominas/${p.id}/desprendibles`)}
+                                onClick={() => navigate(`/empresas/${id}/nominas/${p.procesoLiquiId}/desprendibles`)}
                                 title="Editar"
                               >
                                 <Pencil size={16} color="#0B662A" />
@@ -257,7 +278,7 @@ export default function NominasPage() {
                             <button
                               style={styles.iconBtn}
                               title="Liquidar"
-                              onClick={() => navigate(`/empresas/${id}/nominas/${p.id}/liquidar`)}
+                              onClick={() => navigate(`/empresas/${id}/nominas/${p.procesoLiquiId}/liquidar`)}
                             >
                               <Upload size={16} color="#0B662A" />
                             </button>
@@ -306,12 +327,16 @@ export default function NominasPage() {
       <ConfirmarCambiosModal
         visible={confirmarAnulado}
         onCancelar={() => setConfirmarAnulado(false)}
-        onConfirmar={() => {
-          setPeriodos(periodos.map(p =>
-            p.id === cambioEstado.periodoId ? { ...p, estado: 'Anulado' } : p
-          ));
-          setConfirmarAnulado(false);
-          setModal('exito');
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(cambioEstado.periodoId, 'ANULADO');
+            await recargar();
+            setConfirmarAnulado(false);
+            setModal('exito');
+          } catch (err) {
+            setConfirmarAnulado(false);
+            setModal('error');
+          }
         }}
         titulo="¿Estás seguro de que deseas anular este proceso?"
         descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo. ¿Confirmas la anulación?"

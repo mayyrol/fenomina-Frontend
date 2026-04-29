@@ -1,19 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, ChevronLeft, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
-
-
-const MOCK_PROCESO = {
-  nombreEmpresa:   'PRIIGO SAS',
-  nit:             '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo:         'Diciembre de 2026',
-  semestre:        'Segundo semestre',
-  estado:          'Cerrado',
-};
+import { usePrimaStore } from '../../../../../store/usePrimaStore';
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
 
 export default function LiquidarPrimaPage() {
   const navigate             = useNavigate();
@@ -26,6 +19,30 @@ export default function LiquidarPrimaPage() {
   const [confirmarLiquidar, setConfirmarLiquidar] = useState(false);
   const [hoverLiquidar, setHoverLiquidar]         = useState(false);
   const [hoverCancelar, setHoverCancelar]         = useState(false);
+
+  const [proceso,  setProceso]  = useState(null);
+  const [empresa,  setEmpresa]  = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [modal,    setModal]    = useState(null);
+
+  useEffect(() => {
+    if (!primaId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      payrollService.getProcesosPrima(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(primaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [primaId, id]);
 
   return (
     <div style={styles.container}>
@@ -58,12 +75,12 @@ export default function LiquidarPrimaPage() {
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Liquidar Prima</h3>
         <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Semestre:</span><span style={styles.infoValor}>{MOCK_PROCESO.semestre}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado:</span><span style={styles.infoValor}>{MOCK_PROCESO.estado}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Semestre:</span><span style={styles.infoValor}>{proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre'}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
         </div>
         <hr style={styles.divider} />
       </div>
@@ -91,10 +108,26 @@ export default function LiquidarPrimaPage() {
       <ConfirmarCambiosModal
         visible={confirmarLiquidar}
         onCancelar={() => setConfirmarLiquidar(false)}
-        onConfirmar={() => { setConfirmarLiquidar(false); navigate(`/empresas/${id}/primas/${primaId}/resultado`); }}
+        onConfirmar={async () => {
+          setConfirmarLiquidar(false);
+          try {
+            const { empleadosSeleccionados } = usePrimaStore.getState();
+
+            await payrollService.liquidarPrima(primaId, {
+              empleadosSeleccionados,
+            });
+
+            usePrimaStore.getState().limpiarProceso();
+            navigate(`/empresas/${id}/primas/${primaId}/resultado`);
+          } catch {
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas calcular y liquidar esta prima?"
         descripcion="Una vez confirmes, se procesará la liquidación del periodo seleccionado."
       />
+
+      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
 
     </div>
   );
