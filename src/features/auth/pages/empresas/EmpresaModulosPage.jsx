@@ -114,7 +114,7 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', color: '#272525', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'Nunito, sans-serif', marginTop: '4px', marginBottom: '16px', padding: 0, transition: 'color 0.2s' },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'Nunito, sans-serif', marginTop: '4px', marginBottom: '16px', padding: 0, transition: 'color 0.2s', width: 'fit-content' },
   areaContenido:{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '60px 40px', width: '100%', boxSizing: 'border-box' },
   grid:         { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '40px 32px' },

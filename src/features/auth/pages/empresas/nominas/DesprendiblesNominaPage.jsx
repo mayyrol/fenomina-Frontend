@@ -13,6 +13,7 @@ import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosMod
 import MensajeModal from '../../../../../components/MensajeModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const formatMiles = (valor) => {
   const str = String(Math.round(valor));
@@ -45,6 +46,7 @@ export default function DesprendiblesNominaPage() {
   const [hoverEliminar, setHoverEliminar] = useState(false);
   const [hoverPDF,      setHoverPDF]      = useState(false);
   const [descargando,   setDescargando]   = useState(false);
+  const [mensajeError, setMensajeError] = useState('');
 
   useEffect(() => {
     if (!nominaId || !id) return;
@@ -126,63 +128,48 @@ export default function DesprendiblesNominaPage() {
     e.documentoEmp.includes(busqueda)
   );
 
-  const handleDescargarPDF = () => {
-    const doc = new jsPDF();
-    let y = 14;
+  const handleDescargarExcel = () => {
+    setDescargando(true);
 
-    if (empresa?.logoEmpresaUrl) {
-      doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, y, 30, 30);
-      y += 34;
-    }
+    const filas = empleados.flatMap(emp => {
+      const novsEmp = novedades[emp.empleadoId] ?? [];
+      const dias = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? 30;
 
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text('Desprendibles Nómina — Borrador', 14, y); y += 8;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Empresa: ${empresa?.nombreEmpresa ?? ''}`, 14, y); y += 6;
-    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 14, y); y += 6;
-    doc.text(`Periodo: ${proceso?.fechaInicioPeriodo} - ${proceso?.fechaFinPeriodo}`, 14, y); y += 6;
-    doc.text(`Estado: ${proceso?.estadoProcNomina ?? ''}`, 14, y); y += 10;
+      if (novsEmp.length === 0) {
+        return [{
+          'Nombre': `${emp.nombresEmp} ${emp.apellidosEmp}`,
+          'Documento': emp.documentoEmp,
+          'Cargo': emp.cargoEmp,
+          'Salario': emp.salarioBascMensual,
+          'Días laborados': dias,
+          'Tipo novedad': '-',
+          'Detalle': '-',
+        }];
+      }
 
-    const filas = empleados.flatMap(e => {
-      const novsEmp = novedades[e.empleadoId] ?? [];
-      const dias    = useNominaStore.getState().diasLaborados[e.empleadoId] ?? 30;
-      const base    = [
-        `${e.nombresEmp} ${e.apellidosEmp}`,
-        e.documentoEmp,
-        e.cargoEmp,
-        formatMiles(e.salarioBascMensual),
-        String(dias),
-      ];
-      if (novsEmp.length === 0) return [[...base, '-', '-']];
-      return novsEmp.map(n => [
-        ...base,
-        n.observaciones ?? '',
-        n.cantidadDiasNovedad
+      return novsEmp.map(n => ({
+        'Nombre': `${emp.nombresEmp} ${emp.apellidosEmp}`,
+        'Documento': emp.documentoEmp,
+        'Cargo': emp.cargoEmp,
+        'Salario': emp.salarioBascMensual,
+        'Días laborados': dias,
+        'Tipo novedad': n.observaciones ?? n.nombreConcepto ?? `Novedad ${n.novedadId}`,
+        'Detalle': n.cantidadDiasNovedad
           ? `${n.cantidadDiasNovedad} días`
           : n.cantidadHorasNovedad
           ? `${n.cantidadHorasNovedad} horas`
           : n.valorRefNovedad
           ? formatMiles(n.valorRefNovedad)
-          : '',
-      ]);
+          : '-',
+      }));
     });
 
-    autoTable(doc, {
-      startY: y,
-      head: [['Nombre', 'Documento', 'Cargo', 'Salario', 'Días', 'Tipo novedad', 'Detalle']],
-      body: filas,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Novedades');
+    XLSX.writeFile(wb, `novedades_nomina_${nominaId}.xlsx`);
 
-    setDescargando(true);
-    setTimeout(() => {
-      doc.save(`borrador_nomina_${nominaId}.pdf`);
-      setDescargando(false);
-    }, 100);
+    setTimeout(() => setDescargando(false), 500);
   };
 
   return (
@@ -205,12 +192,6 @@ export default function DesprendiblesNominaPage() {
           </div>
         </div>
       </div>
-
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       {/* Info del proceso */}
       <div style={styles.card}>
@@ -317,7 +298,7 @@ export default function DesprendiblesNominaPage() {
                         <div key={nov.novedadId} style={styles.novedadFila}>
                           <div style={{ flex: 1 }}>
                             <p style={styles.novedadTipo}>
-                              ✓ {nov.observaciones ?? `Novedad ${nov.novedadId}`}
+                              ✓ {nov.observaciones ?? nov.nombreConcepto ?? `Novedad ${nov.novedadId}`}
                             </p>
                             <p style={styles.novedadDetalle}>
                               {nov.cantidadDiasNovedad
@@ -365,7 +346,7 @@ export default function DesprendiblesNominaPage() {
         })}
       </div>
 
-      {/* Descargar PDF borrador */}
+      {/* Descargar excel borrador */}
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
         <button
           style={{
@@ -377,9 +358,9 @@ export default function DesprendiblesNominaPage() {
           }}
           onMouseEnter={() => setHoverPDF(true)}
           onMouseLeave={() => setHoverPDF(false)}
-          onClick={handleDescargarPDF}
+          onClick={handleDescargarExcel}
         >
-          Descargar reporte en PDF
+          Descargar reporte en Excel
         </button>
       </div>
 
@@ -423,6 +404,12 @@ export default function DesprendiblesNominaPage() {
         >
           Eliminar
         </button>
+        <button
+          style={styles.btnAnular}
+          onClick={() => navigate(`/empresas/${id}/nominas`)}
+        >
+          Cancelar
+        </button>
       </div>
 
       {/* Modales */}
@@ -438,6 +425,72 @@ export default function DesprendiblesNominaPage() {
         visible={confirmarCerrar}
         onCancelar={() => setConfirmarCerrar(false)}
         onConfirmar={async () => {
+          const diasStore = useNominaStore.getState().diasLaborados;
+
+          // Validar días laborados vs días reales del periodo
+          const fechaInicioPeriodo = new Date(proceso.fechaInicioPeriodo);
+          const fechaFinPeriodo = new Date(proceso.fechaFinPeriodo);
+          const diasDelPeriodo = Math.round(
+            (fechaFinPeriodo - fechaInicioPeriodo) / (1000 * 60 * 60 * 24)
+          ) + 1;
+
+          console.log('diasStore al cerrar:', diasStore);
+          console.log('diasDelPeriodo:', diasDelPeriodo);
+
+          for (const emp of empleados) {
+            const diasIngresados = diasStore[emp.empleadoId];
+            if (!diasIngresados) continue;
+
+            if (Number(diasIngresados) > diasDelPeriodo) {
+              setMensajeError(
+                `${emp.nombresEmp} ${emp.apellidosEmp} tiene ${diasIngresados} días laborados pero el periodo solo cubre ${diasDelPeriodo} días (${proceso.fechaInicioPeriodo} - ${proceso.fechaFinPeriodo}).`
+              );
+              setModal('error');
+              setConfirmarCerrar(false);
+              return;
+            }
+          }
+          // Validar días laborados vs fecha ingreso de cada empleado
+  
+          for (const emp of empleados) {
+            const diasIngresados = diasStore[emp.empleadoId];
+            if (!diasIngresados) continue;
+
+            if (emp.fechaIngresoEmp) {
+              const fechaIngreso  = new Date(emp.fechaIngresoEmp);
+              const fechaInicio   = new Date(proceso.fechaInicioPeriodo);
+              const fechaFin      = new Date(proceso.fechaFinPeriodo);
+
+              // Si el empleado ingresó dentro del periodo, calcular días válidos
+              if (fechaIngreso > fechaInicio && fechaIngreso <= fechaFin) {
+                const diasValidos = Math.round(
+                  (fechaFin - fechaIngreso) / (1000 * 60 * 60 * 24)
+                ) + 1;
+
+                if (Number(diasIngresados) > diasValidos) {
+                  setMensajeError(
+                    `${emp.nombresEmp} ${emp.apellidosEmp} ingresó el ${emp.fechaIngresoEmp}. Los días laborados no pueden superar ${diasValidos} días válidos del periodo.`
+                  );
+                  setModal('error');
+                  setConfirmarCerrar(false);
+                  return;
+                }
+              }
+            }
+
+            // Validar máximo según tipo de proceso
+            const esQuincenal = proceso?.tipoProceso === 'NOMINA_QUINCENAL';
+            const maxDias = esQuincenal ? 15 : 30;
+            if (Number(diasIngresados) > maxDias) {
+              setMensajeError(
+                `Un empleado tiene más de ${maxDias} días laborados, que es el máximo para nómina ${esQuincenal ? 'quincenal' : 'mensual'}.`
+              );
+              setModal('error');
+              setConfirmarCerrar(false);
+              return;
+            }
+          }
+
           try {
             await payrollService.cambiarEstado(nominaId, 'CERRADO');
             setConfirmarCerrar(false);
@@ -490,7 +543,8 @@ export default function DesprendiblesNominaPage() {
 
       <MensajeModal
         tipo={modal}
-        onClose={() => setModal(null)}
+        mensaje={mensajeError || undefined}
+        onClose={() => { setModal(null); setMensajeError(''); }}
       />
 
       {/* Modal descarga */}
@@ -533,7 +587,7 @@ const styles = {
   avatar:             { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre:       { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:        { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:          { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   card:               { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
   cardTitulo:         { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 20px 0' },
   infoGrid:           { display: 'flex', flexDirection: 'column', gap: '10px' },

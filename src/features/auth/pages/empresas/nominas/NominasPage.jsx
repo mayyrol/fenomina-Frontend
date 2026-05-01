@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload } from 'lucide-react';
+import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
-import { useNominas } from '../../../../../hooks/useNominas';
+import { useNominas } from '../../../hooks/useNominas';
 import payrollService from '../../../../../services/payrollService';
 
 const TABS = ['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado', 'Anulado'];
@@ -43,6 +43,22 @@ function EstadoSelect({ valor, onChange }) {
     </div>
   );
 }
+
+const ESTADO_LABEL = {
+  BORRADOR:         'Borrador',
+  CERRADO:          'Cerrado',
+  PENDIENTE_PAGO:   'Pendiente por pagar',
+  PAGADO:           'Pagado',
+  ANULADO:          'Anulado',
+};
+
+const ESTADO_BACK = {
+  'Borrador':           'BORRADOR',
+  'Cerrado':            'CERRADO',
+  'Pendiente por pagar':'PENDIENTE_PAGO',
+  'Pagado':             'PAGADO',
+  'Anulado':            'ANULADO',
+};
 
 export default function NominasPage() {
   const navigate    = useNavigate();
@@ -109,7 +125,7 @@ export default function NominasPage() {
 
   const handleConfirmarEliminar = async () => {
     try {
-      await payrollService.eliminarProceso(periodoEliminar.id);
+      await payrollService.eliminarProceso(periodoEliminar.procesoLiquiId);
       await recargar();
       setConfirmarEliminar(false);
       setModal('exito');
@@ -119,21 +135,6 @@ export default function NominasPage() {
     }
   };
 
-  const ESTADO_LABEL = {
-    BORRADOR:         'Borrador',
-    CERRADO:          'Cerrado',
-    PENDIENTE_PAGO:   'Pendiente por pagar',
-    PAGADO:           'Pagado',
-    ANULADO:          'Anulado',
-  };
-
-  const ESTADO_BACK = {
-    'Borrador':           'BORRADOR',
-    'Cerrado':            'CERRADO',
-    'Pendiente por pagar':'PENDIENTE_PAGO',
-    'Pagado':             'PAGADO',
-    'Anulado':            'ANULADO',
-  };
 
   return (
     <div style={styles.container}>
@@ -159,7 +160,7 @@ export default function NominasPage() {
       </div>
 
       {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
+      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}`)}>
         <ChevronLeft size={16} color="#272525" />
         <span>Volver</span>
       </button>
@@ -221,11 +222,15 @@ export default function NominasPage() {
             <thead>
               <tr>
                 <th style={styles.th}>Periodo</th>
-                <th style={styles.th}>Empleados incluidos</th>
-                <th style={styles.th}>Total neto</th>
+                {!['Borrador', 'Cerrado'].includes(tab) && (
+                  <th style={styles.th}>Empleados incluidos</th>
+                )}
+                {!['Borrador', 'Cerrado'].includes(tab) && (
+                  <th style={styles.th}>Total neto</th>
+                )}
                 <th style={styles.th}>Fecha de creación proceso</th>
                 <th style={styles.th}>Estado</th>
-                {(tab === 'Borrador' || tab === 'Cerrado') && (
+                {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
                   <th style={styles.th}>Acciones</th>
                 )}
               </tr>
@@ -233,7 +238,14 @@ export default function NominasPage() {
             <tbody>
               {periodosPagina.length === 0 ? (
                 <tr>
-                  <td colSpan={['Borrador', 'Cerrado'].includes(tab) ? 6 : 5} style={{ textAlign: 'center', padding: '20px', color: '#A3A3A3' }}>
+                  <td
+                    colSpan={
+                      ['Borrador', 'Cerrado'].includes(tab) ? 4 :
+                      ['Pendiente por pagar', 'Pagado'].includes(tab) ? 6 :
+                      tab === 'Anulado' ? 5 : 4
+                    }
+                    style={{ textAlign: 'center', padding: '20px', color: '#A3A3A3' }}
+                  >
                     Sin resultados
                   </td>
                 </tr>
@@ -241,8 +253,14 @@ export default function NominasPage() {
                 periodosPagina.map((p, index) => (
                   <tr key={p.procesoLiquiId} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
                     <td style={styles.td}>{p.fechaInicioPeriodo} - {p.fechaFinPeriodo}</td>
-                    <td style={styles.td}>{'-'}</td>
-                    <td style={styles.td}>{'-'}</td>
+                    {!['Borrador', 'Cerrado'].includes(tab) && (
+                      <td style={styles.td}>{p.cantidadEmpleados ?? '-'}</td>
+                    )}
+                    {!['Borrador', 'Cerrado'].includes(tab) && (
+                      <td style={styles.td}>
+                        {p.totalNeto ? formatMiles(p.totalNeto) : '-'}
+                      </td>
+                    )}
                     <td style={styles.td}>{p.createdAt?.split('T')[0]}</td>
                     <td style={styles.td}>
                       {p.estadoProcNomina === 'ANULADO'
@@ -253,10 +271,10 @@ export default function NominasPage() {
                           />
                       }
                     </td>
-                    {['Borrador', 'Cerrado'].includes(tab) && (
+                    {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                          {p.estado === 'Borrador' && (
+                          {p.estadoProcNomina === 'BORRADOR' && (
                             <>
                               <button
                                 style={styles.iconBtn}
@@ -274,13 +292,22 @@ export default function NominasPage() {
                               </button>
                             </>
                           )}
-                          {p.estado === 'Cerrado' && (
+                          {p.estadoProcNomina === 'CERRADO' && (
                             <button
                               style={styles.iconBtn}
                               title="Liquidar"
                               onClick={() => navigate(`/empresas/${id}/nominas/${p.procesoLiquiId}/liquidar`)}
                             >
                               <Upload size={16} color="#0B662A" />
+                            </button>
+                          )}
+                          {['PENDIENTE_PAGO', 'PAGADO'].includes(p.estadoProcNomina) && (
+                            <button
+                              style={styles.iconBtn}
+                              title="Ver reportes"
+                              onClick={() => navigate(`/empresas/${id}/nominas/${p.procesoLiquiId}/resultado`)}
+                            >
+                              <Eye size={16} color="#0B662A" />
                             </button>
                           )}
                         </div>
@@ -329,12 +356,26 @@ export default function NominasPage() {
         onCancelar={() => setConfirmarAnulado(false)}
         onConfirmar={async () => {
           try {
-            await payrollService.cambiarEstado(cambioEstado.periodoId, 'ANULADO');
-            await recargar();
-            setConfirmarAnulado(false);
-            setModal('exito');
-          } catch (err) {
-            setConfirmarAnulado(false);
+            const { diasLaborados } = useNominaStore.getState();
+    
+            // Validación local antes de llamar al backend
+            const tipoProceso = proceso?.tipoProceso;
+            const maxDias = tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30;
+    
+            const empleadoExcede = Object.entries(diasLaborados).find(
+              ([, dias]) => dias > maxDias
+            );
+    
+            if (empleadoExcede) {
+              setModal('error');
+              return;
+            }
+    
+            await payrollService.cambiarEstado(nominaId, 'CERRADO', diasLaborados);
+            setConfirmarCerrar(false);
+            navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+          } catch {
+            setConfirmarCerrar(false);
             setModal('error');
           }
         }}
@@ -368,7 +409,7 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', color: '#272525', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   totalNum:     { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:   { fontSize: '12px', color: '#A3A3A3', margin: 0 },
   addBar:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px' },

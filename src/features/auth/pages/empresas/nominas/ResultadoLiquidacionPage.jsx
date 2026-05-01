@@ -12,6 +12,11 @@ const fmt = (v) =>
     ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
     : '';
 
+const NOMBRE_MES = [
+  '','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+];
+
 export default function ResultadoLiquidacionPage() {
   const navigate         = useNavigate();
   const { id, nominaId } = useParams();
@@ -26,6 +31,18 @@ export default function ResultadoLiquidacionPage() {
   const [cargando,      setCargando]      = useState(false);
   const [hoverDescargar,setHoverDescargar] = useState(false);
   const [descargando,   setDescargando]   = useState(false);
+
+  const CONCEPTOS_EXCLUIDOS = [
+    'Pensión empleador',
+    'Aporte salud empleador',
+    'ARL empleador',
+    'Caja de compensación empleador',
+    'SENA empleador',
+    'ICBF empleador',
+    'Prima de servicios',
+    'Cesantías',
+    'Intereses sobre las cesantías',
+  ];
 
   useEffect(() => {
     if (!nominaId || !id) return;
@@ -54,96 +71,148 @@ export default function ResultadoLiquidacionPage() {
     neto:             desp.netoAPagar       ?? 0,
   });
 
-  const handleDescargar = () => {
+  const handleDescargar = async () => {
     setDescargando(true);
-    setTimeout(() => {
-      const doc = new jsPDF();
 
-      desprendibles.forEach((desp, idx) => {
-        if (idx > 0) doc.addPage();
-        let y = 14;
+    let logoBase64 = null;
+    if (empresa?.logoEmpresaUrl) {
+      try {
+        const logoUrl = `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+        const response = await fetch(logoUrl);
+        const blob = await response.blob();
+ 
+        logoBase64 = await new Promise((resolve) => {
+          const img = new Image();
+          const url = URL.createObjectURL(blob);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            // Limitar tamaño máximo a 100x100px
+            const maxSize = 100;
+            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            const ctx = canvas.getContext('2d');
 
-        if (empresa?.logoEmpresaUrl) {
-          doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, y, 25, 25);
-        }
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Comprimir al 60% de calidad en JPEG
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        });
+      } catch {
+        logoBase64 = null;
+      }
+    }
 
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text(empresa?.nombreEmpresa ?? '', 105, y + 8, { align: 'center' });
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.text(`NIT. ${empresa?.empresaNit ?? ''}`, 105, y + 14, { align: 'center' });
-        y += 30;
+    const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const mitad = pageHeight / 2;
 
-        doc.setFontSize(11);
-        doc.setFont(undefined, 'bold');
-        doc.text('DESPRENDIBLE PAGO DE NÓMINA', 105, y, { align: 'center' });
-        y += 10;
+    const renderDesprendible = (desp, yInicio, mitad, pageHeight, conceptosFiltrados) => {
+      let y = yInicio + 6;
 
-        doc.setFontSize(9);
-        doc.setFont(undefined, 'normal');
-        doc.text(
-          `Periodo: ${proceso?.fechaInicioPeriodo ?? ''} - ${proceso?.fechaFinPeriodo ?? ''}`,
-          14, y
-        ); y += 6;
-        doc.text(
-          `Nombre: ${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
-          14, y
-        ); y += 6;
-        doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 6;
-        doc.text(`Salario básico: ${fmt(desp.salarioBasico)}`, 140, y); y += 8;
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+      }
 
-        const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.text(`NIT. ${empresa?.empresaNit ?? ''}`, 105, y + 11, { align: 'center' });
+      y += 24;
 
-        const body = (desp.conceptos ?? []).map(c => [
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('DESPRENDIBLE PAGO DE NÓMINA', 105, y, { align: 'center' });
+      y += 7;
+
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')}`, 14, y); y += 5;
+      doc.text(`Periodo: ${proceso?.fechaInicioPeriodo ?? ''} - ${proceso?.fechaFinPeriodo ?? ''}`, 14, y); y += 5;
+      doc.text(`Nombre: ${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 14, y); y += 5;
+      doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
+      doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
+      doc.text(`Salario básico  ${fmt(desp.salarioBasico)}`, 196, y - 15, { align: 'right' });
+
+      const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
+
+      const body = conceptosFiltrados.map(c => [
           c.nombreConcepto,
           c.cantidad != null ? String(c.cantidad) : '',
-          c.categoria === 'DEVENGO' && c.valorResultado != null
-            ? fmt(c.valorResultado) : '',
-          c.categoria === 'DEDUCCION' && c.valorResultado != null
-            ? fmt(c.valorResultado) : '',
+          c.categoria === 'DEVENGO' && c.valorResultado != null ? fmt(c.valorResultado) : '',
+          c.categoria === 'DEDUCCION' && c.valorResultado != null ? fmt(c.valorResultado) : '',
         ]);
 
-        body.push(
-          [
-            { content: 'SUBTOTAL', styles: { fontStyle: 'bold' } },
-            '', fmt(totalDevengos), fmt(totalDeducciones),
-          ],
-          [
-            {
-              content: 'NETO A PAGAR',
-              styles: { fontStyle: 'bold', textColor: [11, 102, 42] },
-            },
-            '', fmt(neto), '',
-          ],
-        );
+      body.push(
+        [{ content: 'SUBTOTAL', styles: { fontStyle: 'bold' } }, '', fmt(totalDevengos), fmt(totalDeducciones)],
+        [{ content: 'NETO A PAGAR', styles: { fontStyle: 'bold', textColor: [11, 102, 42] } }, '', fmt(neto), ''],
+      );
 
-        autoTable(doc, {
-          startY: y,
-          head: [['CONCEPTO', 'DÍAS', 'DEVENGOS', 'DEDUCCIONES']],
-          body,
-          styles: { fontSize: 8 },
-          headStyles: {
-            fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold',
-          },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
-          columnStyles: {
-            0: { halign: 'left' },
-            1: { halign: 'center' },
-            2: { halign: 'right' },
-            3: { halign: 'right' },
-          },
-        });
-
-        const finalY = doc.lastAutoTable.finalY + 16;
-        doc.setFontSize(9);
-        doc.text('_______________________', 140, finalY);
-        doc.text('Firma del trabajador', 148, finalY + 6);
+      autoTable(doc, {
+        startY: y,
+        head: [['CONCEPTO', 'DÍAS', 'DEVENGOS', 'DEDUCCIONES']],
+        body,
+        styles: { fontSize: 7, lineColor: [224, 224, 224], lineWidth: 0.1 },
+        headStyles: {
+          fillColor: [11, 102, 42],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'center',
+        },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        columnStyles: {
+          0: { halign: 'left' },
+          1: { halign: 'center' },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+        },
+        margin: { left: 14, right: 14 },
+        didParseCell: (data) => {
+          const lastRow = data.table.body.length - 1;
+          const secondLast = data.table.body.length - 2;
+          if (data.row.index === secondLast) {
+            data.cell.styles.fillColor = [240, 240, 240];
+            data.cell.styles.fontStyle = 'bold';
+          }
+          if (data.row.index === lastRow) {
+            data.cell.styles.fillColor = [232, 245, 238];
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.textColor = [11, 102, 42];
+          }
+        },
       });
 
-      doc.save(`desprendibles_nomina_${nominaId}.pdf`);
-      setDescargando(false);
-    }, 100);
+      const limiteInferior = yInicio === 0 ? mitad - 12 : pageHeight - 8;
+      doc.setTextColor(163, 163, 163);
+      doc.text('Firma del trabajador', 196, y - 5, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+    };
+
+    desprendibles.forEach((desp, idx) => {
+      if (idx > 0) doc.addPage();
+
+      const conceptosFiltrados = (desp.conceptos ?? [])
+        .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto));
+
+      renderDesprendible(desp, 0, mitad, pageHeight, conceptosFiltrados);
+  
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineDashPattern([3, 3], 0);
+      doc.line(14, mitad, 196, mitad);
+      doc.setLineDashPattern([], 0);
+
+      renderDesprendible(desp, mitad, mitad, pageHeight, conceptosFiltrados);
+    });
+
+    doc.save(`desprendibles_nomina_${nominaId}.pdf`);
+    setDescargando(false);
   };
 
   return (
@@ -167,28 +236,6 @@ export default function ResultadoLiquidacionPage() {
         </div>
       </div>
 
-      {/* Barra sticky */}
-      <div style={styles.stickyBar}>
-        <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-          <ChevronLeft size={16} color="#272525" />
-          <span>Volver</span>
-        </button>
-        <button
-          style={{
-            ...styles.btnDescargarSticky,
-            background: hoverDescargar
-              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
-              : '#0B662A',
-            transition: 'background 0.3s ease',
-          }}
-          onMouseEnter={() => setHoverDescargar(true)}
-          onMouseLeave={() => setHoverDescargar(false)}
-          onClick={handleDescargar}
-          disabled={cargando || desprendibles.length === 0}
-        >
-          Descargar Reportes en PDF
-        </button>
-      </div>
 
       {/* Info proceso */}
       <div style={styles.card}>
@@ -242,10 +289,6 @@ export default function ResultadoLiquidacionPage() {
       ) : (
         desprendibles.map((desp) => {
           const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
-          const NOMBRE_MES = [
-            '','Enero','Febrero','Marzo','Abril','Mayo','Junio',
-            'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
-          ];
           return (
             <div key={desp.cabecNominaId} style={styles.desprendibleCard}>
 
@@ -255,9 +298,10 @@ export default function ResultadoLiquidacionPage() {
                   {empresa?.logoEmpresaUrl
                     ? (
                       <img
-                        src={empresa.logoEmpresaUrl}
+                        src={`${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`}
                         alt="logo"
-                        style={{ width: '60px', height: '60px', objectFit: 'contain' }}
+                        style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '0' }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
                       />
                     ) : (
                       <div style={styles.logoPlaceholder}>
@@ -278,6 +322,10 @@ export default function ResultadoLiquidacionPage() {
               {/* Info empleado */}
               <div style={styles.empInfoGrid}>
                 <div>
+                  <p style={styles.empInfoFila}>
+                    <strong>Fecha de generación</strong> &nbsp;
+                    {new Date().toLocaleDateString('es-CO')}
+                  </p>
                   <p style={styles.empInfoFila}>
                     <strong>Periodo</strong> &nbsp;
                     {proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
@@ -320,7 +368,9 @@ export default function ResultadoLiquidacionPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(desp.conceptos ?? []).map((c, i) => (
+                    {(desp.conceptos ?? [])
+                      .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto))
+                      .map((c, i) => (
                       <tr key={i} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
                         <td style={{ ...styles.td, textAlign: 'left' }}>
                           {c.nombreConcepto}
@@ -377,6 +427,47 @@ export default function ResultadoLiquidacionPage() {
         })
       )}
 
+      {/* Botones inferiores */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+        <button
+          style={{
+            background: '#fff',
+            border: '1px solid #D0D0D0',
+            borderRadius: '8px',
+            padding: '10px 28px',
+            fontSize: '14px',
+            fontWeight: '700',
+            fontFamily: 'Nunito, sans-serif',
+            cursor: 'pointer',
+            color: '#272525',
+          }}
+          onClick={() => navigate(`/empresas/${id}/nominas`)}
+        >
+          Cancelar
+        </button>
+        <button
+          style={{
+            background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '10px 28px',
+            fontSize: '14px',
+            fontWeight: '700',
+            fontFamily: 'Nunito, sans-serif',
+            cursor: 'pointer',
+            color: '#fff',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverDescargar(true)}
+          onMouseLeave={() => setHoverDescargar(false)}
+          onClick={handleDescargar}
+          disabled={cargando || desprendibles.length === 0}
+        >
+          Descargar Reportes en PDF
+        </button>
+      </div>
+
+
       {/* Modal descarga */}
       {descargando && (
         <div style={{
@@ -422,7 +513,7 @@ const styles = {
   perfilNombre:       { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:        { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
   stickyBar:          { position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'transparent', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  volverBtn:          { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   btnDescargarSticky: { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   card:               { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
   exitoMsg:           { fontSize: '14px', fontWeight: '700', color: '#0B662A', margin: '0 0 16px 0' },
@@ -433,8 +524,8 @@ const styles = {
   divider:            { border: 'none', borderTop: '1px solid #E8E8E8', margin: '24px 0 0 0' },
   desprendibleCard:   { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px', border: '1px solid #E8E8E8' },
   desprendibleHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
-  logoBox:            { width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  logoPlaceholder:    { width: '60px', height: '60px', border: '1px dashed #D0D0D0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  logoBox: { width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0', overflow: 'hidden' },
+  logoPlaceholder: { width: '60px', height: '60px', border: '1px dashed #D0D0D0', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   empresaNombre:      { fontSize: '16px', fontWeight: '800', color: '#272525', margin: 0 },
   empresaNit:         { fontSize: '12px', color: '#A3A3A3', margin: 0 },
   desprendibleTitulo: { fontSize: '13px', fontWeight: '800', color: '#272525', textAlign: 'center', margin: '0 0 16px 0', letterSpacing: '0.5px' },

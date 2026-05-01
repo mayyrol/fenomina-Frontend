@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import payrollService from '../services/payrollService';
+import payrollService from '../../../services/payrollService';
 
 export function useNominas(empresaId) {
   const [procesos,     setProcesos]     = useState([]);

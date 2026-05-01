@@ -106,6 +106,10 @@ export default function GenerarReportePage() {
   const [seleccionados, setSeleccionados] = useState([]);
   const [modal, setModal]               = useState(null);
   const [hoverSeguir, setHoverSeguir]   = useState(false);
+  const [empleados,       setEmpleados]       = useState([]);
+  const [cargandoEmp,     setCargandoEmp]     = useState(false);
+  const [errorEmp,        setErrorEmp]        = useState(null);
+  const [mensajeError, setMensajeError] = useState('');
 
   const todosSeleccionados = seleccionados.length === empleados.length && empleados.length > 0;
 
@@ -132,6 +136,29 @@ export default function GenerarReportePage() {
       const [diaInicio, mesInicio, anioInicio] = fechaInicio.split('/');
       const [diaFin,    mesFin,    anioFin]    = fechaFin.split('/');
 
+      const fechaInicioDate = new Date(anioInicio, mesInicio - 1, diaInicio);
+      const fechaFinDate    = new Date(anioFin, mesFin - 1, diaFin);
+      const diasPeriodo     = Math.round(
+        (fechaFinDate - fechaInicioDate) / (1000 * 60 * 60 * 24)
+      ) + 1;
+/* 
+      if (diasPeriodo < 12) {
+        setMensajeError(
+          `El periodo tiene ${diasPeriodo} día(s). El mínimo permitido es 12 días.`
+        );
+        setModal('error');
+        return;
+      }
+
+      if (diasPeriodo > 31) {
+        setMensajeError(
+          `El periodo tiene ${diasPeriodo} día(s). El máximo permitido es 31 días.`
+        );
+        setModal('error');
+        return;
+      }
+
+*/
       const MESES_NUM = {
         'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
         'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12
@@ -148,6 +175,8 @@ export default function GenerarReportePage() {
         fechaFin:    `${anioFin}-${mesFin}-${diaFin}`,
       };
 
+      console.log('payload enviado:', payload);
+
       const { data } = await payrollService.crearProceso(payload);
 
       // Guardar en el store para que las siguientes páginas los lean
@@ -156,13 +185,14 @@ export default function GenerarReportePage() {
 
       navigate(`/empresas/${id}/nominas/${data.procesoLiquiId}/desprendibles`);
     } catch (err) {
+      const mensaje = err?.response?.data?.mensaje 
+        ?? 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.';
+      setMensajeError(mensaje);
       setModal('error');
     }
   };
 
-  const [empleados,       setEmpleados]       = useState([]);
-  const [cargandoEmp,     setCargandoEmp]     = useState(false);
-  const [errorEmp,        setErrorEmp]        = useState(null);
+
 
   useEffect(() => {
     if (!id) return;
@@ -303,8 +333,8 @@ export default function GenerarReportePage() {
 
       <MensajeModal
         tipo={modal}
-        mensaje="Por favor completa todos los campos obligatorios y selecciona al menos un empleado."
-        onClose={() => setModal(null)}
+        mensaje={mensajeError || 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.'}
+        onClose={() => { setModal(null); setMensajeError(''); }}
       />
 
     </div>
@@ -320,7 +350,7 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '36px 40px' },
   cardTitulo:   { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 24px 0' },
   seccionTitulo:{ fontSize: '14px', fontWeight: '700', color: '#272525', margin: '0 0 16px 0' },

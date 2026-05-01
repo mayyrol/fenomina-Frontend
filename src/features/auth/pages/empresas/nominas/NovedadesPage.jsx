@@ -119,8 +119,8 @@ function SelectWrapper({ value, onChange, options, placeholder = 'Seleccionar op
     <div style={{ position: 'relative', flex: 1 }}>
       <select value={value} onChange={(e) => onChange(e.target.value)} style={styles.select}>
         <option value="">{placeholder}</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+        {options.map((o, i) => (
+          <option key={o.value ?? i} value={o.value}>{o.label}</option>
         ))}
       </select>
       <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
@@ -175,6 +175,7 @@ export default function NovedadesPage() {
   const [confirmarGuardar,setConfirmarGuardar] = useState(false);
   const [hoverGuardar,    setHoverGuardar]    = useState(false);
   const [hoverRegresar,   setHoverRegresar]   = useState(false);
+  const [mensajeError, setMensajeError] = useState(''); 
 
   // Grupos de conceptos por categoría para los selects
   const [opcionesLicencias,  setOpcionesLicencias]  = useState([]);
@@ -184,6 +185,9 @@ export default function NovedadesPage() {
   const [opcionesSalarial,   setOpcionesSalarial]    = useState([]);
   const [opcionesNoSalarial, setOpcionesNoSalarial]  = useState([]);
 
+  const [procesoPeriodo, setProcesoPeriodo] = useState(null);
+  
+
   useEffect(() => {
     if (!empleadoId || !id) return;
     setCargando(true);
@@ -192,13 +196,16 @@ export default function NovedadesPage() {
       masterAxios.get('/api/master/empleados', {
         params: { empresaId: id, estado: 'ACTIVO' },
       }),
-      payrollService.getConceptosNomina(),
+      payrollService.getConceptosNovedades(),
+      payrollService.getProcesos(id),
     ])
-      .then(([{ data: emps }, { data: conceptos }]) => {
+      .then(([{ data: emps }, { data: conceptos }, { data: procesos }]) => {
         const encontrado = emps.find(
           e => String(e.empleadoId) === String(empleadoId)
         );
         setEmpleado(encontrado ?? null);
+
+        console.log('Conceptos recibidos:', conceptos.map(c => c.nombreConcepNomina));
 
         // Construir mapa nombre -> id y agrupar por tipo
         const mapa = {};
@@ -207,31 +214,42 @@ export default function NovedadesPage() {
 
         const toOpcion = (c) => ({ value: c.concepNominaId, label: c.nombreConcepNomina });
 
-        setOpcionesLicencias(conceptos.filter(c =>
-          c.nombreConcepNomina.toLowerCase().includes('incapacidad') ||
-          c.nombreConcepNomina.toLowerCase().includes('licencia') ||
-          c.nombreConcepNomina.toLowerCase().includes('permiso') ||
-          c.nombreConcepNomina.toLowerCase().includes('cargo') ||
-          c.nombreConcepNomina.toLowerCase().includes('citacion') ||
-          c.nombreConcepNomina.toLowerCase().includes('sufragio') ||
-          c.nombreConcepNomina.toLowerCase().includes('isaac')
-        ).map(toOpcion));
+        setOpcionesLicencias(conceptos.filter(c => [
+          'Incapacidad por enfermedad general',
+          'Incapacidad por origen laboral',
+          'Licencia de maternidad',
+          'Licencia de paternidad',
+          'Licencia por calamidad doméstica',
+          'Licencia por matrimonio',
+          'Licencia Ley ISAAC',
+          'Licencia por sufragio',
+          'Cargos transitorios',
+          'Citaciones judiciales',
+          'Otros permisos remunerados pactados',
+          'Licencias no remuneradas',
+        ].includes(c.nombreConcepNomina)).map(toOpcion));
 
-        setOpcionesHoras(conceptos.filter(c =>
-          c.nombreConcepNomina.toLowerCase().includes('hora extra') ||
-          c.nombreConcepNomina.toLowerCase().includes('recargo')
-        ).map(toOpcion));
 
-        setOpcionesPagos(conceptos.filter(c =>
-          c.nombreConcepNomina.toLowerCase().includes('beneficio') ||
-          c.nombreConcepNomina.toLowerCase().includes('comision') ||
-          c.nombreConcepNomina.toLowerCase().includes('bonificacion') ||
-          c.nombreConcepNomina.toLowerCase().includes('viatico')
-        ).map(toOpcion));
+        setOpcionesHoras(conceptos.filter(c => [
+          'Recargo nocturno lunes a sábado',
+          'Recargo diurno domingo o festivo',
+          'Recargo nocturno domingo o festivo',
+          'Hora extra diurna lunes a sábado',
+          'Hora extra nocturna lunes a sábado',
+          'Hora extra diurna dominical o festivo',
+          'Hora extra nocturna dominical o festivo',
+        ].includes(c.nombreConcepNomina)).map(toOpcion));
 
-        setOpcionesVacaciones(conceptos.filter(c =>
-          c.nombreConcepNomina.toLowerCase().includes('vacacion')
-        ).map(toOpcion));
+        setOpcionesPagos(conceptos.filter(c => [
+          'Comisiones',
+          'Bonificaciones ocasionales o por mera liberalidad',
+          'Beneficios o extralegales no salariales',
+        ].includes(c.nombreConcepNomina)).map(toOpcion));
+
+        setOpcionesVacaciones(conceptos.filter(c => [
+          'Vacaciones disfrutadas',
+          'Vacaciones compensadas en dinero',
+        ].includes(c.nombreConcepNomina)).map(toOpcion));
 
         setOpcionesSalarial(conceptos.filter(c =>
           c.nombreConcepNomina.toLowerCase().includes('devenir salarial') ||
@@ -249,6 +267,11 @@ export default function NovedadesPage() {
             .diasLaborados[Number(empleadoId)];
           if (diasStore) setDiasLaborados(String(diasStore));
         }
+
+        const procesoEncontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(nominaId)
+        );
+        setProcesoPeriodo(procesoEncontrado ?? null);
       })
       .catch(() => {})
       .finally(() => setCargando(false));
@@ -300,6 +323,15 @@ export default function NovedadesPage() {
     return `${a}-${m}-${d}`;
   };
 
+  const fechaEstaEnPeriodo = (fechaStr) => {
+    if (!fechaStr || !procesoPeriodo) return true;
+    const [d, m, a] = fechaStr.split('/');
+    const fecha = new Date(`${a}-${m}-${d}`);
+    const inicio = new Date(procesoPeriodo.fechaInicioPeriodo);
+    const fin = new Date(procesoPeriodo.fechaFinPeriodo);
+    return fecha >= inicio && fecha <= fin;
+  };
+
   const handleGuardar = async () => {
     setConfirmarGuardar(false);
     try {
@@ -315,8 +347,11 @@ export default function NovedadesPage() {
       }
 
       // Tiempo y licencias
-      tiempoLic.forEach(f => {
+      for (const f of tiempoLic) {
         if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
+          if (!fechaEstaEnPeriodo(f.fechaInicio) || !fechaEstaEnPeriodo(f.fechaFin)) {
+            throw new Error(`Las fechas de la licencia están fuera del periodo...`);
+          }
           novedadesAGuardar.push({
             fkEmpleadoId:      Number(empleadoId),
             fkConcepNominaId:  Number(f.concepNominaId),
@@ -330,11 +365,14 @@ export default function NovedadesPage() {
             valorRefNovedad:   null,
           });
         }
-      });
+      }
 
       // Horas extra y recargos
-      horasExtra.forEach(f => {
+      for (const f of horasExtra){
         if (f.concepNominaId && f.cantidad) {
+          if (!fechaEstaEnPeriodo(f.fecha)) {
+            throw new Error(`La fecha ${f.fecha} está fuera del periodo del proceso (${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`);
+          }
           novedadesAGuardar.push({
             fkEmpleadoId:         Number(empleadoId),
             fkConcepNominaId:     Number(f.concepNominaId),
@@ -347,11 +385,14 @@ export default function NovedadesPage() {
             valorRefNovedad:      null,
           });
         }
-      });
+      }
 
       // Pagos extralegales y compensaciones
-      pagosExtra.forEach(f => {
+      for (const f of pagosExtra) {
         if (f.concepNominaId && f.monto) {
+          if (!fechaEstaEnPeriodo(f.fecha)) {
+            throw new Error(`La fecha ${f.fecha} está fuera del periodo del proceso (${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`);
+          }
           novedadesAGuardar.push({
             fkEmpleadoId:         Number(empleadoId),
             fkConcepNominaId:     Number(f.concepNominaId),
@@ -364,11 +405,14 @@ export default function NovedadesPage() {
             cantidadHorasNovedad: null,
           });
         }
-      });
+      }
 
       // Vacaciones
-      vacaciones.forEach(f => {
+      for (const f of vacaciones) {
         if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
+          if (!fechaEstaEnPeriodo(f.fechaInicio) || !fechaEstaEnPeriodo(f.fechaFin)) {
+            throw new Error(`Las fechas de la licencia están fuera del periodo...`);
+          }
           novedadesAGuardar.push({
             fkEmpleadoId:         Number(empleadoId),
             fkConcepNominaId:     Number(f.concepNominaId),
@@ -382,16 +426,19 @@ export default function NovedadesPage() {
             valorRefNovedad:      null,
           });
         }
-      });
+      }
 
       // Otros conceptos a devengar
-      otrosDeveng.forEach(f => {
+      for (const f of otrosDeveng) {
         if (f.monto) {
           const nombreConcepto = f.constituyeSalario === 'si'
             ? 'Otro concepto a devenir salarial'
             : 'Otro concepto a devenir no salarial';
           const concepId = conceptoMap[nombreConcepto];
           if (concepId) {
+            if (!fechaEstaEnPeriodo(f.fecha)) {
+              throw new Error(`La fecha ${f.fecha} está fuera del periodo del proceso (${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`);
+            }
             novedadesAGuardar.push({
               fkEmpleadoId:         Number(empleadoId),
               fkConcepNominaId:     concepId,
@@ -406,13 +453,16 @@ export default function NovedadesPage() {
             });
           }
         }
-      });
+      }
 
       // Retención en la fuente
-      retencion.forEach(f => {
+      for (const f of retencion) {
         if (f.monto) {
           const concepId = conceptoMap['Retención en la fuente'];
           if (concepId) {
+            if (!fechaEstaEnPeriodo(f.fecha)) {
+              throw new Error(`La fecha ${f.fecha} está fuera del periodo del proceso (${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`);
+            }
             novedadesAGuardar.push({
               fkEmpleadoId:         Number(empleadoId),
               fkConcepNominaId:     concepId,
@@ -427,16 +477,19 @@ export default function NovedadesPage() {
             });
           }
         }
-      });
+      }
 
       // Otros conceptos a deducir
-      otrosDeducir.forEach(f => {
+      for (const f of otrosDeducir) {
         if (f.monto) {
           const nombreConcepto = f.constituyeSalario === 'si'
             ? 'Otros conceptos a deducir salariales'
             : 'Otros conceptos a deducir no salariales';
           const concepId = conceptoMap[nombreConcepto];
           if (concepId) {
+            if (!fechaEstaEnPeriodo(f.fecha)) {
+              throw new Error(`La fecha ${f.fecha} está fuera del periodo del proceso (${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`);
+            }
             novedadesAGuardar.push({
               fkEmpleadoId:         Number(empleadoId),
               fkConcepNominaId:     concepId,
@@ -451,7 +504,7 @@ export default function NovedadesPage() {
             });
           }
         }
-      });
+      }
 
       // Si es edición, hacer PUT; si es creación, hacer POST
       if (novedadId && novedadesAGuardar.length === 1) {
@@ -468,7 +521,8 @@ export default function NovedadesPage() {
       }
 
       setModal('exito');
-    } catch {
+    } catch (err) {
+      setMensajeError(err?.message ?? 'Ocurrió un error al guardar las novedades.');
       setModal('error');
     }
   };
@@ -519,7 +573,11 @@ export default function NovedadesPage() {
           <label style={styles.label}>Días laborados</label>
           <input
             value={diasLaborados}
-            onChange={(e) => setDiasLaborados(e.target.value)}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val > 30) return;
+              setDiasLaborados(e.target.value);
+            }}
             onKeyDown={soloNumeros}
             placeholder="Ingresar número"
             style={styles.input}
@@ -869,8 +927,10 @@ export default function NovedadesPage() {
 
       <MensajeModal
         tipo={modal}
+        mensaje={mensajeError || undefined}
         onClose={() => {
           setModal(null);
+          setMensajeError('');
           if (modal === 'exito') navigate(-1);
         }}
       />

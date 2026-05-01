@@ -11,9 +11,12 @@ const payrollService = {
   crearProceso: (payload) =>
     payrollAxios.post(`${BASE}/procesos`, payload),
 
-  cambiarEstado: (procesoId, nuevoEstado) =>
-    payrollAxios.patch(`${BASE}/procesos/${procesoId}/estado`, { nuevoEstado }),
-
+  cambiarEstado: (procesoId, nuevoEstado, diasLaborados = null) =>
+    payrollAxios.patch(`${BASE}/procesos/${procesoId}/estado`, {
+      nuevoEstado,
+      ...(diasLaborados && { diasLaborados }),
+    }),
+    
   eliminarProceso: (procesoId) =>
     payrollAxios.delete(`${BASE}/procesos/${procesoId}`),
 
@@ -63,6 +66,9 @@ const payrollService = {
 
   getDesprendiblesIntereses: (procesoId) =>
     payrollAxios.get(`${BASE}/desprendibles/intereses-cesantias/${procesoId}`),
+
+  getConceptosNovedades: () =>
+  masterAxios.get('/api/master/internal/conceptos-nomina'),
 };
 
 export default payrollService;
