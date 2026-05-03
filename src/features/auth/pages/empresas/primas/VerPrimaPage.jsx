@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, UserRound } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -17,6 +17,10 @@ export default function VerPrimaPage() {
   const [empleado,   setEmpleado]   = useState(null);
   const [novedades,  setNovedades]  = useState([]);
   const [cargando,   setCargando]   = useState(false);
+  const [diasCalculados, setDiasCalculados] = useState(0);
+  const [searchParams] = useSearchParams();
+  const semestre = Number(searchParams.get('semestre'));
+  const anio     = Number(searchParams.get('anio'));
 
   const fmt = (v) =>
     v != null
@@ -24,43 +28,26 @@ export default function VerPrimaPage() {
       : '';
 
   useEffect(() => {
-    if (!empleadoId || !id) return;
+    if (!empleadoId || !id || !semestre || !anio) return;
     setCargando(true);
 
     Promise.all([
       masterAxios.get('/api/master/empleados', {
         params: { empresaId: id, estado: 'ACTIVO' },
       }),
-      payrollService.getProcesosPrima(id),
+      payrollService.getPreviewPrimaEmpleado(id, empleadoId, semestre, anio),
     ])
-      .then(([{ data: emps }, { data: procesos }]) => {
+      .then(([{ data: emps }, { data: preview }]) => {
         const encontrado = emps.find(
           e => String(e.empleadoId) === String(empleadoId)
         );
         setEmpleado(encontrado ?? null);
-
-        // Procesos pagados del semestre actual
-        const procesosNomina = procesos.filter(
-          p => p.estadoProcNomina === 'PAGADO'
-        );
-
-        // Traer novedades del empleado en cada proceso pagado
-        return Promise.all(
-          procesosNomina.map(p =>
-            payrollAxios
-              .get(`/api/payroll/novedades/proceso/${p.procesoLiquiId}/empleado/${empleadoId}`)
-              .then(({ data }) => data)
-              .catch(() => [])
-          )
-        );
-      })
-      .then((resultados) => {
-        const todas = resultados.flat();
-        setNovedades(todas);
+        setDiasCalculados(preview.diasLaborados ?? 0);
+        setNovedades(preview.novedades ?? []);
       })
       .catch(() => {})
       .finally(() => setCargando(false));
-  }, [empleadoId, id]);
+  }, [empleadoId, id, semestre, anio]);
 
   return (
     <div style={styles.container}>
@@ -93,18 +80,7 @@ export default function VerPrimaPage() {
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Días laborados <span style={{ color: '#E53E3E' }}>*</span></label>
           <input
-            value={empleado?.fechaIngresoEmp
-              ? (() => {
-                  const ingreso = new Date(empleado.fechaIngresoEmp);
-                  const hoy = new Date();
-                  const diffMs = hoy - ingreso;
-                  const dias = Math.min(
-                    Math.floor(diffMs / (1000 * 60 * 60 * 24)),
-                    180
-                  );
-                  return dias;
-                })()
-              : 180}
+            value={diasCalculados}
             readOnly
             style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }}
           />
@@ -125,44 +101,37 @@ export default function VerPrimaPage() {
             No hay novedades registradas en el periodo.
           </p>
         ) : novedades.map((nov, i) => (
-          <div key={nov.novedadId ?? i} style={{ marginBottom: '16px' }}>
-            <div style={styles.gridFila}>
-              <span style={styles.label}>Nombre de novedad</span>
-              <span style={styles.label}>Fecha de novedad</span>
-              <span style={styles.label}>Monto / Valor</span>
-            </div>
-            <div style={styles.gridFila}>
-              <input
-                readOnly
-                value={nov.observaciones ?? `Novedad ${nov.novedadId}`}
-                style={{
-                  ...styles.input,
-                  textTransform: 'uppercase',
-                  fontSize: '12px',
-                  backgroundColor: '#F9F9F9',
-                }}
-              />
-              <input
-                readOnly
-                value={nov.fechaNovedad ?? nov.fechaInicioAusen ?? ''}
-                style={{ ...styles.input, backgroundColor: '#F9F9F9' }}
-              />
-              <input
-                readOnly
-                value={
-                  nov.valorRefNovedad != null
-                    ? fmt(nov.valorRefNovedad)
-                    : nov.cantidadHorasNovedad != null
-                    ? `${nov.cantidadHorasNovedad} horas`
-                    : nov.cantidadDiasNovedad != null
-                    ? `${nov.cantidadDiasNovedad} días`
-                    : ''
-                }
-                style={{ ...styles.input, textAlign: 'right', backgroundColor: '#F9F9F9' }}
-              />
-            </div>
-          </div>
-        ))}
+              <div key={i} style={{ marginBottom: '16px' }}>
+                <div style={styles.gridFila}>
+                  <span style={styles.label}>Nombre de novedad</span>
+                  <span style={styles.label}>Periodo</span>
+                  <span style={styles.label}>Monto / Valor</span>
+                </div>
+                <div style={styles.gridFila}>
+                  <input
+                    readOnly
+                    value={nov.nombreConcepto ?? ''}
+                    style={{ ...styles.input, backgroundColor: '#F9F9F9', fontSize: '12px' }}
+                  />
+                  <input
+                    readOnly
+                    value={`Mes ${nov.periodo} de ${nov.anio}`}
+                    style={{ ...styles.input, backgroundColor: '#F9F9F9' }}
+                  />
+                  <input
+                    readOnly
+                    value={
+                      nov.valorResultado != null && nov.valorResultado !== 0
+                        ? fmt(nov.valorResultado)
+                        : nov.cantidad != null && nov.cantidad !== 0
+                        ? `${nov.cantidad}`
+                        : '-'
+                    }
+                    style={{ ...styles.input, textAlign: 'right', backgroundColor: '#F9F9F9' }}
+                  />
+                </div>
+              </div>
+            ))}
 
         <hr style={styles.divider} />
         <p style={styles.nota}>

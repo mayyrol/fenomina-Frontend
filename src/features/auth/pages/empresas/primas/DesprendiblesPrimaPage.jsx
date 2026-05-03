@@ -4,74 +4,35 @@ import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, ChevronLeft, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
 import payrollService from '../../../../../services/payrollService';
 import masterAxios from '../../../../../api/masterAxiosInstance';
 
-const formatMiles = (valor) => '$' + String(Math.round(valor)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const NOMBRE_MES = [
+  '','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+];
 
 export default function DesprendiblesPrimaPage() {
-  const navigate         = useNavigate();
-  const { id, primaId }  = useParams();
-  const { usuario }      = useAuthStore();
+  const navigate        = useNavigate();
+  const { id, primaId } = useParams();
+  const { usuario }     = useAuthStore();
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
-  const [modal, setModal]                                       = useState(null);
-  const [confirmarCerrar, setConfirmarCerrar]                   = useState(false);
-  const [confirmarAnular, setConfirmarAnular]                   = useState(false);
-  const [confirmarEliminar, setConfirmarEliminar]               = useState(false);
-  const [hoverCerrar, setHoverCerrar]                           = useState(false);
-  const [hoverAnular, setHoverAnular]                           = useState(false);
-  const [hoverEliminar, setHoverEliminar]                       = useState(false);
-  const [hoverPDF, setHoverPDF]                                 = useState(false);
-  const [descargando, setDescargando]                           = useState(false);
-
-
-  const empleadosFiltrados = empleados.filter(e =>
-    e.nombre.toLowerCase().includes(busqueda.toLowerCase()) || e.documento.includes(busqueda)
-  );
-
-  const toggleExpandido = (empId) => setExpandidos(prev => ({ ...prev, [empId]: !prev[empId] }));
 
   const [proceso,  setProceso]  = useState(null);
   const [empresa,  setEmpresa]  = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [modal,    setModal]    = useState(null);
 
-  const handleDescargarPDF = () => {
-    const doc = new jsPDF();
-    let y = 14;
+  const [confirmarCerrar,  setConfirmarCerrar]  = useState(false);
+  const [confirmarAnular,  setConfirmarAnular]  = useState(false);
+  const [confirmarEliminar,setConfirmarEliminar]= useState(false);
 
-    if (empresa?.logoEmpresaUrl) {
-      doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, y, 30, 30);
-      y += 34;
-    }
-
-    doc.setFontSize(14); doc.setFont(undefined, 'bold');
-    doc.text('Desprendibles Prima — Borrador', 14, y); y += 8;
-    doc.setFontSize(10); doc.setFont(undefined, 'normal');
-    doc.text(`Empresa: ${empresa?.nombreEmpresa ?? ''}`, 14, y); y += 6;
-    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 14, y); y += 6;
-    doc.text(
-      `Periodo: ${proceso?.fechaInicioPeriodo} - ${proceso?.fechaFinPeriodo}`,
-      14, y
-    ); y += 6;
-    doc.text(
-      `Semestre: ${proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre'}`,
-      14, y
-    ); y += 6;
-    doc.text(`Estado: ${proceso?.estadoProcNomina ?? ''}`, 14, y); y += 10;
-
-    doc.text('Vista previa generada antes de liquidar.', 14, y);
-
-    setDescargando(true);
-    setTimeout(() => {
-      doc.save(`borrador_prima_${primaId}.pdf`);
-      setDescargando(false);
-    }, 100);
-  };
+  const [hoverCerrar,  setHoverCerrar]  = useState(false);
+  const [hoverAnular,  setHoverAnular]  = useState(false);
+  const [hoverEliminar,setHoverEliminar]= useState(false);
 
   useEffect(() => {
     if (!primaId || !id) return;
@@ -92,6 +53,10 @@ export default function DesprendiblesPrimaPage() {
       .finally(() => setCargando(false));
   }, [primaId, id]);
 
+  const mesDelPeriodo = proceso?.fechaFinPeriodo
+    ? NOMBRE_MES[new Date(proceso.fechaFinPeriodo + 'T00:00:00').getMonth() + 1]
+    : '';
+
   return (
     <div style={styles.container}>
 
@@ -101,45 +66,101 @@ export default function DesprendiblesPrimaPage() {
           <CreditCard size={18} color="#0B662A" />
           <div>
             <h2 style={styles.titulo}>Desprendibles Prima</h2>
-            <p style={styles.subtitulo}>Ver desprendibles de Prima</p>
+            <p style={styles.subtitulo}>Gestión del proceso de prima en borrador</p>
           </div>
         </div>
         <div style={styles.perfilBox}>
           <div style={styles.avatar}><UserRound size={22} color="#A3A3A3" /></div>
-          <div><p style={styles.perfilNombre}>{nombre}</p><p style={styles.perfilCargo}>{cargo}</p></div>
+          <div>
+            <p style={styles.perfilNombre}>{nombre}</p>
+            <p style={styles.perfilCargo}>{cargo}</p>
+          </div>
         </div>
       </div>
-
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-      </button>
 
       {/* Info proceso */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Desprendibles Prima</h3>
-        <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Semestre:</span><span style={styles.infoValor}>{proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre'}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
-        </div>
+        {cargando ? (
+          <p style={{ color: '#A3A3A3' }}>Cargando información del proceso...</p>
+        ) : (
+          <div style={styles.infoGrid}>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Nombre Empresa:</span>
+              <span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Nit:</span>
+              <span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Fecha de Generación de Reporte:</span>
+              <span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Periodo:</span>
+              <span style={styles.infoValor}>
+                {proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
+              </span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Mes:</span>
+              <span style={styles.infoValor}>{mesDelPeriodo}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Estado proceso:</span>
+              <span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span>
+            </div>
+          </div>
+        )}
       </div>
-
 
       {/* Acciones */}
       <div style={styles.accionesBar}>
         <button
-          style={{ ...styles.btnCerrar, background: hoverCerrar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverCerrar(true)} onMouseLeave={() => setHoverCerrar(false)}
+          style={{
+            ...styles.btnCerrar,
+            background: hoverCerrar
+              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
+              : '#0B662A',
+            transition: 'background 0.3s ease',
+          }}
+          onMouseEnter={() => setHoverCerrar(true)}
+          onMouseLeave={() => setHoverCerrar(false)}
           onClick={() => setConfirmarCerrar(true)}
         >
           Cerrar proceso
         </button>
-        <button style={{ ...styles.btnAnular, transition: 'background 0.3s ease', ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}) }} onMouseEnter={() => setHoverAnular(true)} onMouseLeave={() => setHoverAnular(false)} onClick={() => setConfirmarAnular(true)}>Anular</button>
-        <button style={{ ...styles.btnEliminar, transition: 'background 0.3s ease', ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}) }} onMouseEnter={() => setHoverEliminar(true)} onMouseLeave={() => setHoverEliminar(false)} onClick={() => setConfirmarEliminar(true)}>Eliminar</button>
+        <button
+          style={{
+            ...styles.btnAnular,
+            transition: 'background 0.3s ease',
+            ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}),
+          }}
+          onMouseEnter={() => setHoverAnular(true)}
+          onMouseLeave={() => setHoverAnular(false)}
+          onClick={() => setConfirmarAnular(true)}
+        >
+          Anular
+        </button>
+        <button
+          style={{
+            ...styles.btnEliminar,
+            transition: 'background 0.3s ease',
+            ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}),
+          }}
+          onMouseEnter={() => setHoverEliminar(true)}
+          onMouseLeave={() => setHoverEliminar(false)}
+          onClick={() => setConfirmarEliminar(true)}
+        >
+          Eliminar
+        </button>
+        <button
+          style={styles.btnAnular}
+          onClick={() => navigate(`/empresas/${id}/primas`)}
+        >
+          Cancelar
+        </button>
       </div>
 
       {/* Modales */}
@@ -168,7 +189,7 @@ export default function DesprendiblesPrimaPage() {
             await payrollService.cambiarEstado(primaId, 'ANULADO');
             usePrimaStore.getState().limpiarProceso();
             setConfirmarAnular(false);
-            navigate(-1);
+            navigate(`/empresas/${id}/primas`);
           } catch {
             setConfirmarAnular(false);
             setModal('error');
@@ -187,7 +208,7 @@ export default function DesprendiblesPrimaPage() {
             await payrollService.eliminarProceso(primaId);
             usePrimaStore.getState().limpiarProceso();
             setConfirmarEliminar(false);
-            navigate(-1);
+            navigate(`/empresas/${id}/primas`);
           } catch {
             setConfirmarEliminar(false);
             setModal('error');
@@ -196,10 +217,12 @@ export default function DesprendiblesPrimaPage() {
         titulo="¿Deseas eliminar este proceso de prima?"
         descripcion="Esta acción eliminará el proceso de prima."
       />
+
       <MensajeModal tipo={modal} onClose={() => setModal(null)} />
     </div>
   );
 }
+
 
 const styles = {
   container:          { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '16px' },

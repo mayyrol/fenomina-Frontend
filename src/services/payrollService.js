@@ -69,6 +69,11 @@ const payrollService = {
 
   getConceptosNovedades: () =>
   masterAxios.get('/api/master/internal/conceptos-nomina'),
+
+  getPreviewPrimaEmpleado: (empresaId, empleadoId, semestre, anio) =>
+  payrollAxios.get(`${BASE}/desprendibles/prima/preview/${empresaId}/empleado/${empleadoId}`, {
+    params: { semestre, anio }
+  }),
 };
 
 export default payrollService;

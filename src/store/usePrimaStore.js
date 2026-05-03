@@ -6,9 +6,13 @@ export const usePrimaStore = create(
     (set) => ({
       procesoActual:         null,
       empleadosSeleccionados: [],
+      semestreSeleccionado:  '',
+      anioSeleccionado:      new Date().getFullYear(),
 
       setProcesoActual:          (proceso)   => set({ procesoActual: proceso }),
       setEmpleadosSeleccionados: (empleados) => set({ empleadosSeleccionados: empleados }),
+      setSemestreSeleccionado:   (semestre)  => set({ semestreSeleccionado: semestre }),
+      setAnioSeleccionado:       (anio)      => set({ anioSeleccionado: anio }),
 
       limpiarProceso: () =>
         set({ procesoActual: null, empleadosSeleccionados: [] }),

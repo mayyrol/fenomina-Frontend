@@ -151,7 +151,7 @@ export default function CesantiasPage() {
         </div>
       </div>
 
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
+      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}`)}>
         <ChevronLeft size={16} color="#272525" /><span>Volver</span>
       </button>
 

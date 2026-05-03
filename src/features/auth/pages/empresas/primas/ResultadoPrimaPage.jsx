@@ -18,11 +18,16 @@ function numLetras(n) {
   if (n === 0) return 'CERO';
   if (n < 0) return 'MENOS ' + numLetras(-n);
   let r = '';
-  if (n >= 1000000) { r += numLetras(Math.floor(n/1000000)) + ' MILLÓN '; n %= 1000000; }
-  if (n >= 1000)    { r += (Math.floor(n/1000) === 1 ? 'MIL' : numLetras(Math.floor(n/1000)) + ' MIL') + ' '; n %= 1000; }
-  if (n >= 100)     { r += (n === 100 ? 'CIEN' : centenas[Math.floor(n/100)]) + ' '; n %= 100; }
-  if (n >= 20)      { r += decenas[Math.floor(n/10)] + (n%10 ? ' Y ' + unidades[n%10] : '') + ' '; }
-  else if (n > 0)   { r += unidades[n] + ' '; }
+  if (n >= 1000000) {
+    const millones = Math.floor(n / 1000000);
+    r += (millones === 1 ? 'UN MILLÓN' : numLetras(millones) + ' MILLONES');
+    n %= 1000000;
+    r += n === 0 ? ' DE ' : ' ';  // <-- "DE" solo cuando no hay más cifras
+  }
+  if (n >= 1000) { r += (Math.floor(n/1000) === 1 ? 'MIL' : numLetras(Math.floor(n/1000)) + ' MIL') + ' '; n %= 1000; }
+  if (n >= 100)  { r += (n === 100 ? 'CIEN' : centenas[Math.floor(n/100)]) + ' '; n %= 100; }
+  if (n >= 20)   { r += decenas[Math.floor(n/10)] + (n%10 ? ' Y ' + unidades[n%10] : '') + ' '; }
+  else if (n > 0){ r += unidades[n] + ' '; }
   return r.trim();
 }
 
@@ -42,139 +47,173 @@ export default function ResultadoPrimaPage() {
   const [desprendibles, setDesprendibles] = useState([]);
   const [cargando,      setCargando]      = useState(false);
 
+  const calcularFechaInicio = (desp) => {
+    if (!desp.fechaInicioCorte) return '';
+    const fechaCorte = new Date(desp.fechaInicioCorte + 'T00:00:00');
+    const inicioPeriodo = proceso?.periodo === 1
+      ? new Date(`${proceso.anio}-01-01`)
+      : new Date(`${proceso.anio}-07-01`);
+    return fechaCorte > inicioPeriodo
+      ? desp.fechaInicioCorte
+      : inicioPeriodo.toISOString().split('T')[0];
+  };
+
   const totalGeneral = desprendibles.reduce(
     (s, d) => s + (d.valorPrestacion ?? 0), 0
   );
 
-  const handleDescargar = () => {
+  const handleDescargar = async () => {
     setDescargando(true);
-    setTimeout(() => {
-      const doc = new jsPDF();
-      let y = 14;
 
-      if (empresa?.logoEmpresaUrl) {
-        doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, y, 25, 25);
+    let logoBase64 = null;
+    if (empresa?.logoEmpresaUrl) {
+      try {
+        const logoUrl = `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+        const response = await fetch(logoUrl);
+        const blob = await response.blob();
+        logoBase64 = await new Promise((resolve) => {
+          const img = new Image();
+          const url = URL.createObjectURL(blob);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxSize = 100;
+            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        });
+      } catch {
+        logoBase64 = null;
       }
+    }
 
-      const semestre = proceso?.periodo === 1
-        ? 'Primer semestre' : 'Segundo semestre';
+    const doc = new jsPDF();
+    const semestre = proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre';
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const mitad = pageHeight / 2;
 
-      doc.setFontSize(12); doc.setFont(undefined, 'bold');
-      doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
-      doc.setFontSize(9); doc.setFont(undefined, 'normal');
-      doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 105, y + 12, { align: 'center' });
-      doc.text('INGRESO / PAGOS', 105, y + 18, { align: 'center' });
-      doc.text(`PLANILLA PRIMA ${semestre.toUpperCase()} ${proceso?.anio ?? ''}`,
-        105, y + 24, { align: 'center' });
-      y += 34;
+    // Página 1 — planilla resumen
+    let y = 14;
+    if (logoBase64) doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+    doc.setFontSize(12); doc.setFont(undefined, 'bold');
+    doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 105, y + 12, { align: 'center' });
+    doc.text('INGRESO / PAGOS', 105, y + 18, { align: 'center' });
+    doc.text(`PLANILLA PRIMA ${semestre.toUpperCase()} ${proceso?.anio ?? ''}`, 105, y + 24, { align: 'center' });
+    y += 34;
 
-      autoTable(doc, {
-        startY: y,
-        head: [[
-          'No', 'CC', 'NOMBRES Y APELLIDOS',
-          'FECHA INICIO', 'FECHA FIN', 'DÍAS',
-          'SALARIO BASE', 'AUX. TRANSPORTE', 'NETO'
-        ]],
-        body: [
-          ...desprendibles.map((desp, i) => [
-            i + 1,
-            desp.documentoEmpleado,
-            `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
-            desp.fechaInicioCorte,
-            desp.fechaFinCorte,
-            desp.diasLiquidados,
-            fmt(desp.salarioBase),
-            fmt(desp.auxTransporte),
-            fmt(desp.valorPrestacion),
-          ]),
-          [{
-            content: 'TOTAL',
-            colSpan: 8,
-            styles: { halign: 'right', fontStyle: 'bold' },
-          }, {
-            content: fmt(totalGeneral),
-            styles: { fontStyle: 'bold' },
-          }],
-        ],
-        styles: { fontSize: 7 },
-        headStyles: {
-          fillColor: [11, 102, 42], textColor: 255,
-          fontStyle: 'bold', fontSize: 7,
-        },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-      });
-
-      desprendibles.forEach((desp) => {
-        doc.addPage();
-        const neto = desp.valorPrestacion ?? 0;
-        let cy = 20;
-        doc.setDrawColor(0); doc.rect(10, 10, 190, cy + 130);
-
-        if (empresa?.logoEmpresaUrl) {
-          doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, cy, 20, 20);
-        }
-
-        doc.setFontSize(10); doc.setFont(undefined, 'bold');
-        doc.text('Empleador:', 14, cy + 6);
-        doc.text(empresa?.nombreEmpresa ?? '', 60, cy + 6);
-        doc.setFont(undefined, 'normal');
-        doc.text('NIT:', 14, cy + 12);
-        doc.text(empresa?.empresaNit ?? '', 60, cy + 12);
-        cy += 20;
-
-        doc.setFont(undefined, 'bold');
-        doc.text('Datos del trabajador:', 14, cy); cy += 6;
-        doc.setFont(undefined, 'normal');
-        doc.text('Nombre:', 14, cy);
-        doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 60, cy);
-        cy += 6;
-        doc.text('Cédula:', 14, cy);
-        doc.text(desp.documentoEmpleado, 60, cy);
-        cy += 10;
-
-        doc.setFontSize(9); doc.setFont(undefined, 'bold');
-        doc.text(
-          `Comprobante del pago de la prima de servicios correspondiente al ${semestre}`,
-          105, cy, { align: 'center' }
-        );
-        cy += 10;
-
-        doc.setFont(undefined, 'normal'); doc.setFontSize(9);
-        doc.text('Fecha inicial:', 14, cy);
-        doc.text(desp.fechaInicioCorte ?? '', 80, cy); cy += 6;
-        doc.text('Fecha final:', 14, cy);
-        doc.text(desp.fechaFinCorte ?? '', 80, cy); cy += 6;
-        doc.text('Días trabajados en el semestre:', 14, cy);
-        doc.text(String(desp.diasLiquidados ?? ''), 80, cy); cy += 10;
-
-        doc.text('Salario Base:', 14, cy);
-        doc.text(fmt(desp.salarioBase), 80, cy); cy += 6;
-        doc.text('Auxilio de transporte:', 14, cy);
-        doc.text(fmt(desp.auxTransporte), 80, cy); cy += 10;
-
-        doc.setFont(undefined, 'bold');
-        doc.text('Valor de la prima de servicios:', 14, cy);
-        doc.text(fmt(neto), 80, cy); cy += 6;
-        doc.text('Valor en letras:', 14, cy);
-        doc.setFont(undefined, 'normal');
-        const letras = (() => {
-          try { return numLetras(neto) + ' PESOS M/CTE'; } catch { return ''; }
-        })();
-        const split = doc.splitTextToSize(letras, 120);
-        doc.text(split, 55, cy); cy += split.length * 5 + 6;
-
-        doc.text('Recibí conforme:', 14, cy); cy += 14;
-        doc.line(14, cy, 80, cy); cy += 5;
-        doc.text(
+    autoTable(doc, {
+      startY: y,
+      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'FECHA INICIO', 'FECHA FIN', 'DÍAS', 'SALARIO BASE', 'AUX. TRANSPORTE', 'NETO']],
+      body: [
+        ...desprendibles.map((desp, i) => [
+          i + 1,
+          desp.documentoEmpleado,
           `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
-          14, cy
-        ); cy += 5;
-        doc.text('Fecha de recibido:', 14, cy);
-      });
+          desp.fechaInicioCorte,
+          desp.fechaFinCorte,
+          desp.diasLiquidados,
+          fmt(desp.salarioBase),
+          fmt(desp.auxTransporte),
+          fmt(desp.valorPrestacion),
+        ]),
+        [{ content: 'TOTAL', colSpan: 8, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: fmt(totalGeneral), styles: { fontStyle: 'bold' } }],
+      ],
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
 
-      doc.save(`prima_${semestre.replace(/ /g, '_')}_${proceso?.anio ?? ''}.pdf`);
-      setDescargando(false);
-    }, 100);
+    // Páginas individuales — original + copia por página
+    const renderComprobante = (desp, yInicio, mitadRef, pageHeightRef) => {
+      const neto = desp.valorPrestacion ?? 0;
+      let cy = yInicio + 8;
+
+      const margenSuperior = yInicio + 2;
+      const alturaComprobante = (yInicio === 0 ? mitadRef : pageHeightRef) - yInicio - 4;
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.rect(10, margenSuperior, 190, alturaComprobante);
+
+      // Empleador y NIT
+      doc.setFontSize(8); doc.setFont(undefined, 'normal');
+      doc.text('Empleador:', 14, cy);
+      doc.setFont(undefined, 'bold');
+      doc.text(empresa?.nombreEmpresa ?? '', 55, cy); cy += 5;
+      doc.setFont(undefined, 'normal');
+      doc.text('NIT:', 14, cy);
+      doc.text(empresa?.empresaNit ?? '', 55, cy); cy += 8;
+
+      // Datos del trabajador
+      doc.setFont(undefined, 'bold');
+      doc.text('Datos del trabajador:', 14, cy); cy += 5;
+      doc.setFont(undefined, 'normal');
+      doc.text('Nombre:', 14, cy);
+      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 55, cy); cy += 5;
+      doc.text('Cédula:', 14, cy);
+      doc.text(desp.documentoEmpleado, 55, cy); cy += 8;
+
+      // Título centrado
+      doc.setFont(undefined, 'bold');
+      doc.text(
+        `Comprobante del pago de la prima de servicios correspondiente al ${semestre}`,
+        105, cy, { align: 'center' }
+      ); cy += 8;
+
+      // Fechas y días
+      doc.setFont(undefined, 'normal');
+      doc.text('Fecha inicial:', 14, cy);
+      doc.text(desp.fechaInicioCorte ?? '', 70, cy); cy += 5;
+      doc.text('Fecha final:', 14, cy);
+      doc.text(desp.fechaFinCorte ?? '', 70, cy); cy += 5;
+      doc.text('Días trabajados en el semestre:', 14, cy);
+      doc.text(String(desp.diasLiquidados ?? ''), 70, cy); cy += 8;
+
+      // Salario y auxilio
+      doc.text('Salario Base:', 14, cy);
+      doc.text(fmt(desp.salarioBase), 70, cy); cy += 5;
+      doc.text('Auxilio de transporte:', 14, cy);
+      doc.text(fmt(desp.auxTransporte), 70, cy); cy += 8;
+
+      // Valor prima y letras
+      doc.setFont(undefined, 'bold');
+      doc.text('Valor de la prima de servicios:', 14, cy);
+      doc.text(fmt(neto), 70, cy); cy += 5;
+      doc.text('Valor en letras:', 14, cy);
+      doc.setFont(undefined, 'normal');
+      const letras = (() => { try { return numLetras(Math.round(neto)) + ' PESOS M/CTE'; } catch { return ''; } })();
+      const split = doc.splitTextToSize(letras, 125);
+      doc.text(split, 55, cy); cy += split.length * 4 + 8;
+
+      // Recibí conforme
+      doc.text('Recibí conforme:', 14, cy); cy += 12;
+      doc.line(14, cy, 90, cy); cy += 4;
+      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 14, cy); cy += 5;
+      doc.text('Fecha de recibido:', 14, cy);
+    };
+
+    desprendibles.forEach((desp) => {
+      doc.addPage();
+      renderComprobante(desp, 0, mitad, pageHeight);
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineDashPattern([3, 3], 0);
+      doc.line(14, mitad, 196, mitad);
+      doc.setLineDashPattern([], 0);
+      renderComprobante(desp, mitad, mitad, pageHeight);
+    });
+
+    doc.save(`prima_${semestre.replace(/ /g, '_')}_${proceso?.anio ?? ''}.pdf`);
+    setDescargando(false);
   };
 
   useEffect(() => {
@@ -216,21 +255,6 @@ export default function ResultadoPrimaPage() {
         </div>
       </div>
 
-      {/* Barra sticky */}
-      <div style={styles.stickyBar}>
-        <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-          <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-        </button>
-        <button
-          style={{ ...styles.btnDescargarSticky, background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverDescargar(true)}
-          onMouseLeave={() => setHoverDescargar(false)}
-          onClick={handleDescargar}
-        >
-          Descargar Reportes en PDF
-        </button>
-      </div>
-
       {/* Info proceso */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Desprendibles Prima</h3>
@@ -248,53 +272,64 @@ export default function ResultadoPrimaPage() {
 
       {/* Planilla resumen */}
       <div style={styles.card}>
-        <p style={styles.tableTitle}>
-          Planilla Prima — {proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre'}
-        </p>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.tabla}>
-            <thead>
-              <tr>
-                <th style={styles.th}>No</th>
-                <th style={styles.th}>CC</th>
-                <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
-                <th style={styles.th}>Fecha inicio</th>
-                <th style={styles.th}>Fecha fin</th>
-                <th style={styles.th}>Días</th>
-                <th style={styles.th}>Salario Base</th>
-                <th style={styles.th}>Aux. Transporte</th>
-                <th style={styles.th}>Neto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cargando ? (
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <p style={{ fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 4px 0' }}>
+            {empresa?.nombreEmpresa ?? ''}
+          </p>
+          <p style={{ fontSize: '13px', color: '#272525', margin: '0 0 2px 0' }}>
+            NIT: {empresa?.empresaNit ?? ''}
+          </p>
+          <p style={{ fontSize: '12px', color: '#272525', margin: '0 0 2px 0' }}>
+            INGRESO / PAGOS
+          </p>
+          <p style={{ fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 }}>
+            PLANILLA PRIMA — {proceso?.periodo === 1 ? 'PRIMER SEMESTRE' : 'SEGUNDO SEMESTRE'} {proceso?.anio ?? ''}
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={styles.tabla}>
+              <thead>
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
-                    Cargando...
-                  </td>
+                  <th style={styles.th}>No</th>
+                  <th style={styles.th}>CC</th>
+                  <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
+                  <th style={styles.th}>Fecha inicio</th>
+                  <th style={styles.th}>Fecha fin</th>
+                  <th style={styles.th}>Días</th>
+                  <th style={styles.th}>Salario Base</th>
+                  <th style={styles.th}>Aux. Transporte</th>
+                  <th style={styles.th}>Neto</th>
                 </tr>
-              ) : desprendibles.map((desp, i) => (
-                <tr key={desp.cabeLiquiPrestacionId ?? i}
-                  style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={styles.td}>{i + 1}</td>
-                  <td style={styles.td}>{desp.documentoEmpleado}</td>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>
-                    {desp.nombresEmpleado} {desp.apellidosEmpleado}
-                  </td>
-                  <td style={styles.td}>{desp.fechaInicioCorte}</td>
-                  <td style={styles.td}>{desp.fechaFinCorte}</td>
-                  <td style={styles.td}>{desp.diasLiquidados}</td>
-                  <td style={styles.td}>{fmt(desp.salarioBase)}</td>
-                  <td style={styles.td}>{fmt(desp.auxTransporte)}</td>
-                  <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
+              </thead>
+              <tbody>
+                {cargando ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                      Cargando...
+                    </td>
+                  </tr>
+                ) : desprendibles.map((desp, i) => (
+                  <tr key={desp.cabeLiquiPrestacionId ?? i}
+                    style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                    <td style={styles.td}>{i + 1}</td>
+                    <td style={styles.td}>{desp.documentoEmpleado}</td>
+                    <td style={{ ...styles.td, textAlign: 'left' }}>
+                      {desp.nombresEmpleado} {desp.apellidosEmpleado}
+                    </td>
+                    <td style={styles.td}>{calcularFechaInicio(desp)}</td>
+                    <td style={styles.td}>{desp.fechaFinCorte}</td>
+                    <td style={styles.td}>{desp.diasLiquidados}</td>
+                    <td style={styles.td}>{fmt(desp.salarioBase)}</td>
+                    <td style={styles.td}>{fmt(desp.auxTransporte)}</td>
+                    <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
+                  </tr>
+                ))}
+                <tr style={{ backgroundColor: '#E8F5EE' }}>
+                  <td colSpan={8} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>TOTAL</td>
+                  <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalGeneral)}</td>
                 </tr>
-              ))}
-              <tr style={{ backgroundColor: '#E8F5EE' }}>
-                <td colSpan={8} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>TOTAL</td>
-                <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalGeneral)}</td>
-              </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -337,7 +372,8 @@ export default function ResultadoPrimaPage() {
 
               <p style={{
                 fontSize: '11px', fontWeight: '700',
-                textAlign: 'center', margin: '12px 0', color: '#272525',
+                textAlign: 'center', margin: '12px auto', color: '#272525',
+                width: '100%',
               }}>
                 Comprobante del pago de la prima de servicios
                 correspondiente al {semestre}
@@ -346,7 +382,7 @@ export default function ResultadoPrimaPage() {
               <div style={{ marginBottom: '12px' }}>
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '2px' }}>
                   <span style={styles.comprobanteLabel}>Fecha inicial:</span>
-                  <span style={styles.comprobanteValor}>{desp.fechaInicioCorte}</span>
+                  <span style={styles.comprobanteValor}>{calcularFechaInicio(desp)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '2px' }}>
                   <span style={styles.comprobanteLabel}>Fecha final:</span>
@@ -390,7 +426,7 @@ export default function ResultadoPrimaPage() {
                   </span>
                   <span style={{ ...styles.comprobanteValor, textTransform: 'uppercase' }}>
                     {(() => {
-                      try { return numLetras(neto) + ' PESOS M/CTE'; }
+                      try { return numLetras(Math.round(neto)) + ' PESOS M/CTE'; }
                       catch { return ''; }
                     })()}
                   </span>
@@ -415,6 +451,24 @@ export default function ResultadoPrimaPage() {
           </div>
         );
       })}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+        <button
+          style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#272525' }}
+          onClick={() => navigate(`/empresas/${id}/primas`)}
+        >
+          Cancelar
+        </button>
+        <button
+          style={{ background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease' }}
+          onMouseEnter={() => setHoverDescargar(true)}
+          onMouseLeave={() => setHoverDescargar(false)}
+          onClick={handleDescargar}
+          disabled={cargando || desprendibles.length === 0}
+        >
+          Descargar Reportes en PDF
+        </button>
+      </div>
 
       {/* Modal descarga */}
       {descargando && (

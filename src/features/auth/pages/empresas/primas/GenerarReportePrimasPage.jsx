@@ -79,7 +79,13 @@ const SEMESTRE_A_PERIODO = {
 function SelectSemestre({ value, onChange }) {
   return (
     <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={styles.select}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          ...styles.select,
+        }}
+      >
         <option value="">Seleccionar opción</option>
         {SEMESTRES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -95,16 +101,17 @@ export default function GenerarReportePrimasPage() {
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
+  const { semestreSeleccionado, anioSeleccionado, setSemestreSeleccionado, setAnioSeleccionado } = usePrimaStore();
 
-  const [fechaInicio, setFechaInicio]     = useState('');
-  const [fechaFin, setFechaFin]           = useState('');
-  const [semestre, setSemestre]           = useState('');
+  const [anio, setAnio]         = useState(anioSeleccionado || new Date().getFullYear());
+  const [semestre, setSemestre] = useState(semestreSeleccionado || '');
   const [seleccionados, setSeleccionados] = useState([]);
   const [modal, setModal]                 = useState(null);
   const [hoverSeguir, setHoverSeguir]     = useState(false);
   const [empleados,   setEmpleados]   = useState([]);
   const [cargandoEmp, setCargandoEmp] = useState(false);
-
+  const [mensajeError, setMensajeError] = useState('');
+  
   const todosSeleccionados =
     seleccionados.length === empleados.length && empleados.length > 0;
 
@@ -121,34 +128,35 @@ export default function GenerarReportePrimasPage() {
     );
   };
 
-  const camposCompletos = fechaInicio && fechaFin && semestre && seleccionados.length > 0;
+  const camposCompletos = anio && semestre && seleccionados.length > 0;
 
   const handleSeguir = async () => {
     if (!camposCompletos) { setModal('error'); return; }
 
     try {
-      const [diaInicio, mesInicio, anioInicio] = fechaInicio.split('/');
-      const [diaFin,    mesFin,    anioFin]    = fechaFin.split('/');
+      const esPrimerSemestre = SEMESTRE_A_PERIODO[semestre] === 1;
+      const fechaInicio = esPrimerSemestre ? `${anio}-01-01` : `${anio}-07-01`;
+      const fechaFin = esPrimerSemestre ? `${anio}-06-30` : `${anio}-12-31`;
 
       const payload = {
         empresaId:   Number(id),
         tipoProceso: 'PRIMA_SEMESTRAL',
-        anio:        Number(anioInicio),
+        anio:        Number(anio),
         periodo:     SEMESTRE_A_PERIODO[semestre],
-        fechaInicio: `${anioInicio}-${mesInicio}-${diaInicio}`,
-        fechaFin:    `${anioFin}-${mesFin}-${diaFin}`,
+        fechaInicio,
+        fechaFin,
       };
 
       const { data } = await payrollService.crearProceso(payload);
       usePrimaStore.getState().setProcesoActual(data);
       usePrimaStore.getState().setEmpleadosSeleccionados(seleccionados);
       navigate(`/empresas/${id}/primas/${data.procesoLiquiId}/desprendibles`);
-    } catch {
+    } catch (err) {
+      const mensaje = err?.response?.data?.mensaje ?? 'Ocurrió un error al crear el proceso.';
+      setMensajeError(mensaje);
       setModal('error');
     }
   };
-
-
 
   useEffect(() => {
     if (!id) return;
@@ -193,16 +201,20 @@ export default function GenerarReportePrimasPage() {
         <p style={styles.seccionTitulo}>Periodo de Liquidación</p>
         <div style={styles.filaFechas}>
           <div style={styles.campoBox}>
-            <label style={styles.label}>Fecha de inicio de corte <span style={styles.req}>*</span></label>
-            <CalendarioInput value={fechaInicio} onChange={setFechaInicio} />
-          </div>
-          <div style={styles.campoBox}>
-            <label style={styles.label}>Fecha de fin de corte <span style={styles.req}>*</span></label>
-            <CalendarioInput value={fechaFin} onChange={setFechaFin} />
-          </div>
-          <div style={styles.campoBox}>
             <label style={styles.label}>Semestre a liquidar <span style={styles.req}>*</span></label>
-            <SelectSemestre value={semestre} onChange={setSemestre} />
+            <SelectSemestre value={semestre} onChange= {(val) => { setSemestre(val); setSemestreSeleccionado(val); }} />
+          </div>
+          <div style={styles.campoBox}>
+            <label style={styles.label}>Año a liquidar <span style={styles.req}>*</span></label>
+            <input
+              type="number"
+              value={anio}
+              onChange={(e) => { setAnio(e.target.value); setAnioSeleccionado(e.target.value); }}
+              style={styles.input}
+              min={2000}
+              max={2100}
+              placeholder="Ej: 2026"
+            />
           </div>
         </div>
       </div>
@@ -252,7 +264,7 @@ export default function GenerarReportePrimasPage() {
                     <button
                       style={styles.iconBtn}
                       onClick={() => navigate(
-                        `/empresas/${id}/primas/ver-prima/${emp.empleadoId}`
+                        `/empresas/${id}/primas/ver-prima/${emp.empleadoId}?semestre=${SEMESTRE_A_PERIODO[semestre]}&anio=${anio}`
                       )}
                       title="Ver prima"
                     >
@@ -287,7 +299,11 @@ export default function GenerarReportePrimasPage() {
         <button style={styles.btnCancelar} onClick={() => navigate(-1)}>Cancelar</button>
       </div>
 
-      <MensajeModal tipo={modal} mensaje="Por favor completa todos los campos obligatorios y selecciona al menos un empleado." onClose={() => setModal(null)} />
+      <MensajeModal
+        tipo={modal}
+        mensaje={mensajeError || 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.'}
+        onClose={() => { setModal(null); setMensajeError(''); }}
+      />
 
     </div>
   );
@@ -312,7 +328,7 @@ const styles = {
   label:        { fontSize: '13px', fontWeight: '600', color: '#272525' },
   req:          { color: '#E53E3E' },
   input:        { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '11px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box', userSelect: 'none' },
-  select:       { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '11px 36px 11px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', WebkitAppearance: 'none', backgroundColor: '#fff', color: '#272525', cursor: 'pointer', boxSizing: 'border-box' },
+  select:       { backgroundImage: 'none', appearance: 'none', width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '11px 36px 11px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', WebkitAppearance: 'none', backgroundColor: '#fff', color: '#272525', cursor: 'pointer', boxSizing: 'border-box' },
   tabla:        { width: '100%', borderCollapse: 'collapse', minWidth: '650px' },
   th:           { fontSize: '12px', fontWeight: '700', color: '#A3A3A3', padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #F0F0F0', whiteSpace: 'nowrap' },
   td:           { fontSize: '13px', color: '#272525', padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' },

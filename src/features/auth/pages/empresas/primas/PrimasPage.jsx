@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { CreditCard, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload } from 'lucide-react';
+import { CreditCard, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
@@ -164,7 +164,7 @@ export default function PrimasPage() {
       </div>
 
       {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
+      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}`)}>
         <ChevronLeft size={16} color="#272525" />
         <span>Volver</span>
       </button>
@@ -222,74 +222,82 @@ export default function PrimasPage() {
             <thead>
               <tr>
                 <th style={styles.th}>Periodo</th>
-                <th style={styles.th}>Empleados incluidos</th>
-                <th style={styles.th}>Total neto</th>
+                {!['Borrador', 'Cerrado'].includes(tab) && (
+                  <th style={styles.th}>Empleados incluidos</th>
+                )}
+                {!['Borrador', 'Cerrado'].includes(tab) && (
+                  <th style={styles.th}>Total neto</th>
+                )}
                 <th style={styles.th}>Fecha de creación proceso</th>
                 <th style={styles.th}>Estado</th>
-                {(tab === 'Borrador' || tab === 'Cerrado') && <th style={styles.th}>Acciones</th>}
+                {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
+                  <th style={styles.th}>Acciones</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {periodosPagina.length === 0 ? (
-                <tr><td colSpan={tab === 'Borrador' || tab === 'Cerrado' ? 6 : 5} style={{ textAlign: 'center', padding: '20px', color: '#A3A3A3' }}>Sin resultados</td></tr>
+                <tr>
+                  <td
+                    colSpan={
+                      ['Borrador', 'Cerrado'].includes(tab) ? 4 :
+                      ['Pendiente por pagar', 'Pagado'].includes(tab) ? 6 :
+                      tab === 'Anulado' ? 5 : 4
+                    }
+                    style={{ textAlign: 'center', padding: '20px', color: '#A3A3A3' }}
+                  >
+                    Sin resultados
+                  </td>
+                </tr>
               ) : (
                 periodosPagina.map((p, index) => (
                   <tr key={p.procesoLiquiId} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
-                    <td style={styles.td}>
-                      {p.fechaInicioPeriodo} - {p.fechaFinPeriodo}
-                    </td>
-                    <td style={styles.td}>-</td>
-                    <td style={styles.td}>-</td>
+                    <td style={styles.td}>{p.fechaInicioPeriodo} - {p.fechaFinPeriodo}</td>
+                    {!['Borrador', 'Cerrado'].includes(tab) && (
+                      <td style={styles.td}>{p.cantidadEmpleados ?? '-'}</td>
+                    )}
+                    {!['Borrador', 'Cerrado'].includes(tab) && (
+                      <td style={styles.td}>{p.totalNeto ? formatMiles(p.totalNeto) : '-'}</td>
+                    )}
                     <td style={styles.td}>{p.createdAt?.split('T')[0]}</td>
                     <td style={styles.td}>
                       {p.estadoProcNomina === 'ANULADO'
-                        ? <span style={styles.estadoTexto}>
-                            {ESTADO_LABEL[p.estadoProcNomina]}
-                          </span>
+                        ? <span style={styles.estadoTexto}>{ESTADO_LABEL[p.estadoProcNomina]}</span>
                         : <EstadoSelect
                             valor={ESTADO_LABEL[p.estadoProcNomina]}
-                            onChange={(v) => handleEstadoChange(
-                              p.procesoLiquiId,
-                              ESTADO_BACK[v]
-                            )}
+                            onChange={(v) => handleEstadoChange(p.procesoLiquiId, ESTADO_BACK[v])}
                           />
                       }
                     </td>
-                    {(tab === 'Borrador' || tab === 'Cerrado') && (
+                    {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
                       <td style={styles.td}>
-                        <div style={{
-                          display: 'flex', gap: '10px',
-                          justifyContent: 'center', alignItems: 'center',
-                        }}>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
                           {p.estadoProcNomina === 'BORRADOR' && (
                             <>
-                              <button
-                                style={styles.iconBtn}
-                                onClick={() => navigate(
-                                  `/empresas/${id}/primas/${p.procesoLiquiId}/desprendibles`
-                                )}
-                                title="Editar"
-                              >
+                              <button style={styles.iconBtn}
+                                onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/desprendibles`)}
+                                title="Editar">
                                 <Pencil size={16} color="#0B662A" />
                               </button>
-                              <button
-                                style={styles.iconBtn}
+                              <button style={styles.iconBtn}
                                 onClick={() => handleEliminar(p)}
-                                title="Eliminar"
-                              >
+                                title="Eliminar">
                                 <Trash2 size={16} color="#E53E3E" />
                               </button>
                             </>
                           )}
                           {p.estadoProcNomina === 'CERRADO' && (
-                            <button
-                              style={styles.iconBtn}
-                              onClick={() => navigate(
-                                `/empresas/${id}/primas/${p.procesoLiquiId}/liquidar`
-                              )}
-                              title="Liquidar"
-                            >
+                            <button style={styles.iconBtn}
+                              onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/liquidar`)}
+                              title="Liquidar">
                               <Upload size={16} color="#0B662A" />
+                            </button>
+                          )}
+                          {['PENDIENTE_PAGO', 'PAGADO'].includes(p.estadoProcNomina) && (
+                            <button style={styles.iconBtn}
+                              onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/resultado`)}
+                              title="Ver reportes">
+                              <Eye size={16} color="#0B662A" />
                             </button>
                           )}
                         </div>
