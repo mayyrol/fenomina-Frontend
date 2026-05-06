@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye } from 'lucide-react';
+import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X  } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { useNominas } from '../../../hooks/useNominas';
@@ -81,19 +81,26 @@ export default function NominasPage() {
   const [periodoEliminar, setPeriodoEliminar]   = useState(null);
   const [hoverLiquidar, setHoverLiquidar]       = useState(false);
 
+  const [fechaBusqueda, setFechaBusqueda] = useState('');
+  const [itemsPerPage, setItemsPerPage]   = useState(10);
+
   useEffect(() => {
     setPeriodos(procesos);
   }, [procesos]);
 
-  const periodosFiltrados = periodos.filter(p =>
-    ESTADO_LABEL[p.estadoProcNomina] === tab &&
-    (p.fechaInicioPeriodo?.includes(busqueda) ||
-    p.fechaFinPeriodo?.includes(busqueda))
-  );
+  const periodosFiltrados = periodos.filter(p => {
+    if (ESTADO_LABEL[p.estadoProcNomina] !== tab) return false;
+    if (busqueda && !p.fechaInicioPeriodo?.includes(busqueda) && !p.fechaFinPeriodo?.includes(busqueda)) return false;
+    if (fechaBusqueda) {
+      const matchInicio   = (p.fechaInicioPeriodo ?? '').slice(0, 10) === fechaBusqueda;
+      const matchCreacion = (p.createdAt ?? '').slice(0, 10) === fechaBusqueda;
+      if (!matchInicio && !matchCreacion) return false;
+    }
+    return true;
+  });
 
-  const totalPaginas   = Math.max(1, Math.ceil(periodosFiltrados.length / PAGE_SIZE));
-  const periodosPagina = periodosFiltrados.slice(pagina * PAGE_SIZE, pagina * PAGE_SIZE + PAGE_SIZE);
-
+  const totalPaginas   = Math.max(1, Math.ceil(periodosFiltrados.length / itemsPerPage));
+  const periodosPagina = periodosFiltrados.slice(pagina * itemsPerPage, pagina * itemsPerPage + itemsPerPage);
   const handleEstadoChange = (periodoId, nuevoEstado) => {
     setCambioEstado({ periodoId, nuevoEstado });
     if (nuevoEstado === 'Anulado') {
@@ -133,6 +140,20 @@ export default function NominasPage() {
       setConfirmarEliminar(false);
       setModal('error');
     }
+  };
+
+  const generarPaginas = () => {
+    const paginas = [];
+    if (totalPaginas <= 6) {
+      for (let i = 0; i < totalPaginas; i++) paginas.push(i);
+    } else {
+      paginas.push(0);
+      if (pagina > 2) paginas.push('...');
+      for (let i = Math.max(1, pagina - 1); i <= Math.min(totalPaginas - 2, pagina + 1); i++) paginas.push(i);
+      if (pagina < totalPaginas - 3) paginas.push('...');
+      paginas.push(totalPaginas - 1);
+    }
+    return paginas;
   };
 
 
@@ -203,15 +224,17 @@ export default function NominasPage() {
 
       {/* Tabs */}
       <div style={styles.tabsBox}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            style={{ ...styles.tab, ...(tab === t ? styles.tabActivo : {}) }}
-            onClick={() => { setTab(t); setPagina(0); }}
-          >
-            {t}
-          </button>
-        ))}
+        <div style={{ display: 'flex' }}>
+          {TABS_ESTADO.map((t) => (
+            <button key={t} style={{ ...styles.tab, ...(tab === t ? styles.tabActivo : {}) }} onClick={() => { setTab(t); setPagina(0); }}>{t}</button>
+          ))}
+        </div>
+        <div style={styles.porPaginaBox}>
+          <span style={styles.porPaginaLabel}>Resultados por página:</span>
+          <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPagina(0); }} style={styles.porPaginaSelect}>
+            {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -322,22 +345,13 @@ export default function NominasPage() {
 
         {/* Paginación */}
         <div style={styles.paginacion}>
-          {Array.from({ length: totalPaginas }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setPagina(i)}
-              style={{ ...styles.pageBtn, ...(pagina === i ? styles.pageBtnActivo : {}) }}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <button
-            onClick={() => setPagina(totalPaginas - 1)}
-            style={styles.pageBtn}
-            disabled={pagina === totalPaginas - 1}
-          >
-            {'>>'}
-          </button>
+          {generarPaginas().map((p, i) =>
+            p === '...'
+              ? <span key={`e-${i}`} style={styles.ellipsis}>...</span>
+              : <button key={p} onClick={() => setPagina(p)} style={{ ...styles.pageBtn, ...(pagina === p ? styles.pageBtnActivo : {}) }}>{p + 1}</button>
+          )}
+          <button onClick={() => setPagina(p => Math.min(totalPaginas - 1, p + 1))} disabled={pagina >= totalPaginas - 1}
+            style={{ ...styles.pageBtn, opacity: pagina >= totalPaginas - 1 ? 0.4 : 1 }}>{'>>'}</button>
         </div>
       </div>
 
@@ -356,26 +370,12 @@ export default function NominasPage() {
         onCancelar={() => setConfirmarAnulado(false)}
         onConfirmar={async () => {
           try {
-            const { diasLaborados } = useNominaStore.getState();
-    
-            // Validación local antes de llamar al backend
-            const tipoProceso = proceso?.tipoProceso;
-            const maxDias = tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30;
-    
-            const empleadoExcede = Object.entries(diasLaborados).find(
-              ([, dias]) => dias > maxDias
-            );
-    
-            if (empleadoExcede) {
-              setModal('error');
-              return;
-            }
-    
-            await payrollService.cambiarEstado(nominaId, 'CERRADO', diasLaborados);
-            setConfirmarCerrar(false);
-            navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+            await payrollService.cambiarEstado(cambioEstado.periodoId, 'ANULADO');
+            await recargar();
+            setConfirmarAnulado(false);
+            setModal('exito');
           } catch {
-            setConfirmarCerrar(false);
+            setConfirmarAnulado(false);
             setModal('error');
           }
         }}
@@ -415,7 +415,7 @@ const styles = {
   addBar:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px' },
   addLabel:     { fontSize: '15px', fontWeight: '700', color: '#272525' },
   btnLiquidar:  { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  tabsBox:      { display: 'flex', borderBottom: '1px solid #E8E8E8' },
+  tabsBox: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8', flexWrap: 'wrap', gap: '8px' },
   tab:          { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
   tabActivo:    { color: '#0B662A', borderBottom: '2px solid #0B662A' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '24px' },
@@ -435,4 +435,12 @@ const styles = {
   searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
   searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   iconBtn:      { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },
+  dateWrapper:    { display: 'flex', alignItems: 'center', gap: '4px' },
+  clearDateBtn:   { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' },
+  dateInput:      { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', cursor: 'pointer', color: '#272525' },
+  tabsBox:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8', flexWrap: 'wrap', gap: '8px' },
+  porPaginaBox:   { display: 'flex', alignItems: 'center', gap: '8px' },
+  porPaginaLabel: { fontSize: '13px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },
+  porPaginaSelect:{ padding: '6px 28px 6px 10px', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23272525\' stroke-width=\'2\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundColor: '#fff' },
+  ellipsis:       { fontSize: '13px', color: '#A3A3A3', padding: '0 4px', lineHeight: '36px' },
 };
