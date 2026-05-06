@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../store/authStore';
 import { ScrollText, ChevronLeft, UserRound, Search } from 'lucide-react';
-import { useHistoricos } from '../../../hooks/useHistoricos';
-import historicosService from '../../../services/historicosService';
+import { useHistoricos } from "../hooks/useHistoricos";
+import historicosService from "../../../services/historicosService";
 
 const OPCIONES_PAGINA = [10, 25, 50];
 
