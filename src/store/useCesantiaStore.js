@@ -7,6 +7,7 @@ export const useCesantiaStore = create(
       procesoCesantiasActual:  null,
       procesoInteresesActual:  null,
       empleadosSeleccionados:  [],
+      anioSeleccionado:        '',
 
       setProcesosCesantiasActual: (proceso) =>
         set({ procesoCesantiasActual: proceso }),
@@ -16,6 +17,9 @@ export const useCesantiaStore = create(
 
       setEmpleadosSeleccionados: (empleados) =>
         set({ empleadosSeleccionados: empleados }),
+
+      setAnioSeleccionado: (anio) =>
+        set({ anioSeleccionado: anio }),
 
       limpiarProceso: () =>
         set({

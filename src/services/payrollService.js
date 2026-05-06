@@ -6,7 +6,13 @@ const BASE = '/api/payroll';
 const payrollService = {
 
   getProcesos: (empresaId) =>
-    payrollAxios.get(`${BASE}/procesos`, { params: { empresaId } }),
+    payrollAxios.get(`${BASE}/procesos`, { params: { empresaId } })
+      .then(res => ({
+        ...res,
+        data: res.data.filter(p =>
+          p.tipoProceso === 'NOMINA_MENSUAL' || p.tipoProceso === 'NOMINA_QUINCENAL'
+        )
+      })),
 
   crearProceso: (payload) =>
     payrollAxios.post(`${BASE}/procesos`, payload),

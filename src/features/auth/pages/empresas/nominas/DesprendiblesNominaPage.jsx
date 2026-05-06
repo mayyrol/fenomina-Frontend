@@ -426,21 +426,44 @@ export default function DesprendiblesNominaPage() {
         onCancelar={() => setConfirmarCerrar(false)}
         onConfirmar={async () => {
           const diasStore = useNominaStore.getState().diasLaborados;
+          const esQuincenal = proceso?.tipoProceso === 'NOMINA_QUINCENAL';
+          const maxDias = esQuincenal ? 15 : 30;
 
-          // Validar días laborados vs días reales del periodo
-          const fechaInicioPeriodo = new Date(proceso.fechaInicioPeriodo);
-          const fechaFinPeriodo = new Date(proceso.fechaFinPeriodo);
-          const diasDelPeriodo = Math.round(
-            (fechaFinPeriodo - fechaInicioPeriodo) / (1000 * 60 * 60 * 24)
-          ) + 1;
+          const fechaInicioPeriodo = new Date(proceso.fechaInicioPeriodo + 'T00:00:00');
+          const fechaFinPeriodo = new Date(proceso.fechaFinPeriodo + 'T00:00:00');
+          const calcularDiasComerciales = (inicio, fin) => {
+            const meses = (fin.getFullYear() - inicio.getFullYear()) * 12
+              + (fin.getMonth() - inicio.getMonth());
 
-          console.log('diasStore al cerrar:', diasStore);
-          console.log('diasDelPeriodo:', diasDelPeriodo);
+            // Si fin es el último día del mes, contar como día 30
+            const ultimoDiaMesFin = new Date(fin.getFullYear(), fin.getMonth() + 1, 0).getDate();
+            const diaFin = fin.getDate() === ultimoDiaMesFin ? 30 : Math.min(fin.getDate(), 30);
+            const diaInicio = Math.min(inicio.getDate(), 30);
 
+            return meses * 30 + (diaFin - diaInicio) + 1;
+          };
+
+          const diasDelPeriodo = calcularDiasComerciales(fechaInicioPeriodo, fechaFinPeriodo);
+          console.log('fechaInicioPeriodo:', fechaInicioPeriodo);
+          console.log('fechaFinPeriodo:', fechaFinPeriodo);
+          console.log('fin.getDate():', fechaFinPeriodo.getDate());
+          console.log('ultimoDiaMesFin:', new Date(fechaFinPeriodo.getFullYear(), fechaFinPeriodo.getMonth() + 1, 0).getDate());
+          console.log('diasDelPeriodo calculado:', diasDelPeriodo);
           for (const emp of empleados) {
-            const diasIngresados = diasStore[emp.empleadoId];
-            if (!diasIngresados) continue;
+            // Si no hay valor en el store, asumir 30 (valor por defecto)
+            const diasIngresados = diasStore[emp.empleadoId] ?? 30;
 
+            // Validar máximo según tipo de proceso
+            if (Number(diasIngresados) > maxDias) {
+              setMensajeError(
+                `${emp.nombresEmp} ${emp.apellidosEmp} tiene ${diasIngresados} días laborados registrados, pero el máximo para nómina ${esQuincenal ? 'quincenal' : 'mensual'} es ${maxDias} días. Por favor ingresa a novedades y corrige los días laborados.`
+              );
+              setModal('error');
+              setConfirmarCerrar(false);
+              return;
+            }
+
+            // Validar días laborados vs días reales del periodo
             if (Number(diasIngresados) > diasDelPeriodo) {
               setMensajeError(
                 `${emp.nombresEmp} ${emp.apellidosEmp} tiene ${diasIngresados} días laborados pero el periodo solo cubre ${diasDelPeriodo} días (${proceso.fechaInicioPeriodo} - ${proceso.fechaFinPeriodo}).`
@@ -449,24 +472,14 @@ export default function DesprendiblesNominaPage() {
               setConfirmarCerrar(false);
               return;
             }
-          }
-          // Validar días laborados vs fecha ingreso de cada empleado
-  
-          for (const emp of empleados) {
-            const diasIngresados = diasStore[emp.empleadoId];
-            if (!diasIngresados) continue;
 
+            // Validar días laborados vs fecha de ingreso
             if (emp.fechaIngresoEmp) {
-              const fechaIngreso  = new Date(emp.fechaIngresoEmp);
-              const fechaInicio   = new Date(proceso.fechaInicioPeriodo);
-              const fechaFin      = new Date(proceso.fechaFinPeriodo);
-
-              // Si el empleado ingresó dentro del periodo, calcular días válidos
-              if (fechaIngreso > fechaInicio && fechaIngreso <= fechaFin) {
+              const fechaIngreso = new Date(emp.fechaIngresoEmp + 'T00:00:00');
+              if (fechaIngreso > fechaInicioPeriodo && fechaIngreso <= fechaFinPeriodo) {
                 const diasValidos = Math.round(
-                  (fechaFin - fechaIngreso) / (1000 * 60 * 60 * 24)
+                  (fechaFinPeriodo - fechaIngreso) / (1000 * 60 * 60 * 24)
                 ) + 1;
-
                 if (Number(diasIngresados) > diasValidos) {
                   setMensajeError(
                     `${emp.nombresEmp} ${emp.apellidosEmp} ingresó el ${emp.fechaIngresoEmp}. Los días laborados no pueden superar ${diasValidos} días válidos del periodo.`
@@ -476,18 +489,6 @@ export default function DesprendiblesNominaPage() {
                   return;
                 }
               }
-            }
-
-            // Validar máximo según tipo de proceso
-            const esQuincenal = proceso?.tipoProceso === 'NOMINA_QUINCENAL';
-            const maxDias = esQuincenal ? 15 : 30;
-            if (Number(diasIngresados) > maxDias) {
-              setMensajeError(
-                `Un empleado tiene más de ${maxDias} días laborados, que es el máximo para nómina ${esQuincenal ? 'quincenal' : 'mensual'}.`
-              );
-              setModal('error');
-              setConfirmarCerrar(false);
-              return;
             }
           }
 

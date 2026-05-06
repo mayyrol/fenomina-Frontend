@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, ChevronLeft, UserRound } from 'lucide-react';
+import { Coins, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
 import payrollService from '../../../../../services/payrollService';
@@ -26,7 +26,13 @@ export default function LiquidarCesantiasPage() {
   const [cargando, setCargando] = useState(false);
   const [modal,    setModal]    = useState(null);
 
+ 
+
   useEffect(() => {
+    const state = useCesantiaStore.getState();
+    console.log('Estado del store de cesantías:', state);
+    console.log('Empleados seleccionados:', state.empleadosSeleccionados);
+    console.log('sessionStorage cesantia-store:', sessionStorage.getItem('cesantia-store'));
     if (!cesantiaId || !id) return;
     setCargando(true);
 
@@ -62,10 +68,6 @@ export default function LiquidarCesantiasPage() {
         </div>
       </div>
 
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-      </button>
-
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Liquidar Cesantías e Intereses</h3>
         <div style={styles.infoGrid}>
@@ -89,7 +91,7 @@ export default function LiquidarCesantiasPage() {
         <button
           style={{ ...styles.btnCancelar, background: hoverCancelar ? '#f5f5f5' : '#fff', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverCancelar(true)} onMouseLeave={() => setHoverCancelar(false)}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/empresas/${id}/cesantias`)}
         >
           Cancelar
         </button>
@@ -101,19 +103,34 @@ export default function LiquidarCesantiasPage() {
         onConfirmar={async () => {
           setConfirmarLiquidar(false);
           try {
-            const {
-              procesoInteresesActual,
-              empleadosSeleccionados,
-            } = useCesantiaStore.getState();
+            const { procesoInteresesActual, empleadosSeleccionados } =
+              useCesantiaStore.getState();
+
+            let empleados = empleadosSeleccionados;
+            if (!empleados || empleados.length === 0) {
+              const { data: empleadosActivos } =
+                await payrollService.getEmpleadosActivos(id);
+              empleados = empleadosActivos.map(e => e.empleadoId);
+            }
 
             await payrollService.liquidarCesantias(cesantiaId, {
-              empleadosSeleccionados,
+              empleadosSeleccionados: empleados,
             });
 
-            if (procesoInteresesActual) {
+            let procesoIntereses = procesoInteresesActual;
+            if (!procesoIntereses) {
+              const { data: procesos } = await payrollService.getProcesosIntereses(id);
+              procesoIntereses = procesos.find(
+                p => p.anio === proceso?.anio &&
+                  p.estadoProcNomina !== 'ANULADO' &&
+                  p.estadoProcNomina !== 'PAGADO'
+              ) ?? null;
+            }
+
+            if (procesoIntereses) {
               await payrollService.liquidarIntereses(
-                procesoInteresesActual.procesoLiquiId,
-                { empleadosSeleccionados }
+                procesoIntereses.procesoLiquiId,
+                { empleadosSeleccionados: empleados }
               );
             }
 
@@ -143,7 +160,6 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '36px 40px' },
   cardTitulo:   { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 32px 0' },
   infoGrid:     { display: 'flex', flexDirection: 'column', gap: '14px' },

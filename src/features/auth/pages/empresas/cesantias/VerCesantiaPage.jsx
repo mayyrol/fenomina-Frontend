@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { Coins, UserRound } from 'lucide-react';
 import payrollAxios from '../../../../../api/payrollAxiosInstance';
@@ -18,46 +18,77 @@ export default function VerCesantiaPage() {
   const [novedades, setNovedades] = useState([]);
   const [cargando,  setCargando]  = useState(false);
 
+  const [searchParams] = useSearchParams();
+  const anio = Number(searchParams.get('anio'));
+
+  const [diasCalculados, setDiasCalculados] = useState(0);
+
   const fmt = (v) =>
     v != null
       ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
       : '';
 
   useEffect(() => {
-    if (!empleadoId || !id) return;
+    if (!empleadoId || !id || !anio) return;
     setCargando(true);
 
     Promise.all([
       masterAxios.get('/api/master/empleados', {
         params: { empresaId: id, estado: 'ACTIVO' },
       }),
-      payrollService.getProcesosCesantias(id),
+      payrollService.getProcesos(id), // nóminas pagadas del año
     ])
-      .then(([{ data: emps }, { data: procesos }]) => {
+      .then(([{ data: emps }, { data: procesosNomina }]) => {
         const encontrado = emps.find(
           e => String(e.empleadoId) === String(empleadoId)
         );
         setEmpleado(encontrado ?? null);
 
-        const procesosPagados = procesos.filter(
-          p => p.estadoProcNomina === 'PAGADO'
+        // Nóminas pagadas del año seleccionado
+        const nominasDelAnio = procesosNomina.filter(p =>
+          (p.estadoProcNomina === 'PAGADO' || p.estadoProcNomina === 'PENDIENTE_PAGO') &&
+          p.anio === anio
         );
 
         return Promise.all(
-          procesosPagados.map(p =>
+          nominasDelAnio.map(p =>
             payrollAxios
               .get(`/api/payroll/novedades/proceso/${p.procesoLiquiId}/empleado/${empleadoId}`)
-              .then(({ data }) => data)
-              .catch(() => [])
+              .then(({ data }) => ({ novedades: data, procesoLiquiId: p.procesoLiquiId }))
+              .catch(() => ({ novedades: [], procesoLiquiId: p.procesoLiquiId }))
           )
-        );
+        ).then(resultados => {
+          const todasNovedades = resultados.flatMap(r => r.novedades);
+          setNovedades(todasNovedades);
+
+          // Calcular días laborados sumando cantidad_concept donde concepto ID=1
+          // desde los detalles de nómina
+          return Promise.all(
+            nominasDelAnio.map(p =>
+              payrollAxios
+                .get(`/api/payroll/desprendibles/nomina/${p.procesoLiquiId}`)
+                .then(({ data: desps }) => {
+                  const despEmpleado = desps.find(
+                    d => String(d.empleadoId) === String(empleadoId)
+                  );
+                  if (!despEmpleado) return 0;
+                  const conceptoSalario = despEmpleado.conceptos?.find(
+                    c => c.concepNominaId === 1
+                  );
+                  return conceptoSalario?.cantidad ?? 0;
+                })
+                .catch(() => 0)
+            )
+          );
+        });
       })
-      .then((resultados) => {
-        setNovedades(resultados.flat());
+      .then(diasPorNomina => {
+        const totalDias = diasPorNomina.reduce((s, d) => s + d, 0);
+        setDiasCalculados(Math.min(totalDias, 360));
       })
       .catch(() => {})
       .finally(() => setCargando(false));
-  }, [empleadoId, id]);
+  }, [empleadoId, id, anio]);
 
   return (
     <div style={styles.container}>
@@ -87,15 +118,7 @@ export default function VerCesantiaPage() {
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Días laborados <span style={{ color: '#E53E3E' }}>*</span></label>
           <input
-            value={empleado?.fechaIngresoEmp
-              ? Math.min(
-                  Math.floor(
-                    (new Date() - new Date(empleado.fechaIngresoEmp))
-                    / (1000 * 60 * 60 * 24)
-                  ),
-                  360
-                )
-              : 360}
+            value={diasCalculados}
             readOnly
             style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }}
           />
@@ -125,7 +148,7 @@ export default function VerCesantiaPage() {
             <div style={styles.gridFila}>
               <input
                 readOnly
-                value={nov.observaciones ?? `Novedad ${nov.novedadId}`}
+                value={nov.observaciones ?? nov.nombreConcepto ?? `Novedad ${nov.novedadId}`}
                 style={{
                   ...styles.input,
                   textTransform: 'uppercase',

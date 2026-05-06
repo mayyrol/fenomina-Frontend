@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, ChevronLeft, UserRound, ChevronDown } from 'lucide-react';
+import { Coins, ChevronLeft, UserRound, ChevronDown, Eye  } from 'lucide-react';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
 import payrollService from '../../../../../services/payrollService';
@@ -29,13 +29,17 @@ export default function GenerarReporteCesantiasPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [año, setAño]                         = useState('');
+  const { anioSeleccionado, setAnioSeleccionado } = useCesantiaStore();
+  const [año, setAño] = useState('');
   const [seleccionados, setSeleccionados]     = useState([]);
   const [modal, setModal]                     = useState(null);
   const [hoverGenerar, setHoverGenerar]       = useState(false);
 
   const [empleados,   setEmpleados]   = useState([]);
   const [cargandoEmp, setCargandoEmp] = useState(false);
+
+  const [mensajeError, setMensajeError] = useState('');
+
 
   const todosSeleccionados =
     seleccionados.length === empleados.length && empleados.length > 0;
@@ -89,14 +93,21 @@ export default function GenerarReporteCesantiasPage() {
       useCesantiaStore.getState().setProcesosCesantiasActual(dataCesantias);
       useCesantiaStore.getState().setProcesosInteresesActual(dataIntereses);
       useCesantiaStore.getState().setEmpleadosSeleccionados(seleccionados);
+      useCesantiaStore.getState().setAnioSeleccionado(año);
 
       navigate(
         `/empresas/${id}/cesantias/${dataCesantias.procesoLiquiId}/desprendibles`
       );
-    } catch {
+    } catch (err) {
+      const mensaje = err?.response?.data?.mensaje ?? 'Ocurrió un error al crear el proceso.';
+      setMensajeError(mensaje);
       setModal('error');
     }
   };
+
+  useEffect(() => {
+    useCesantiaStore.getState().limpiarProceso();
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -135,7 +146,7 @@ export default function GenerarReporteCesantiasPage() {
         <div style={styles.filaFechas}>
           <div style={styles.campoBox}>
             <label style={styles.label}>Año <span style={styles.req}>*</span></label>
-            <SelectAño value={año} onChange={setAño} />
+            <SelectAño value={año} onChange={(val) => { setAño(val); setAnioSeleccionado(val); }} />
           </div>
         </div>
       </div>
@@ -155,6 +166,7 @@ export default function GenerarReporteCesantiasPage() {
                 <th style={styles.th}>Apellidos</th>
                 <th style={styles.th}>Fecha de ingreso</th>
                 <th style={styles.th}>Número de documento</th>
+                <th style={styles.th}>Ver cesantía</th>
                 <th style={styles.th}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                     <span>Seleccionar</span>
@@ -169,7 +181,7 @@ export default function GenerarReporteCesantiasPage() {
             <tbody>
               {cargandoEmp ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
                     Cargando empleados...
                   </td>
                 </tr>
@@ -180,6 +192,15 @@ export default function GenerarReporteCesantiasPage() {
                   <td style={styles.td}>{emp.apellidosEmp}</td>
                   <td style={styles.td}>{emp.fechaIngresoEmp}</td>
                   <td style={styles.td}>{emp.documentoEmp}</td>
+                  <td style={styles.td}>
+                    <button
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                      onClick={() => navigate(`/empresas/${id}/cesantias/ver-cesantia/${emp.empleadoId}?anio=${año}`)}
+                      title="Ver cesantía"
+                    >
+                      <Eye size={16} color="#0B662A" />
+                    </button>
+                  </td>
                   <td style={styles.td}>
                     <input
                       type="checkbox"
@@ -204,10 +225,14 @@ export default function GenerarReporteCesantiasPage() {
         >
           Generar Desprendibles
         </button>
-        <button style={styles.btnCancelar} onClick={() => navigate(-1)}>Regresar</button>
+        <button style={styles.btnCancelar} onClick={() => navigate(`/empresas/${id}/cesantias`)}>Regresar</button>
       </div>
 
-      <MensajeModal tipo={modal} mensaje="Por favor completa todos los campos obligatorios y selecciona al menos un empleado." onClose={() => setModal(null)} />
+      <MensajeModal
+        tipo={modal}
+        mensaje={mensajeError || 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.'}
+        onClose={() => { setModal(null); setMensajeError(''); }}
+      />
 
     </div>
   );

@@ -1,13 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, ChevronLeft, UserRound } from 'lucide-react';
+import { Coins, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import payrollService from '../../../../../services/payrollService';
 import masterAxios from '../../../../../api/masterAxiosInstance';
 
 const fmt = (v) => v != null ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
+
+const unidades = ['','UN','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE'];
+const decenas  = ['','','VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+const centenas = ['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+
+function numLetras(n) {
+  if (n === 0) return 'CERO';
+  if (n < 0) return 'MENOS ' + numLetras(-n);
+  let r = '';
+  if (n >= 1000000) {
+    const millones = Math.floor(n / 1000000);
+    r += (millones === 1 ? 'UN MILLÓN' : numLetras(millones) + ' MILLONES');
+    n %= 1000000;
+    r += n === 0 ? ' DE ' : ' ';
+  }
+  if (n >= 1000) { r += (Math.floor(n/1000) === 1 ? 'MIL' : numLetras(Math.floor(n/1000)) + ' MIL') + ' '; n %= 1000; }
+  if (n >= 100)  { r += (n === 100 ? 'CIEN' : centenas[Math.floor(n/100)]) + ' '; n %= 100; }
+  if (n >= 20)   { r += decenas[Math.floor(n/10)] + (n%10 ? ' Y ' + unidades[n%10] : '') + ' '; }
+  else if (n > 0){ r += unidades[n] + ' '; }
+  return r.trim();
+}
 
 export default function ResultadoCesantiasPage() {
   const navigate             = useNavigate();
@@ -32,133 +53,157 @@ export default function ResultadoCesantiasPage() {
     (s, d) => s + (d.valorInteresesCesantias ?? 0), 0
   );
 
-  const handleDescargar = () => {
+  const handleDescargar = async () => {
     setDescargando(true);
-    setTimeout(() => {
-      const doc = new jsPDF('landscape');
-      let y = 14;
 
-      if (empresa?.logoEmpresaUrl) {
-        doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, y, 20, 20);
+    let logoBase64 = null;
+    if (empresa?.logoEmpresaUrl) {
+      try {
+        const logoUrl = `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+        const response = await fetch(logoUrl);
+        const blob = await response.blob();
+        logoBase64 = await new Promise((resolve) => {
+          const img = new Image();
+          const url = URL.createObjectURL(blob);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxSize = 100;
+            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        });
+      } catch {
+        logoBase64 = null;
       }
+    }
 
-      doc.setFontSize(11); doc.setFont(undefined, 'bold');
-      doc.text(empresa?.nombreEmpresa ?? '', 148, y + 4, { align: 'center' });
-      doc.setFontSize(9); doc.setFont(undefined, 'normal');
-      doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 148, y + 10, { align: 'center' });
-      doc.text(
-        `CESANTIAS E INTERESES DE LAS CESANTIAS ${proceso?.anio ?? ''}`,
-        148, y + 16, { align: 'center' }
-      );
-      y += 26;
+    const doc = new jsPDF('landscape');
+    let y = 14;
 
-      autoTable(doc, {
-        startY: y,
-        head: [[
-          'No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS',
-          'FECHA INGRESO', 'FECHA CORTE INICIO', 'FECHA CORTE FIN',
-          'SALARIO BASE', 'AUX TRANSPORTE', 'SAL. LIQUIDACIÓN',
-          'CESANTÍAS', 'INTERESES CESANTÍAS', 'FONDO PENSIONES',
-        ]],
-        body: [
-          ...desprendibles.map((desp, i) => [
-            i + 1,
-            desp.documentoEmpleado,
-            `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
-            desp.diasLiquidados,
-            desp.fechaInicioCorte,
-            desp.fechaInicioCorte,
-            desp.fechaFinCorte,
-            fmt(desp.salarioBase),
-            fmt(desp.auxTransporte),
-            fmt(desp.baseLiquidacion),
-            fmt(desp.valorPrestacion),
-            fmt(desp.valorInteresesCesantias),
-            desp.fondoPension ?? '',
-          ]),
-          [{
-            content: 'TOTAL', colSpan: 10,
-            styles: { halign: 'right', fontStyle: 'bold' },
-          },
-          { content: fmt(totalCesantias), styles: { fontStyle: 'bold' } },
-          { content: fmt(totalIntereses), styles: { fontStyle: 'bold' } },
-          ''],
-        ],
-        styles: { fontSize: 6 },
-        headStyles: {
-          fillColor: [11, 102, 42], textColor: 255,
-          fontStyle: 'bold', fontSize: 6,
-        },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-      });
+    if (logoBase64) doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.text(empresa?.nombreEmpresa ?? '', 148, y + 4, { align: 'center' });
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 148, y + 10, { align: 'center' });
+    doc.text(`CESANTIAS E INTERESES DE LAS CESANTIAS ${proceso?.anio ?? ''}`, 148, y + 16, { align: 'center' });
+    y += 26;
 
-      desprendibles.forEach((desp) => {
-        doc.addPage('portrait');
-        let cy = 20;
-        doc.setDrawColor(0); doc.rect(10, 10, 190, 165);
-
-        if (empresa?.logoEmpresaUrl) {
-          doc.addImage(empresa.logoEmpresaUrl, 'PNG', 14, cy, 20, 20);
-        }
-
-        doc.setFontSize(10); doc.setFont(undefined, 'bold');
-        doc.text('Empleador:', 14, cy);
-        doc.text(empresa?.nombreEmpresa ?? '', 60, cy);
-        doc.setFont(undefined, 'normal');
-        doc.text('NIT:', 14, cy + 6);
-        doc.text(empresa?.empresaNit ?? '', 60, cy + 6);
-        cy += 16;
-
-        doc.setFont(undefined, 'bold');
-        doc.text('Datos del trabajador:', 14, cy); cy += 6;
-        doc.setFont(undefined, 'normal');
-        doc.text('Nombre:', 14, cy);
-        doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 60, cy);
-        cy += 6;
-        doc.text('Cédula:', 14, cy);
-        doc.text(desp.documentoEmpleado, 60, cy);
-        cy += 10;
-
-        doc.setFont(undefined, 'bold');
-        doc.text(
-          `Liquidaciones de cesantías e intereses de cesantías ${proceso?.anio ?? ''}`,
-          105, cy, { align: 'center' }
-        );
-        cy += 10;
-
-        doc.setFont(undefined, 'normal');
-        doc.text('Fecha inicial:', 14, cy);
-        doc.text(desp.fechaInicioCorte ?? '', 80, cy); cy += 6;
-        doc.text('Fecha final:', 14, cy);
-        doc.text(desp.fechaFinCorte ?? '', 80, cy); cy += 6;
-        doc.text('Días trabajados:', 14, cy);
-        doc.text(String(desp.diasLiquidados ?? ''), 80, cy); cy += 10;
-
-        doc.text('Salario Base:', 14, cy);
-        doc.text(fmt(desp.salarioBase), 80, cy); cy += 6;
-        doc.text('Auxilio de transporte:', 14, cy);
-        doc.text(fmt(desp.auxTransporte), 80, cy); cy += 6;
-        doc.text('Cesantías (informativo):', 14, cy);
-        doc.text(fmt(desp.valorPrestacion), 80, cy); cy += 6;
-        doc.text('Intereses de cesantías:', 14, cy);
-        doc.text(fmt(desp.valorInteresesCesantias), 80, cy); cy += 10;
-
-        doc.setFont(undefined, 'bold');
-        doc.text('Valor a pagar intereses de cesantías:', 14, cy);
-        doc.text(fmt(desp.valorInteresesCesantias), 80, cy); cy += 12;
-
-        doc.text('Recibí conforme:', 14, cy); cy += 14;
-        doc.line(14, cy, 80, cy); cy += 5;
-        doc.text(
+    autoTable(doc, {
+      startY: y,
+      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS', 'FECHA INICIO', 'FECHA FIN', 'SALARIO BASE', 'AUX TRANSPORTE', 'BASE LIQ.', 'CESANTÍAS', 'INTERESES', 'FONDO PENSIONES']],
+      body: [
+        ...desprendibles.map((desp, i) => [
+          i + 1,
+          desp.documentoEmpleado,
           `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
-          14, cy
-        ); cy += 5;
-        doc.text('Fecha de recibido:', 14, cy);
-      });
+          desp.diasLiquidados,
+          desp.fechaInicioCorte,
+          desp.fechaFinCorte,
+          fmt(desp.salarioBase),
+          fmt(desp.auxTransporte),
+          fmt(desp.baseLiquidacion),
+          fmt(desp.valorPrestacion),
+          fmt(desp.valorInteresesCesantias),
+          desp.fondoPension ?? '',
+        ]),
+        [{ content: 'TOTAL', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: fmt(totalCesantias), styles: { fontStyle: 'bold' } },
+        { content: fmt(totalIntereses), styles: { fontStyle: 'bold' } },
+        ''],
+      ],
+      styles: { fontSize: 6 },
+      headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold', fontSize: 6 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
 
-      doc.save(`cesantias_${proceso?.anio ?? ''}.pdf`);
-      setDescargando(false);
-    }, 100);
+    // Comprobantes individuales — original + copia por página
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const mitad = pageHeight / 2;
+
+    const renderComprobante = (desp, yInicio, mitadRef, pageHeightRef) => {
+      let cy = yInicio + 8;
+
+      const alturaComprobante = (yInicio === 0 ? mitadRef : pageHeightRef) - yInicio - 4;
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.rect(10, yInicio + 2, 190, alturaComprobante);
+
+      doc.setFontSize(8); doc.setFont(undefined, 'normal');
+      doc.text('Empleador:', 14, cy);
+      doc.setFont(undefined, 'bold');
+      doc.text(empresa?.nombreEmpresa ?? '', 55, cy); cy += 5;
+      doc.setFont(undefined, 'normal');
+      doc.text('NIT:', 14, cy);
+      doc.text(empresa?.empresaNit ?? '', 55, cy); cy += 8;
+
+      doc.setFont(undefined, 'bold');
+      doc.text('Datos del trabajador:', 14, cy); cy += 5;
+      doc.setFont(undefined, 'normal');
+      doc.text('Nombre:', 14, cy);
+      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 55, cy); cy += 5;
+      doc.text('Cédula:', 14, cy);
+      doc.text(desp.documentoEmpleado, 55, cy); cy += 8;
+
+      doc.setFont(undefined, 'bold');
+      doc.text(`Liquidaciones de cesantías e intereses de cesantías ${proceso?.anio ?? ''}`, 105, cy, { align: 'center' });
+      cy += 8;
+
+      doc.setFont(undefined, 'normal');
+      doc.text('Fecha inicial:', 14, cy);
+      doc.text(desp.fechaInicioCorte ?? '', 70, cy); cy += 5;
+      doc.text('Fecha final:', 14, cy);
+      doc.text(desp.fechaFinCorte ?? '', 70, cy); cy += 5;
+      doc.text('Días trabajados:', 14, cy);
+      doc.text(String(desp.diasLiquidados ?? ''), 70, cy); cy += 8;
+
+      doc.text('Salario Base:', 14, cy);
+      doc.text(fmt(desp.salarioBase), 70, cy); cy += 5;
+      doc.text('Auxilio de transporte:', 14, cy);
+      doc.text(fmt(desp.auxTransporte), 70, cy); cy += 5;
+      doc.setFont(undefined, 'bold');
+      doc.text('Cesantías (informativo):', 14, cy);
+      doc.text(fmt(desp.valorPrestacion), 70, cy); cy += 5;
+      doc.text('Intereses de cesantías:', 14, cy);
+      doc.text(fmt(desp.valorInteresesCesantias), 70, cy); cy += 8;
+
+      doc.text('Valor a pagar intereses de cesantías:', 14, cy);
+      doc.text(fmt(desp.valorInteresesCesantias), 70, cy); 
+      const cyFirma = cy - 8;
+      cy += 5;
+      doc.setFont(undefined, 'normal');
+      const letras = (() => {
+        try { return numLetras(Math.round(desp.valorInteresesCesantias ?? 0)) + ' PESOS M/CTE'; }
+        catch { return ''; }
+      })();
+      const split = doc.splitTextToSize(`En letras: ${letras}`, 160);
+      doc.text(split, 14, cy); cy += split.length * 4 + 4;
+
+      doc.text('_______________________', 130, cyFirma);
+      doc.text('Firma del trabajador', 138, cyFirma + 5);
+    };
+
+    desprendibles.forEach((desp) => {
+      doc.addPage('portrait');
+      const phPortrait = doc.internal.pageSize.getHeight();
+      const mitadPortrait = phPortrait / 2;
+      renderComprobante(desp, 0, mitadPortrait, phPortrait);
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineDashPattern([3, 3], 0);
+      doc.line(14, mitadPortrait, 196, mitadPortrait);
+      doc.setLineDashPattern([], 0);
+      renderComprobante(desp, mitadPortrait, mitadPortrait, phPortrait);
+    });
+
+    doc.save(`cesantias_${proceso?.anio ?? ''}.pdf`);
+    setDescargando(false);
   };
 
   useEffect(() => {
@@ -200,24 +245,10 @@ export default function ResultadoCesantiasPage() {
         </div>
       </div>
 
-      {/* Volver sticky */}
-      <div style={styles.stickyBar}>
-        <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-          <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-        </button>
-        <button
-          style={{ ...styles.btnDescargarSticky, background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverDescargar(true)}
-          onMouseLeave={() => setHoverDescargar(false)}
-          onClick={handleDescargar}
-        >
-          Descargar Reportes en PDF
-        </button>
-      </div>
-
       {/* Info proceso */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Desprendibles Cesantías e Intereses de Cesantías</h3>
+        <p style={styles.exitoMsg}>¡Cesantías e intereses liquidados exitosamente!</p>
         <div style={styles.infoGrid}>
           <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
           <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
@@ -229,61 +260,95 @@ export default function ResultadoCesantiasPage() {
       </div>
 
       {/* Planilla resumen */}
-      {cargando ? (
-        <tr>
-          <td colSpan={13} style={{ textAlign: 'center', padding: '20px' }}>
-            Cargando...
-          </td>
-        </tr>
-      ) : desprendibles.map((desp, i) => (
-        <tr key={desp.empleadoId ?? i}
-          style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-          <td style={styles.td}>{i + 1}</td>
-          <td style={styles.td}>{desp.documentoEmpleado}</td>
-          <td style={{ ...styles.td, textAlign: 'left' }}>
-            {desp.nombresEmpleado} {desp.apellidosEmpleado}
-          </td>
-          <td style={styles.td}>{desp.diasLiquidados}</td>
-          <td style={styles.td}>{desp.fechaInicioCorte}</td>
-          <td style={styles.td}>{desp.fechaInicioCorte}</td>
-          <td style={styles.td}>{desp.fechaFinCorte}</td>
-          <td style={styles.td}>{fmt(desp.salarioBase)}</td>
-          <td style={styles.td}>{fmt(desp.auxTransporte)}</td>
-          <td style={styles.td}>{fmt(desp.baseLiquidacion)}</td>
-          <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
-          <td style={styles.td}>{fmt(desp.valorInteresesCesantias)}</td>
-          <td style={styles.td}>{desp.fondoPension ?? ''}</td>
-        </tr>
-      ))}
+      <div style={styles.card}>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <p style={{ fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 4px 0' }}>
+            {empresa?.nombreEmpresa ?? ''}
+          </p>
+          <p style={{ fontSize: '13px', color: '#272525', margin: '0 0 2px 0' }}>
+            NIT: {empresa?.empresaNit ?? ''}
+          </p>
+          <p style={{ fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 }}>
+            CESANTÍAS E INTERESES DE CESANTÍAS {proceso?.anio ?? ''}
+          </p>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={styles.tabla}>
+            <thead>
+              <tr>
+                <th style={styles.th}>No</th>
+                <th style={styles.th}>CC</th>
+                <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
+                <th style={styles.th}>Días</th>
+                <th style={styles.th}>Fecha inicio</th>
+                <th style={styles.th}>Fecha fin</th>
+                <th style={styles.th}>Salario Base</th>
+                <th style={styles.th}>Aux. Transporte</th>
+                <th style={styles.th}>Base Liquidación</th>
+                <th style={styles.th}>Cesantías</th>
+                <th style={styles.th}>Intereses Cesantías</th>
+                <th style={styles.th}>Fondo Pensiones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cargando ? (
+                <tr>
+                  <td colSpan={12} style={{ textAlign: 'center', padding: '20px' }}>
+                    Cargando...
+                  </td>
+                </tr>
+              ) : desprendibles.map((desp, i) => (
+                <tr key={desp.empleadoId ?? i} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                  <td style={styles.td}>{i + 1}</td>
+                  <td style={styles.td}>{desp.documentoEmpleado}</td>
+                  <td style={{ ...styles.td, textAlign: 'left' }}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</td>
+                  <td style={styles.td}>{desp.diasLiquidados}</td>
+                  <td style={styles.td}>{desp.fechaInicioCorte}</td>
+                  <td style={styles.td}>{desp.fechaFinCorte}</td>
+                  <td style={styles.td}>{fmt(desp.salarioBase)}</td>
+                  <td style={styles.td}>{fmt(desp.auxTransporte)}</td>
+                  <td style={styles.td}>{fmt(desp.baseLiquidacion)}</td>
+                  <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
+                  <td style={styles.td}>{fmt(desp.valorInteresesCesantias)}</td>
+                  <td style={styles.td}>{desp.fondoPension ?? ''}</td>
+                </tr>
+              ))}
+              <tr style={{ backgroundColor: '#E8F5EE' }}>
+                <td colSpan={9} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>TOTAL</td>
+                <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalCesantias)}</td>
+                <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalIntereses)}</td>
+                <td style={styles.td} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* Comprobantes individuales con logo */}
+      {/* Comprobantes individuales */}
       {desprendibles.map((desp) => (
         <div key={desp.empleadoId} style={{ display: 'flex', justifyContent: 'center' }}>
           <div style={styles.comprobante}>
+
+            {/* Logo */}
             {empresa?.logoEmpresaUrl && (
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
                 <img
-                  src={empresa.logoEmpresaUrl}
+                  src={`${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`}
                   alt="logo"
-                  style={{ width: '60px', objectFit: 'contain' }}
+                  style={{ width: '60px', objectFit: 'contain', borderRadius: '0' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               </div>
             )}
 
             <div style={{ marginBottom: '10px' }}>
               <div style={{ display: 'flex', gap: '12px', marginBottom: '2px' }}>
-                <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '80px' }}>
-                  Empleador:
-                </span>
-                <span style={{ ...styles.comprobanteValor, fontWeight: '700' }}>
-                  {empresa?.nombreEmpresa ?? ''}
-                </span>
+                <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '80px' }}>Empleador:</span>
+                <span style={{ ...styles.comprobanteValor, fontWeight: '700' }}>{empresa?.nombreEmpresa ?? ''}</span>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <span style={{ ...styles.comprobanteLabel, minWidth: '80px' }}>NIT:</span>
-                <span style={{ ...styles.comprobanteValor, fontWeight: '700' }}>
-                  {empresa?.empresaNit ?? ''}
-                </span>
+                <span style={styles.comprobanteValor}>{empresa?.empresaNit ?? ''}</span>
               </div>
             </div>
 
@@ -293,9 +358,7 @@ export default function ResultadoCesantiasPage() {
               </p>
               <div style={{ display: 'flex', gap: '12px', marginBottom: '2px' }}>
                 <span style={{ ...styles.comprobanteLabel, minWidth: '80px' }}>Nombre:</span>
-                <span style={styles.comprobanteValor}>
-                  {desp.nombresEmpleado} {desp.apellidosEmpleado}
-                </span>
+                <span style={styles.comprobanteValor}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</span>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <span style={{ ...styles.comprobanteLabel, minWidth: '80px' }}>Cédula:</span>
@@ -303,10 +366,7 @@ export default function ResultadoCesantiasPage() {
               </div>
             </div>
 
-            <p style={{
-              fontSize: '11px', fontWeight: '700',
-              textAlign: 'center', margin: '12px 0', color: '#272525',
-            }}>
+            <p style={{ fontSize: '11px', fontWeight: '700', textAlign: 'center', margin: '12px auto', color: '#272525', width: '100%' }}>
               Liquidaciones de cesantías e intereses de cesantías {proceso?.anio ?? ''}
             </p>
 
@@ -331,27 +391,21 @@ export default function ResultadoCesantiasPage() {
                 <span style={styles.comprobanteValor}>{fmt(desp.salarioBase)}</span>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '2px' }}>
-                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>
-                  Auxilio de transporte:
-                </span>
+                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>Auxilio de transporte:</span>
                 <span style={styles.comprobanteValor}>{fmt(desp.auxTransporte)}</span>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '2px' }}>
-                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>
-                  Cesantías (informativo):
-                </span>
+                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>Cesantías (informativo):</span>
                 <span style={styles.comprobanteValor}>{fmt(desp.valorPrestacion)}</span>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>
-                  Intereses de cesantías:
-                </span>
+                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>Intereses de cesantías:</span>
                 <span style={styles.comprobanteValor}>{fmt(desp.valorInteresesCesantias)}</span>
               </div>
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '2px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '200px' }}>
                   Valor a pagar intereses de cesantías:
                 </span>
@@ -361,21 +415,47 @@ export default function ResultadoCesantiasPage() {
               </div>
             </div>
 
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '200px' }}>
+                Valor en letras:
+              </span>
+              <span style={{ ...styles.comprobanteValor, textTransform: 'uppercase' }}>
+                {(() => {
+                  try { return numLetras(Math.round(desp.valorInteresesCesantias ?? 0)) + ' PESOS M/CTE'; }
+                  catch { return ''; }
+                })()}
+              </span>
+            </div>
+
             <p style={{ ...styles.comprobanteLabel, marginBottom: '20px' }}>Recibí conforme:</p>
-            <div style={{
-              borderTop: '1px solid #272525', width: '220px',
-              paddingTop: '6px', marginTop: '8px',
-            }}>
+            <div style={{ borderTop: '1px solid #272525', width: '220px', paddingTop: '6px', marginTop: '8px' }}>
               <p style={{ fontSize: '11px', fontWeight: '700', color: '#272525', margin: '0 0 2px 0' }}>
                 {desp.nombresEmpleado} {desp.apellidosEmpleado}
               </p>
-              <p style={{ fontSize: '11px', color: '#272525', margin: 0 }}>
-                Fecha de recibido:
-              </p>
+              <p style={{ fontSize: '11px', color: '#272525', margin: 0 }}>Fecha de recibido:</p>
             </div>
           </div>
         </div>
       ))}
+
+      {/* Botones inferiores */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+        <button
+          style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#272525' }}
+          onClick={() => navigate(`/empresas/${id}/cesantias`)}
+        >
+          Cancelar
+        </button>
+        <button
+          style={{ background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease' }}
+          onMouseEnter={() => setHoverDescargar(true)}
+          onMouseLeave={() => setHoverDescargar(false)}
+          onClick={handleDescargar}
+          disabled={cargando || desprendibles.length === 0}
+        >
+          Descargar Reportes en PDF
+        </button>
+      </div>
 
       {/* Modal descarga */}
       {descargando && (
@@ -403,7 +483,6 @@ const styles = {
   avatar:             { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre:       { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:        { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-stickyBar: { position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'transparent', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },  volverBtn:          { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
   btnDescargarSticky: { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   card:               { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
   cardTitulo:         { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 12px 0' },
@@ -421,4 +500,5 @@ stickyBar: { position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'transpare
   comprobante:        { border: '1px solid #D0D0D0', borderRadius: '4px', padding: '24px 28px', width: '100%', maxWidth: '680px', boxSizing: 'border-box', backgroundColor: '#fff', marginBottom: '8px' },
   comprobanteLabel:   { fontSize: '11px', color: '#272525', margin: 0 },
   comprobanteValor:   { fontSize: '11px', color: '#272525', margin: 0 },
+  exitoMsg: { fontSize: '14px', fontWeight: '700', color: '#0B662A', margin: '0 0 16px 0' },
 };
