@@ -5,17 +5,15 @@ import { Settings2, ChevronDown, Plus, Trash2, UserRound } from 'lucide-react';
 import MensajeModal from '../../../../components/MensajeModal';
 import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal';
 import parametrosService from '../../../../services/parametrosService';
+import { formatearMiles, limpiarMiles } from '../../../../utils/formatters';
 
 const MAPA_PARAMETRO_NOMBRE = {
-  // Valores Base
   'SMMLV (SALARIO MÍNIMO)':                    'SMMLV',
   'AUXILIO DE TRANSPORTE':                     'AUXILIO_TRANSPORTE',
   'VALOR UVT (UNIDAD DE VALOR TRIBUTARIO)':    'VALOR_UVT',
   'SANCIÓN MÍNIMA DIAN (10 UVT)':              'SANCION_MINIMA_DIAN',
   'TOPE DE COTIZACIÓN (IBC MÁXIMO)':           'TOPE_COTIZACION',
   'SALARIO INTEGRAL MÍNIMO':                   'SALARIO_INTEGRAL_MINIMO',
-
-  // Jornada
   'JORNADA MÁXIMA SEMANAL':                    'JORNADA_MAXIMA_SEMANAL',
   'HORAS TRABAJADAS AL MES':                   'HORAS_TRABAJADAS_MES',
   'VALOR HORA ORDINARIA':                      'VALOR_HORA_ORDINARIA',
@@ -26,8 +24,6 @@ const MAPA_PARAMETRO_NOMBRE = {
   'RECARGO NOCTURNO ORDINARIO':                'RECARGO_NOCTURNO',
   'RECARGO DIURNO DOMINICAL O FESTIVO':        'RECARGO_DIURNO_DOMINICAL',
   'RECARGO NOCTURNO DOMINICAL O FESTIVO':      'RECARGO_NOCTURNO_DOMINICAL',
-
-  // Seguridad Social
   'SALUD (DEDUCCIÓN EMPLEADO)':                'SALUD_EMPLEADO',
   'SALUD (DEDUCCIÓN EMPLEADOR)':               'SALUD_EMPLEADOR',
   'PENSIÓN (DEDUCCIÓN EMPLEADO)':              'PENSION_EMPLEADO',
@@ -43,27 +39,15 @@ const MAPA_PARAMETRO_NOMBRE = {
   'ARL EMPLEADOR CLASE III':                   'ARL_EMPLEADOR_III',
   'ARL EMPLEADOR CLASE IV':                    'ARL_EMPLEADOR_IV',
   'ARL EMPLEADOR CLASE V':                     'ARL_EMPLEADOR_V',
-
-  // Parafiscales
   'CAJA DE COMPENSACIÓN':                      'CAJA_COMPENSACION',
   'SENA':                                      'SENA',
   'ICBF':                                      'ICBF',
-
-  // Prestaciones
   'PRIMA DE SERVICIOS':                        'PRIMA_SERVICIOS',
   'CESANTÍAS':                                 'CESANTIAS',
   'INTERESES SOBRE CESANTÍAS':                 'INTERESES_CESANTIAS',
   'VACACIONES':                                'VACACIONES',
 };
 
-
-const PARAMETROS_TIPO_VALOR = new Set([
-  'SMMLV', 'AUXILIO_TRANSPORTE', 'VALOR_UVT', 'SANCION_MINIMA_DIAN',
-  'TOPE_COTIZACION', 'SALARIO_INTEGRAL_MINIMO',
-  'JORNADA_MAXIMA_SEMANAL', 'HORAS_TRABAJADAS_MES', 'VALOR_HORA_ORDINARIA',
-]);
-
-// ─── Opciones por sección ───────────────────────────────────────────────────
 const OPCIONES = {
   valoresBase: [
     'SMMLV (SALARIO MÍNIMO)',
@@ -117,27 +101,22 @@ const OPCIONES = {
 
 const filaVacia = () => ({ nombre: '', fecha: '', valor: '', porcentaje: '', descripcion: '' });
 
-// ─── Componente: fila individual de parámetro ───────────────────────────────
 function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpenDropdown, onChange, onAdd, onRemove }) {
   const dropKey = `${seccionKey}-${index}`;
   const isOpen  = openDropdown === dropKey;
 
   return (
     <div style={styles.filaWrapper}>
-      {/* Fila superior: Nombre | Fecha | Valor */}
       <div style={styles.fila3}>
 
-        {/* Nombre de Parámetro – select custom */}
+        {/* Nombre de Parámetro */}
         <div style={styles.campo}>
           <label style={styles.label}>Nombre de Parámetro<span style={styles.req}>*</span></label>
           <div style={styles.selectWrapper}>
             <button
-              style={{
-                ...styles.selectBtn,
-                color: fila.nombre ? '#272525' : '#A3A3A3',
-              }}
+              style={{ ...styles.selectBtn, color: fila.nombre ? '#272525' : '#A3A3A3' }}
               onClick={(e) => {
-                e.stopPropagation(); // ← agrega esto
+                e.stopPropagation();
                 setOpenDropdown(isOpen ? null : dropKey);
               }}
             >
@@ -151,14 +130,11 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
                 {opciones.map(op => (
                   <div
                     key={op}
-                    style={{
-                      ...styles.dropdownItem,
-                      backgroundColor: fila.nombre === op ? '#f0f9f4' : '#fff',
-                    }}
+                    style={{ ...styles.dropdownItem, backgroundColor: fila.nombre === op ? '#f0f9f4' : '#fff' }}
                     onMouseEnter={e => { if (fila.nombre !== op) e.currentTarget.style.backgroundColor = '#fafafa'; }}
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = fila.nombre === op ? '#f0f9f4' : '#fff'; }}
                     onClick={(e) => {
-                      e.stopPropagation(); // ← agrega esto también
+                      e.stopPropagation();
                       onChange(index, 'nombre', op);
                       setOpenDropdown(null);
                     }}
@@ -183,28 +159,31 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
           />
         </div>
 
-        {/* Valor */}
+        {/* Valor — con formateo de miles */}
         <div style={styles.campo}>
           <label style={styles.label}>Valor</label>
           <input
             style={styles.input}
             placeholder="Ingresar valor"
-            value={fila.valor}
-            onChange={e => onChange(index, 'valor', e.target.value)}
+            inputMode="numeric"
+            value={formatearMiles(fila.valor)}
+            onChange={e => onChange(index, 'valor', limpiarMiles(e.target.value))}
           />
         </div>
       </div>
 
-      {/* Fila inferior: Porcentaje | Descripción | + 🗑 */}
       <div style={styles.filaInferior}>
+        {/* Porcentaje — type text con restricción de caracteres */}
         <div style={{ ...styles.campo, width: '220px', flexShrink: 0 }}>
           <label style={styles.label}>Porcentaje (Ej: 4% = 0.04)</label>
           <input
             style={styles.input}
             placeholder="Ingresar número"
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={fila.porcentaje}
             onChange={e => onChange(index, 'porcentaje', e.target.value)}
+            onKeyPress={e => { if (!/[\d.]/.test(e.key)) e.preventDefault(); }}
           />
         </div>
 
@@ -231,7 +210,6 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
   );
 }
 
-// ─── Componente: bloque de sección ─────────────────────────────────────────
 function SeccionParametros({ titulo, descripcion, opciones, filas, setter, seccionKey, openDropdown, setOpenDropdown }) {
   const handleChange = (index, field, value) => {
     setter(prev => {
@@ -265,7 +243,6 @@ function SeccionParametros({ titulo, descripcion, opciones, filas, setter, secci
   );
 }
 
-// ─── Página principal ───────────────────────────────────────────────────────
 export default function ParametrosGeneralesPage() {
   const navigate    = useNavigate();
   const { usuario } = useAuthStore();
@@ -297,10 +274,8 @@ export default function ParametrosGeneralesPage() {
     const secciones = [valoresBase, jornada, seguridadSocial, parafiscales, prestaciones];
     for (const seccion of secciones) {
       for (const fila of seccion) {
-        // Solo valida filas que el usuario haya empezado a llenar
         const tocada = fila.nombre || fila.fecha || fila.valor || fila.porcentaje || fila.descripcion;
-        if (!tocada) continue; // fila vacía → la ignora
-
+        if (!tocada) continue;
         if (!fila.nombre || !fila.fecha || !fila.descripcion) {
           setModalCampos(true);
           return false;
@@ -309,21 +284,14 @@ export default function ParametrosGeneralesPage() {
     }
     return true;
   };
-  
 
   const handleGuardar = async () => {
     if (!validar()) return;
 
-    // Construir lista de DTOs para enviar al backend
     const todasLasFilas = [
-      ...valoresBase,
-      ...jornada,
-      ...seguridadSocial,
-      ...parafiscales,
-      ...prestaciones,
+      ...valoresBase, ...jornada, ...seguridadSocial, ...parafiscales, ...prestaciones,
     ];
 
-    // Filtrar filas que tengan nombre y fecha
     const filasValidas = todasLasFilas.filter(f => f.nombre && f.fecha && f.descripcion);
 
     if (filasValidas.length === 0) {
@@ -331,7 +299,7 @@ export default function ParametrosGeneralesPage() {
       setModal('error');
       return;
     }
-    // Validar que cada fila tenga valor O porcentaje pero no ambos ni ninguno
+
     for (const fila of filasValidas) {
       const tieneValor      = fila.valor      !== '' && fila.valor      != null;
       const tienePorcentaje = fila.porcentaje !== '' && fila.porcentaje != null;
@@ -342,26 +310,21 @@ export default function ParametrosGeneralesPage() {
       }
     }
 
-    // Construir los DTOs
     const dtos = filasValidas.map(fila => {
       const enumNombre      = MAPA_PARAMETRO_NOMBRE[fila.nombre];
       const tieneValor      = fila.valor !== '' && fila.valor != null;
       const tienePorcentaje = fila.porcentaje !== '' && fila.porcentaje != null;
-
       return {
-        nombreParamGeneral:    enumNombre,
-        descripcionParam:      fila.descripcion || null,
-        fechaParamGeneral:     fila.fecha,           // ya está en formato YYYY-MM-DD por el input type="date"
-        valorParamGeneral:     tieneValor      ? parseFloat(fila.valor)      : null,
+        nombreParamGeneral:     enumNombre,
+        descripcionParam:       fila.descripcion || null,
+        fechaParamGeneral:      fila.fecha,
+        valorParamGeneral:      tieneValor      ? parseFloat(fila.valor)      : null,
         porcentajeParamGeneral: tienePorcentaje ? parseFloat(fila.porcentaje) : null,
       };
     });
 
     try {
-      // Enviar cada parámetro individualmente al backend
-      await Promise.all(
-        dtos.map(dto => parametrosService.crearParametro(dto))
-      );
+      await Promise.all(dtos.map(dto => parametrosService.crearParametro(dto)));
       setModal('exito');
     } catch (err) {
       const msg = err.response?.data?.message ?? '';
@@ -370,15 +333,13 @@ export default function ParametrosGeneralesPage() {
     }
   };
 
-  // Cerrar dropdown al hacer clic fuera
   const handlePageClick = () => setOpenDropdown(null);
-
   const seccionProps = { openDropdown, setOpenDropdown };
 
   return (
     <div style={styles.container} onClick={handlePageClick}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Settings2 size={18} color="#0B662A" />
@@ -398,7 +359,7 @@ export default function ParametrosGeneralesPage() {
         </div>
       </div>
 
-      {/* ── Card intro + Valores Base ── */}
+      {/* Card intro + Valores Base */}
       <div style={styles.card}>
         <h3 style={styles.formTitulo}>Parámetros Generales</h3>
         <p style={styles.textoDescripcion}>
@@ -408,7 +369,6 @@ export default function ParametrosGeneralesPage() {
           de seguridad social, prestaciones sociales y deducciones parafiscales, garantizando que cada pago sea preciso, esté actualizado
           frente a la normativa vigente y sea consistente con los estándares de la UGPP y la DIAN.
         </p>
-
         <SeccionParametros
           titulo="Parámetros de Valores Base"
           descripcion="Define los montos mínimos legales, el auxilio de transporte y los topes de referencia que sirven como base para todos los cálculos del año."
@@ -420,12 +380,11 @@ export default function ParametrosGeneralesPage() {
         />
       </div>
 
-      {/* ── Jornada ── */}
+      {/* Jornada */}
       <div style={styles.card}>
         <SeccionParametros
           titulo="Parámetros de Jornada y Recargos (Suplementarios)"
-          descripcion="Establece la duración de la jornada laboral legal y los porcentajes adicionales por trabajo extra, nocturno, dominical o festivo.
-          (Ingrese el valor decimal. Ej: 4% = 0.04, 8.5% = 0.085)"
+          descripcion="Establece la duración de la jornada laboral legal y los porcentajes adicionales por trabajo extra, nocturno, dominical o festivo. (Ingrese el valor decimal. Ej: 4% = 0.04, 8.5% = 0.085)"
           opciones={OPCIONES.jornada}
           filas={jornada}
           setter={setJornada}
@@ -434,11 +393,11 @@ export default function ParametrosGeneralesPage() {
         />
       </div>
 
-      {/* ── Seguridad Social ── */}
+      {/* Seguridad Social */}
       <div style={styles.card}>
         <SeccionParametros
           titulo="Parámetros de Seguridad Social"
-          descripcion="Configura los porcentajes de aporte obligatorio a Salud, Pensión y Riesgos Laborales (ARL) tanto para el empleador como para el trabajador. Ingrese el valor decimal. Ej: 4% = 0.04, 8.5% = 0.085)*"
+          descripcion="Configura los porcentajes de aporte obligatorio a Salud, Pensión y Riesgos Laborales (ARL) tanto para el empleador como para el trabajador. (Ingrese el valor decimal. Ej: 4% = 0.04, 8.5% = 0.085)"
           opciones={OPCIONES.seguridadSocial}
           filas={seguridadSocial}
           setter={setSeguridadSocial}
@@ -447,7 +406,7 @@ export default function ParametrosGeneralesPage() {
         />
       </div>
 
-      {/* ── Parafiscales ── */}
+      {/* Parafiscales */}
       <div style={styles.card}>
         <SeccionParametros
           titulo="Parámetros de Parafiscales"
@@ -460,7 +419,7 @@ export default function ParametrosGeneralesPage() {
         />
       </div>
 
-      {/* ── Prestaciones ── */}
+      {/* Prestaciones */}
       <div style={styles.card}>
         <SeccionParametros
           titulo="Parámetros de Prestaciones Sociales (Provisiones)"
@@ -473,7 +432,7 @@ export default function ParametrosGeneralesPage() {
         />
       </div>
 
-      {/* ── Botones ── */}
+      {/* Botones */}
       <div style={styles.botonesRow}>
         <button
           style={{
@@ -501,7 +460,7 @@ export default function ParametrosGeneralesPage() {
         </button>
       </div>
 
-      {/* ── Modales ── */}
+      {/* Modales */}
       <MensajeModal
         tipo={modal}
         mensaje={
@@ -528,53 +487,35 @@ export default function ParametrosGeneralesPage() {
   );
 }
 
-// ─── Estilos (alineados con CrearEmpresaPage) ────────────────────────────────
 const styles = {
-  // Layout general
-  container:       { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '100%' },
-
-  // Header
-  header:          { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  titulo:          { fontSize: '18px', fontWeight: '800', color: '#272525', margin: 0 },
-  subtitulo:       { fontSize: '12px', color: '#A3A3A3', margin: 0, maxWidth: '620px' },
-  perfilBox:       { display: 'flex', alignItems: 'center', gap: '10px' },
-  avatar:          { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  perfilNombre:    { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
-  perfilCargo:     { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-
-  // Cards
-  card:            { backgroundColor: '#fff', borderRadius: '16px', padding: '55px 55px' },
-  formTitulo:      { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 20px 0' },
-  textoDescripcion:{ fontSize: '13px', color: '#555', margin: '0 0 28px 0', lineHeight: 1.7 },
-
-  // Secciones internas
-  seccionBloque:   { marginBottom: '8px' },
-  seccionTitulo:   { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 8px 0' },
-
-  // Filas de formulario
-  filaWrapper:     { marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #F5F5F5' },
-  fila3:           { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '40px', marginBottom: '16px' },
-  filaInferior:    { display: 'flex', alignItems: 'flex-end', gap: '40px' },
-
-  // Campos individuales
-  campo:           { display: 'flex', flexDirection: 'column', gap: '8px' },
-  label:           { fontSize: '13px', fontWeight: '600', color: '#272525' },
-  req:             { color: '#E53E3E', marginLeft: '2px' },
-  input:           { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box' },
-
-  // Select custom
-  selectWrapper:   { position: 'relative' },
-  selectBtn:       { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontFamily: 'Nunito, sans-serif', outline: 'none', backgroundColor: '#fff', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', boxSizing: 'border-box' },
-  chevronIcon:     { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
-  dropdown:        { position: 'absolute', top: '106%', left: 0, right: 0, backgroundColor: '#fff', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, maxHeight: '280px', overflowY: 'auto', border: '1px solid #ECECEC' },
-  dropdownItem:    { padding: '11px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#272525', fontFamily: 'Nunito, sans-serif', transition: 'background 0.15s' },
-
-  // Botones acción fila
-  accionesBox:     { display: 'flex', gap: '8px', paddingBottom: '2px', flexShrink: 0 },
-  btnAccion:       { width: '42px', height: '46px', border: '1px solid #D0D0D0', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-
-  // Botones principales
-  botonesRow:      { display: 'flex', gap: '16px', justifyContent: 'center', paddingBottom: '16px' },
-  btnGuardar:      { color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  btnRegresar:     { color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  container:        { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '100%' },
+  header:           { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  titulo:           { fontSize: '18px', fontWeight: '800', color: '#272525', margin: 0 },
+  subtitulo:        { fontSize: '12px', color: '#A3A3A3', margin: 0, maxWidth: '620px' },
+  perfilBox:        { display: 'flex', alignItems: 'center', gap: '10px' },
+  avatar:           { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  perfilNombre:     { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
+  perfilCargo:      { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
+  card:             { backgroundColor: '#fff', borderRadius: '16px', padding: '55px 55px' },
+  formTitulo:       { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 20px 0' },
+  textoDescripcion: { fontSize: '13px', color: '#555', margin: '0 0 28px 0', lineHeight: 1.7 },
+  seccionBloque:    { marginBottom: '8px' },
+  seccionTitulo:    { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 8px 0' },
+  filaWrapper:      { marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #F5F5F5' },
+  fila3:            { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '40px', marginBottom: '16px' },
+  filaInferior:     { display: 'flex', alignItems: 'flex-end', gap: '40px' },
+  campo:            { display: 'flex', flexDirection: 'column', gap: '8px' },
+  label:            { fontSize: '13px', fontWeight: '600', color: '#272525' },
+  req:              { color: '#E53E3E', marginLeft: '2px' },
+  input:            { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box' },
+  selectWrapper:    { position: 'relative' },
+  selectBtn:        { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontFamily: 'Nunito, sans-serif', outline: 'none', backgroundColor: '#fff', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', boxSizing: 'border-box' },
+  chevronIcon:      { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
+  dropdown:         { position: 'absolute', top: '106%', left: 0, right: 0, backgroundColor: '#fff', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, maxHeight: '280px', overflowY: 'auto', border: '1px solid #ECECEC' },
+  dropdownItem:     { padding: '11px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#272525', fontFamily: 'Nunito, sans-serif', transition: 'background 0.15s' },
+  accionesBox:      { display: 'flex', gap: '8px', paddingBottom: '2px', flexShrink: 0 },
+  btnAccion:        { width: '42px', height: '46px', border: '1px solid #D0D0D0', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  botonesRow:       { display: 'flex', gap: '16px', justifyContent: 'center', paddingBottom: '16px' },
+  btnGuardar:       { color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnRegresar:      { color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '14px 60px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
 };

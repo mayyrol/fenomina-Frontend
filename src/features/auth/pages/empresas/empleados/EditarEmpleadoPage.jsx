@@ -8,13 +8,7 @@ import MensajeModal from "../../../../../components/MensajeModal";
 import ConfirmarCambiosModal from "../../../../../components/ConfirmarCambiosModal";
 import parametrosService from '../../../../../services/parametrosService';
 import conceptoNominaService from '../../../../../services/conceptoNominaService';
-
-const formatearMiles = (valor) => {
-  const soloNumeros = limpiarMiles(valor);
-  if (!soloNumeros) return '';
-  return soloNumeros.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-};
-const limpiarMiles = (valor) => String(valor).replace(/\./g, '').replace(/[^0-9]/g, '');
+import { formatearMiles, limpiarMiles } from '../../../../../utils/formatters';
 
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error }) {
   const [abierto, setAbierto] = useState(false);
@@ -719,9 +713,10 @@ export default function EditarEmpleadoPage() {
             <div style={{ ...styles.campo, flex: 1 }}>
               {i === 0 && <label style={styles.label}>Valor neto (mensual)</label>}
               <input
-                value={c.valor}
-                onChange={(e) => handleConcepto(i, 'valor', e.target.value)}
+                value={formatearMiles(c.valor)}
+                onChange={(e) => handleConcepto(i, 'valor', limpiarMiles(e.target.value))}
                 placeholder="Ingresar valor"
+                inputMode="numeric"
                 style={styles.input}
               />
             </div>

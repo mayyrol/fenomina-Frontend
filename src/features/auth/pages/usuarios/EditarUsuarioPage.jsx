@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { UserRound } from 'lucide-react';
+import { UserRound, Eye, EyeOff } from 'lucide-react';
 import axiosInstance from '../../../../api/axiosInstance';
 import { useAuthStore } from '../../../../store/authStore';
 import { useEmpresasLista } from '../../hooks/useEmpresasLista';
@@ -18,22 +18,26 @@ export default function EditarUsuarioPage() {
   const { empresas, cargando: cargandoEmpresas } = useEmpresasLista();
   const navigate = useNavigate();
   const { usuario: usuarioActual } = useAuthStore();
-  const [form, setForm] = useState({ nombresUsuario: '', apellidosUsuario: '', cargoUsuario: '', rolUsuario: '', fkIdEmpresa: '' });
+  const [form, setForm] = useState({ nombresUsuario: '', apellidosUsuario: '', cargoUsuario: '', numIdentiUsuario: '', userName: '', contrasenaUsuario: '', rolUsuario: '', fkIdEmpresa: '' });
   const [errores, setErrores] = useState({});
   const [errorGlobal, setErrorGlobal] = useState('');
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [hoverGuardar, setHoverGuardar] = useState(false);
   const [exito, setExito] = useState(false);
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
 
   useEffect(() => {
     axiosInstance.get(`/auth/usuarios/${id}`).then(({ data }) => {
       setForm({
-        nombresUsuario: data.nombresUsuario || '',
+        nombresUsuario:   data.nombresUsuario || '',
         apellidosUsuario: data.apellidosUsuario || '',
-        cargoUsuario: data.cargoUsuario || '',
-        rolUsuario: data.rolUsuario || '',
-        fkIdEmpresa: data.fkIdEmpresa ?? '',
+        cargoUsuario:     data.cargoUsuario || '',
+        numIdentiUsuario: data.numIdentiUsuario || '',
+        userName:         data.userName || '',
+        contrasenaUsuario: '',
+        rolUsuario:       data.rolUsuario || '',
+        fkIdEmpresa:      data.fkIdEmpresa ?? '',
       });
     }).finally(() => setCargando(false));
   }, [id]);
@@ -51,9 +55,17 @@ export default function EditarUsuarioPage() {
 
   const validar = () => {
     const e = {};
-    if (!form.nombresUsuario) e.nombresUsuario = 'Los nombres son obligatorios.';
+    if (!form.nombresUsuario)   e.nombresUsuario   = 'Los nombres son obligatorios.';
     if (!form.apellidosUsuario) e.apellidosUsuario = 'Los apellidos son obligatorios.';
-    if (!form.cargoUsuario) e.cargoUsuario = 'El cargo es obligatorio.';
+    if (!form.cargoUsuario)     e.cargoUsuario     = 'El cargo es obligatorio.';
+    if (!form.numIdentiUsuario) e.numIdentiUsuario = 'El número de identificación es obligatorio.';
+    if (!form.userName)         e.userName         = 'El nombre de usuario es obligatorio.';
+    if (form.contrasenaUsuario) {
+      if (form.contrasenaUsuario.length < 8)
+        e.contrasenaUsuario = 'Mínimo 8 caracteres.';
+      else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(form.contrasenaUsuario))
+        e.contrasenaUsuario = 'Debe tener al menos una mayúscula y un número.';
+    }
     if (!form.rolUsuario) e.rolUsuario = 'El rol es obligatorio.';
     if (form.rolUsuario === 'CLIENTE_EMPRESA' && !form.fkIdEmpresa) {
       e.fkIdEmpresa = 'Debes seleccionar una empresa para este rol.';
@@ -66,9 +78,12 @@ export default function EditarUsuarioPage() {
     if (Object.keys(nuevosErrores).length > 0) { setErrores(nuevosErrores); return; }
     setGuardando(true);
     try {
-      await axiosInstance.put(`/auth/usuarios/${id}`, {
-        ...form, fkIdEmpresa: form.fkIdEmpresa ? Number(form.fkIdEmpresa) : null,
-      });
+      const payload = {
+        ...form,
+        fkIdEmpresa: form.fkIdEmpresa ? Number(form.fkIdEmpresa) : null,
+      };
+      if (!payload.contrasenaUsuario) delete payload.contrasenaUsuario;
+      await axiosInstance.put(`/auth/usuarios/${id}`, payload);
       setExito(true);
     } catch (err) {
       const erroresBackend = err.response?.data?.errors;
@@ -120,13 +135,41 @@ export default function EditarUsuarioPage() {
 
       {errorGlobal && <p style={styles.errorGlobal}>{errorGlobal}</p>}
 
-      {/* Sección */}
+      {/* Sección 1: Información Personal */}
       <div style={styles.seccion}>
-        <h2 style={styles.seccionTitulo}>Información del Usuario</h2>
+        <h2 style={styles.seccionTitulo}>Información Personal e Identidad</h2>
         <div style={styles.grid3}>
           <Campo label="Nombre(s) Usuario*" name="nombresUsuario" placeholder="Ingresar nombres" value={form.nombresUsuario} onChange={handleChange} error={errores.nombresUsuario} />
           <Campo label="Apellidos Usuario*" name="apellidosUsuario" placeholder="Ingresar apellidos" value={form.apellidosUsuario} onChange={handleChange} error={errores.apellidosUsuario} />
           <Campo label="Cargo*" name="cargoUsuario" placeholder="Ingresar cargo" value={form.cargoUsuario} onChange={handleChange} error={errores.cargoUsuario} />
+        </div>
+        <div style={{ marginTop: '16px', maxWidth: '32%' }}>
+          <Campo label="Número de Identificación*" name="numIdentiUsuario" placeholder="Ingresar número" value={form.numIdentiUsuario} onChange={handleChange} error={errores.numIdentiUsuario} />
+        </div>
+      </div>
+
+      {/* Sección 2: Datos de Usuario */}
+      <div style={styles.seccion}>
+        <h2 style={styles.seccionTitulo}>Datos de Usuario</h2>
+        <div style={styles.grid2}>
+          <Campo label="Nombre de usuario*" name="userName" placeholder="Ingresar nombre de usuario" value={form.userName} onChange={handleChange} error={errores.userName} />
+          <div>
+            <label style={styles.label}>Nueva contraseña <span style={{ color: '#A3A3A3', fontWeight: '400' }}>(dejar vacío para no cambiar)</span></label>
+            <div style={styles.inputWrapper}>
+              <input
+                type={mostrarContrasena ? 'text' : 'password'}
+                name="contrasenaUsuario"
+                placeholder="Ingresar nueva contraseña"
+                value={form.contrasenaUsuario}
+                onChange={handleChange}
+                style={{ ...styles.input, borderColor: errores.contrasenaUsuario ? '#e53e3e' : '#D0D0D0' }}
+              />
+              <button type="button" onClick={() => setMostrarContrasena(v => !v)} style={styles.eyeButton}>
+                {mostrarContrasena ? <EyeOff size={18} color="#777777" /> : <Eye size={18} color="#777777" />}
+              </button>
+            </div>
+            {errores.contrasenaUsuario && <span style={styles.errorTexto}>{errores.contrasenaUsuario}</span>}
+          </div>
         </div>
         <div style={{ ...styles.grid2, marginTop: '16px' }}>
           <div>
@@ -138,34 +181,20 @@ export default function EditarUsuarioPage() {
             </select>
             {errores.rolUsuario && <span style={styles.errorTexto}>{errores.rolUsuario}</span>}
           </div>
-
           {form.rolUsuario === 'CLIENTE_EMPRESA' && (
             <div>
               <label style={styles.label}>Empresa<span style={{ color: '#e53e3e' }}>*</span></label>
-              <select
-                name="fkIdEmpresa"
-                value={form.fkIdEmpresa}
-                onChange={handleChange}
-                style={{
-                  ...styles.input,
-                  borderColor: errores.fkIdEmpresa ? '#e53e3e' : '#D0D0D0',
-                  color: form.fkIdEmpresa ? '#272525' : '#A3A3A3',
-                }}
-              >
+              <select name="fkIdEmpresa" value={form.fkIdEmpresa} onChange={handleChange}
+                style={{ ...styles.input, borderColor: errores.fkIdEmpresa ? '#e53e3e' : '#D0D0D0', color: form.fkIdEmpresa ? '#272525' : '#A3A3A3' }}>
                 <option value="">Seleccionar empresa</option>
                 {cargandoEmpresas
                   ? <option disabled>Cargando empresas...</option>
-                  : empresas.map(e => (
-                      <option key={e.empresaId} value={e.empresaId}>
-                        {e.nombreEmpresa}
-                      </option>
-                    ))
+                  : empresas.map(e => <option key={e.empresaId} value={e.empresaId}>{e.nombreEmpresa}</option>)
                 }
               </select>
               {errores.fkIdEmpresa && <span style={styles.errorTexto}>{errores.fkIdEmpresa}</span>}
             </div>
           )}
-
         </div>
       </div>
 
@@ -223,7 +252,9 @@ const styles = {
     borderRadius: '6px', fontSize: '14px', color: '#272525', outline: 'none',
     fontFamily: 'Nunito, sans-serif', backgroundColor: '#ffffff',
   },
-  errorTexto: { display: 'block', marginTop: '5px', fontSize: '12px', color: '#e53e3e' },
+  inputWrapper: { position: 'relative' },
+  eyeButton:    { position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' },
+  errorTexto:   { display: 'block', marginTop: '5px', fontSize: '12px', color: '#e53e3e' },
   filaBotones: { display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '8px' },
   btnRegresar: {
     padding: '10px 32px', backgroundColor: '#ffffff', color: '#272525',
@@ -252,4 +283,4 @@ const styles = {
     border: 'none', borderRadius: '8px', fontSize: '13px',
     fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
   },
-};
+};S

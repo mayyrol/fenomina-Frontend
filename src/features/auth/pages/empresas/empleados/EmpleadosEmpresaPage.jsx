@@ -1,4 +1,4 @@
-import { useState } from 'react'; 
+import { useState } from 'react';
 import empleadosService from '../../../../../services/empleadosService';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
@@ -20,7 +20,6 @@ export default function EmpleadosEmpresaPage() {
     recargar,
   } = useEmpleados(id);
 
-  const inicial = usuario?.nombresUsuario?.charAt(0).toUpperCase() ?? 'U';
   const nombre  = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo   = usuario?.cargoUsuario ?? '';
 
@@ -31,6 +30,7 @@ export default function EmpleadosEmpresaPage() {
   const [hoverCrear, setHoverCrear]                     = useState(false);
   const [fechaFiltro, setFechaFiltro]                   = useState('');
   const [busquedaLocal, setBusquedaLocal]               = useState('');
+  const [itemsPerPage, setItemsPerPage]                 = useState(10);
 
   const tabs = ['activos', 'inactivos', 'retirados'];
 
@@ -83,11 +83,27 @@ export default function EmpleadosEmpresaPage() {
   });
 
   // ── Paginación sobre resultados filtrados ──
-  const SIZE_LOCAL            = 10;
   const totalFiltrados        = empleadosFiltrados.length;
-  const totalPaginasFiltradas = Math.max(1, Math.ceil(totalFiltrados / SIZE_LOCAL));
-  const inicioLocal           = pagina * SIZE_LOCAL;
-  const empleadosPagina       = empleadosFiltrados.slice(inicioLocal, inicioLocal + SIZE_LOCAL);
+  const totalPaginasFiltradas = Math.max(1, Math.ceil(totalFiltrados / itemsPerPage));
+  const inicioLocal           = pagina * itemsPerPage;
+  const empleadosPagina       = empleadosFiltrados.slice(inicioLocal, inicioLocal + itemsPerPage);
+
+  // ── Generar botones de paginación con ellipsis ──
+  const generarPaginas = () => {
+    const paginas = [];
+    if (totalPaginasFiltradas <= 6) {
+      for (let i = 0; i < totalPaginasFiltradas; i++) paginas.push(i);
+    } else {
+      paginas.push(0);
+      if (pagina > 2) paginas.push('...');
+      for (let i = Math.max(1, pagina - 1); i <= Math.min(totalPaginasFiltradas - 2, pagina + 1); i++) {
+        paginas.push(i);
+      }
+      if (pagina < totalPaginasFiltradas - 3) paginas.push('...');
+      paginas.push(totalPaginasFiltradas - 1);
+    }
+    return paginas;
+  };
 
   return (
     <div style={styles.container}>
@@ -122,7 +138,7 @@ export default function EmpleadosEmpresaPage() {
       <div style={styles.toolbarCard}>
         <div>
           <p style={styles.totalNum}>{total}</p>
-          <p style={styles.totalLabel}>Total employees</p>
+          <p style={styles.totalLabel}>Total empleados</p>
         </div>
         <div style={styles.filtrosBox}>
           <div style={styles.searchBox}>
@@ -161,17 +177,29 @@ export default function EmpleadosEmpresaPage() {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Tabs + Resultados por página */}
       <div style={styles.tabsBox}>
-        {tabs.map((t) => (
-          <button
-            key={t}
-            style={{ ...styles.tab, ...(tab === t ? styles.tabActivo : {}) }}
-            onClick={() => { setTab(t); setPagina(0); }}
+        <div style={{ display: 'flex', gap: '0' }}>
+          {tabs.map((t) => (
+            <button
+              key={t}
+              style={{ ...styles.tab, ...(tab === t ? styles.tabActivo : {}) }}
+              onClick={() => { setTab(t); setPagina(0); }}
+            >
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div style={styles.porPaginaBox}>
+          <span style={styles.porPaginaLabel}>Resultados por página:</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPagina(0); }}
+            style={styles.porPaginaSelect}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
+            {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -229,24 +257,24 @@ export default function EmpleadosEmpresaPage() {
           </table>
         </div>
 
-        {/* Paginación sobre filtrados */}
+        {/* Paginación numerada */}
         <div style={styles.paginacion}>
-          {Array.from({ length: totalPaginasFiltradas }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setPagina(i)}
-              style={{ ...styles.pageBtn, ...(pagina === i ? styles.pageBtnActivo : {}) }}
-            >
-              {i + 1}
-            </button>
-          ))}
+          {generarPaginas().map((p, i) =>
+            p === '...'
+              ? <span key={`e-${i}`} style={styles.ellipsis}>...</span>
+              : <button
+                  key={p}
+                  onClick={() => setPagina(p)}
+                  style={{ ...styles.pageBtn, ...(pagina === p ? styles.pageBtnActivo : {}) }}
+                >
+                  {p + 1}
+                </button>
+          )}
           <button
-            onClick={() => setPagina(totalPaginasFiltradas - 1)}
-            style={styles.pageBtn}
-            disabled={pagina === totalPaginasFiltradas - 1}
-          >
-            {'>>'}
-          </button>
+            onClick={() => setPagina(p => Math.min(totalPaginasFiltradas - 1, p + 1))}
+            disabled={pagina >= totalPaginasFiltradas - 1}
+            style={{ ...styles.pageBtn, opacity: pagina >= totalPaginasFiltradas - 1 ? 0.4 : 1 }}
+          >{'>>'}</button>
         </div>
       </div>
 
@@ -273,10 +301,10 @@ const styles = {
   avatar:        { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', color: '#272525', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 },
   perfilNombre:  { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:   { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:     { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:     { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   totalNum:      { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:    { fontSize: '12px', color: '#A3A3A3', margin: 0 },
-  toolbarCard:   { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
+  toolbarCard:   { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
   filtrosBox:    { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   searchBox:     { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '320px', minWidth: '180px' },
   searchInput:   { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
@@ -284,9 +312,15 @@ const styles = {
   addBar:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
   addLabel:      { fontSize: '15px', fontWeight: '700', color: '#272525' },
   btnCrear:      { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  tabsBox:       { display: 'flex', gap: '0', borderBottom: '1px solid #E8E8E8', flexWrap: 'wrap' },
-  tab:           { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+
+  // ── Tabs + resultados por página ──
+  tabsBox:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8', flexWrap: 'wrap', gap: '8px' },
+  tab:           { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '14px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
   tabActivo:     { color: '#0B662A', borderBottom: '2px solid #0B662A' },
+  porPaginaBox:  { display: 'flex', alignItems: 'center', gap: '8px' },
+  porPaginaLabel:{ fontSize: '13px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },
+  porPaginaSelect: { padding: '6px 28px 6px 10px', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23272525\' stroke-width=\'2\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundColor: '#fff' },
+
   card:          { backgroundColor: '#fff', borderRadius: '16px', padding: '24px 24px', width: '100%', boxSizing: 'border-box', overflow: 'hidden' },
   tableTitle:    { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 16px 0' },
   tableWrapper:  { overflowX: 'auto', width: '100%' },
@@ -297,6 +331,7 @@ const styles = {
   trImpar:       { backgroundColor: '#FAFAFA' },
   btnVer:        { background: 'none', border: 'none', cursor: 'pointer', padding: '4px' },
   paginacion:    { display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '20px', flexWrap: 'wrap' },
-  pageBtn:       { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #D0D0D0', cursor: 'pointer', fontSize: '13px', fontWeight: '600', backgroundColor: '#fff', color: '#272525', fontFamily: 'Nunito, sans-serif' },
+  pageBtn:       { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #D0D0D0', cursor: 'pointer', fontSize: '13px', fontWeight: '600', backgroundColor: '#fff', color: '#272525', fontFamily: 'Nunito, sans-serif', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   pageBtnActivo: { backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
+  ellipsis:      { fontSize: '13px', color: '#A3A3A3', padding: '0 4px', lineHeight: '36px' },
 };
