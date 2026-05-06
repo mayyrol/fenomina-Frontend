@@ -12,6 +12,16 @@ const ROLES = [
   { value: 'CLIENTE_EMPRESA', label: 'Cliente Empresa' },
 ];
 
+function Campo({ label, name, placeholder, value, onChange, error, type = 'text' }) {
+  return (
+    <div>
+      <label style={styles.label}>{label}</label>
+      <input type={type} name={name} placeholder={placeholder} value={value} onChange={onChange}
+        style={{ ...styles.input, borderColor: error ? '#e53e3e' : '#D0D0D0' }} />
+      {error && <span style={styles.errorTexto}>{error}</span>}
+    </div>
+  );
+}
 
 export default function EditarUsuarioPage() {
   const { id } = useParams();
@@ -214,16 +224,6 @@ export default function EditarUsuarioPage() {
   );
 }
 
-function Campo({ label, name, placeholder, value, onChange, error, type = 'text' }) {
-  return (
-    <div>
-      <label style={styles.label}>{label}</label>
-      <input type={type} name={name} placeholder={placeholder} value={value} onChange={onChange}
-        style={{ ...styles.input, borderColor: error ? '#e53e3e' : '#D0D0D0' }} />
-      {error && <span style={styles.errorTexto}>{error}</span>}
-    </div>
-  );
-}
 
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '20px' },
@@ -283,4 +283,4 @@ const styles = {
     border: 'none', borderRadius: '8px', fontSize: '13px',
     fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif',
   },
-};S
+};
