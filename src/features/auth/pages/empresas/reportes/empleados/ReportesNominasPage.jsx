@@ -33,12 +33,14 @@ export default function ReportesNominasPage() {
   const paramsEmpleados = {
     empresaId: id,
     nombres:   busqueda || undefined,
+    estado:    'PAGADO',
     page:      pagina,
     size:      porPagina,
   };
 
   const paramsPeriodo = {
     empresaId: id,
+    estado:    'PAGADO',
     page:      pagina,
     size:      porPagina,
   };

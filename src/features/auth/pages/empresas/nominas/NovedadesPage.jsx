@@ -138,7 +138,7 @@ const soloNumeros = (e) => {
 const filaVaciaLicencia  = () => ({ concepNominaId: '', fechaInicio: '', fechaFin: '' });
 const filaVaciaHoras     = () => ({ concepNominaId: '', fecha: '', cantidad: '' });
 const filaVaciaPagos     = () => ({ concepNominaId: '', fecha: '', monto: '' });
-const filaVaciaVacacion  = () => ({ concepNominaId: '', fechaInicio: '', fechaFin: '' });
+const filaVaciaVacacion = () => ({ concepNominaId: '', diasVacaciones: '' });
 const filaVaciaOtros     = () => ({ descripcion: '', monto: '', fecha: '', constituyeSalario: 'si' });
 const filaVaciaReten     = () => ({ descripcion: '', monto: '', fecha: '' });
 
@@ -231,13 +231,13 @@ export default function NovedadesPage() {
 
 
         setOpcionesHoras(conceptos.filter(c => [
-          'Recargo nocturno lunes a sábado',
-          'Recargo diurno domingo o festivo',
-          'Recargo nocturno domingo o festivo',
-          'Hora extra diurna lunes a sábado',
-          'Hora extra nocturna lunes a sábado',
-          'Hora extra diurna dominical o festivo',
-          'Hora extra nocturna dominical o festivo',
+          'Recargo nocturno ordinario',
+          'Recargo diurno dominical o festivo',
+          'Recargo nocturno dominical o festivo',
+          'Hora extra diurna ordinaria',
+          'Hora extra nocturna ordinaria',
+          'Hora extra diurna dominical o festiva',
+          'Hora extra nocturna dominical o festiva',
         ].includes(c.nombreConcepNomina)).map(toOpcion));
 
         setOpcionesPagos(conceptos.filter(c => [
@@ -409,21 +409,25 @@ export default function NovedadesPage() {
 
       // Vacaciones
       for (const f of vacaciones) {
-        if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
-          if (!fechaEstaEnPeriodo(f.fechaInicio) || !fechaEstaEnPeriodo(f.fechaFin)) {
-            throw new Error(`Las fechas de la licencia están fuera del periodo...`);
+        if (f.concepNominaId && f.diasVacaciones) {
+          const dias = parseInt(f.diasVacaciones, 10);
+          if (isNaN(dias) || dias <= 0) {
+            throw new Error('Los días de vacaciones deben ser mayor a cero');
+          }
+          if (dias > 30) {
+            throw new Error('Los días de vacaciones no pueden superar 30 días por período');
           }
           novedadesAGuardar.push({
-            fkEmpleadoId:         Number(empleadoId),
-            fkConcepNominaId:     Number(f.concepNominaId),
-            procesoLiquid:        procesoActual?.procesoLiquiId,
-            anio:                 procesoActual?.anio,
-            periodo:              procesoActual?.periodo,
-            fechaInicioAusen:     fechaToISO(f.fechaInicio),
-            fechaFinAusen:        fechaToISO(f.fechaFin),
-            cantidadDiasNovedad:  null,
+            fkEmpleadoId:        Number(empleadoId),
+            fkConcepNominaId:    Number(f.concepNominaId),
+            procesoLiquid:       procesoActual?.procesoLiquiId,
+            anio:                procesoActual?.anio,
+            periodo:             procesoActual?.periodo,
+            fechaInicioAusen:    null,
+            fechaFinAusen:       null,
+            cantidadDiasNovedad: dias,
             cantidadHorasNovedad: null,
-            valorRefNovedad:      null,
+            valorRefNovedad:     null,
           });
         }
       }
@@ -692,37 +696,32 @@ export default function NovedadesPage() {
       </div>
 
       {/* Card 5: Vacaciones */}
-      <div style={styles.card}>
-        <p style={styles.seccionTitulo}>Vacaciones</p>
-        <p style={styles.descripcion}>
-          Reporte días de descanso remunerado o pago en dinero de vacaciones pendientes.
-        </p>
-        {vacaciones.map((f, i) => (
-          <div key={i} style={styles.filaRow}>
-            {campo('Tipo de vacación',
-              <SelectWrapper
-                value={f.concepNominaId}
-                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'concepNominaId', v)}
-                options={opcionesVacaciones}
-              />, i)}
-            {campo('Fecha de inicio',
-              <CalendarioInput
-                value={f.fechaInicio}
-                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaInicio', v)}
-              />, i)}
-            {campo('Fecha de fin',
-              <CalendarioInput
-                value={f.fechaFin}
-                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaFin', v)}
-              />, i)}
-            {iconos(
-              () => addFila(setVacaciones, vacaciones, filaVaciaVacacion),
-              () => removeFila(setVacaciones, vacaciones, i),
-              vacaciones.length === 1, i
-            )}
-          </div>
-        ))}
-      </div>
+      {vacaciones.map((f, i) => (
+        <div key={i} style={styles.filaRow}>
+          {campo('Tipo de vacación',
+            <SelectWrapper
+              value={f.concepNominaId}
+              onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'concepNominaId', v)}
+              options={opcionesVacaciones}
+            />, i)}
+          {campo('Días de vacaciones',
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={f.diasVacaciones}
+              onChange={(e) => updateFila(setVacaciones, vacaciones, i, 'diasVacaciones', e.target.value)}
+              onKeyDown={soloNumeros}
+              style={styles.input}
+              placeholder="Ej: 15"
+            />, i)}
+          {iconos(
+            () => addFila(setVacaciones, vacaciones, filaVaciaVacacion),
+            () => removeFila(setVacaciones, vacaciones, i),
+            vacaciones.length === 1, i
+          )}
+        </div>
+      ))}
 
       {/* Card 6: Otros conceptos a devengar */}
       <div style={styles.card}>

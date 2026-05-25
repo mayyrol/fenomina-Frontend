@@ -6,6 +6,7 @@ import { useHistoricos } from "../../../../hooks/useHistoricos";
 import historicosService from '../../../../../../services/historicosService';
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const fmt2 = (v) => v == null ? '-' : '' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
 const TABS_PRINCIPAL = [
   { id: 'horasExtra',      label: 'Horas extra y recargos'       },
@@ -160,19 +161,19 @@ export default function ReportesConceptosPage() {
           <td style={styles.td}>{r.anio}</td>
           <td style={styles.td}>{r.periodo}</td>
           <td style={styles.td}>{r.documentoEmp}</td>
-          <td style={styles.td}>{fmt(r.horasRecargoNocturnoLunSab)}</td>
+          <td style={styles.td}>{fmt2(r.horasRecargoNocturnoLunSab)}</td>
           <td style={styles.td}>{fmt(r.valorRecargoNocturnoLunSab)}</td>
-          <td style={styles.td}>{fmt(r.horasRecargoDiurnoDomFest)}</td>
+          <td style={styles.td}>{fmt2(r.horasRecargoDiurnoDomFest)}</td>
           <td style={styles.td}>{fmt(r.valorRecargoDiurnoDomFest)}</td>
-          <td style={styles.td}>{fmt(r.horasRecargoNocturnoDomFest)}</td>
+          <td style={styles.td}>{fmt2(r.horasRecargoNocturnoDomFest)}</td>
           <td style={styles.td}>{fmt(r.valorRecargoNocturnoDomFest)}</td>
-          <td style={styles.td}>{fmt(r.horasExtraDiurnaLunSab)}</td>
+          <td style={styles.td}>{fmt2(r.horasExtraDiurnaLunSab)}</td>
           <td style={styles.td}>{fmt(r.valorExtraDiurnaLunSab)}</td>
-          <td style={styles.td}>{fmt(r.horasExtraNocturnaLunSab)}</td>
+          <td style={styles.td}>{fmt2(r.horasExtraNocturnaLunSab)}</td>
           <td style={styles.td}>{fmt(r.valorExtraNocturnaLunSab)}</td>
-          <td style={styles.td}>{fmt(r.horasExtraDiurnaDomFest)}</td>
+          <td style={styles.td}>{fmt2(r.horasExtraDiurnaDomFest)}</td>
           <td style={styles.td}>{fmt(r.valorExtraDiurnaDomFest)}</td>
-          <td style={styles.td}>{fmt(r.horasExtraNocturnaDomFest)}</td>
+          <td style={styles.td}>{fmt2(r.horasExtraNocturnaDomFest)}</td>
           <td style={styles.td}>{fmt(r.valorExtraNocturnaDomFest)}</td>
           <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.totalHorasExtraYRecargos)}</td>
         </tr>

@@ -134,8 +134,9 @@ export default function ResultadoLiquidacionPage() {
 
       doc.setFontSize(8);
       doc.setFont(undefined, 'normal');
-      doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')}`, 14, y); y += 5;
-      doc.text(`Periodo: ${proceso?.fechaInicioPeriodo ?? ''} - ${proceso?.fechaFinPeriodo ?? ''}`, 14, y); y += 5;
+      doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')}`, 14, y);
+      y += 5;
+      doc.text(`Periodo: ${desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo ?? ''} - ${proceso?.fechaFinPeriodo ?? ''}`, 14, y); y += 5;
       doc.text(`Nombre: ${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 14, y); y += 5;
       doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
       doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
@@ -145,7 +146,11 @@ export default function ResultadoLiquidacionPage() {
 
       const body = conceptosFiltrados.map(c => [
           c.nombreConcepto,
-          c.cantidad != null ? String(c.cantidad) : '',
+          c.cantidad != null
+              ? `${Number.isInteger(Number(c.cantidad))
+                  ? Math.floor(c.cantidad)
+                  : c.cantidad} ${c.unidadCantidad ?? ''}`.trim()
+              : '',
           c.categoria === 'DEVENGO' && c.valorResultado != null ? fmt(c.valorResultado) : '',
           c.categoria === 'DEDUCCION' && c.valorResultado != null ? fmt(c.valorResultado) : '',
         ]);
@@ -157,7 +162,7 @@ export default function ResultadoLiquidacionPage() {
 
       autoTable(doc, {
         startY: y,
-        head: [['CONCEPTO', 'DÍAS', 'DEVENGOS', 'DEDUCCIONES']],
+        head: [['CONCEPTO', 'CANTIDAD', 'DEVENGOS', 'DEDUCCIONES']],
         body,
         styles: { fontSize: 7, lineColor: [224, 224, 224], lineWidth: 0.1 },
         headStyles: {
@@ -328,7 +333,7 @@ export default function ResultadoLiquidacionPage() {
                   </p>
                   <p style={styles.empInfoFila}>
                     <strong>Periodo</strong> &nbsp;
-                    {proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
+                    {desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
                   </p>
                   <p style={styles.empInfoFila}>
                     <strong>Nombre</strong> &nbsp;
@@ -362,7 +367,7 @@ export default function ResultadoLiquidacionPage() {
                   <thead>
                     <tr>
                       <th style={{ ...styles.th, textAlign: 'left' }}>CONCEPTO</th>
-                      <th style={styles.th}>DÍAS</th>
+                      <th style={styles.th}>CANTIDAD</th>
                       <th style={styles.th}>DEVENGOS</th>
                       <th style={styles.th}>DEDUCCIONES</th>
                     </tr>
@@ -376,7 +381,11 @@ export default function ResultadoLiquidacionPage() {
                           {c.nombreConcepto}
                         </td>
                         <td style={styles.td}>
-                          {c.cantidad != null ? c.cantidad : ''}
+                            {c.cantidad != null
+                                ? `${Number.isInteger(Number(c.cantidad))
+                                    ? Math.floor(c.cantidad)
+                                    : c.cantidad} ${c.unidadCantidad ?? ''}`.trim()
+                                : ''}
                         </td>
                         <td style={styles.td}>
                           {c.categoria === 'DEVENGO' && c.valorResultado != null
