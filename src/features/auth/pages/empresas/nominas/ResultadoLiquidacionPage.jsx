@@ -17,6 +17,13 @@ const NOMBRE_MES = [
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
 ];
 
+const CONCEPTOS_CON_DESCRIPCION = [
+    'Otro concepto a devenir salarial',
+    'Otro concepto a devenir no salarial',
+    'Otros conceptos a deducir salariales',
+    'Otros conceptos a deducir no salariales',
+];
+
 export default function ResultadoLiquidacionPage() {
   const navigate         = useNavigate();
   const { id, nominaId } = useParams();
@@ -43,6 +50,8 @@ export default function ResultadoLiquidacionPage() {
     'Cesantías',
     'Intereses sobre las cesantías',
   ];
+
+
 
   useEffect(() => {
     if (!nominaId || !id) return;
@@ -136,7 +145,8 @@ export default function ResultadoLiquidacionPage() {
       doc.setFont(undefined, 'normal');
       doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')}`, 14, y);
       y += 5;
-      doc.text(`Periodo: ${desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo ?? ''} - ${proceso?.fechaFinPeriodo ?? ''}`, 14, y); y += 5;
+      const fechaFinMostrar = (proceso?.fechaFinPeriodo ?? '').replace(/-31$/, '-30');
+      doc.text(`Periodo: ${desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo ?? ''} - ${fechaFinMostrar}`, 14, y); y += 5;
       doc.text(`Nombre: ${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 14, y); y += 5;
       doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
       doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
@@ -144,8 +154,11 @@ export default function ResultadoLiquidacionPage() {
 
       const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
 
+      
       const body = conceptosFiltrados.map(c => [
-          c.nombreConcepto,
+          CONCEPTOS_CON_DESCRIPCION.includes(c.nombreConcepto) && c.observacion
+              ? c.observacion
+              : c.nombreConcepto,
           c.cantidad != null
               ? `${Number.isInteger(Number(c.cantidad))
                   ? Math.floor(c.cantidad)
@@ -194,6 +207,27 @@ export default function ResultadoLiquidacionPage() {
         },
       });
 
+      if (desp.advertenciaNoSalarial) {
+          const finalY = doc.lastAutoTable.finalY + 4;
+    
+          // Fondo amarillo
+          doc.setFillColor(254, 243, 199);
+          doc.setDrawColor(217, 119, 6);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(14, finalY, 182, 10, 2, 2, 'FD');
+    
+          doc.setFontSize(7);
+          doc.setTextColor(146, 64, 14);
+          doc.text(
+              ` ${desp.advertenciaNoSalarial}`,
+              18,
+              finalY + 6,
+              { maxWidth: 174 }
+          );
+          doc.setTextColor(0, 0, 0);
+          doc.setDrawColor(0, 0, 0);
+      }
+    
       const limiteInferior = yInicio === 0 ? mitad - 12 : pageHeight - 8;
       doc.setTextColor(163, 163, 163);
       doc.text('Firma del trabajador', 196, y - 5, { align: 'right' });
@@ -204,7 +238,16 @@ export default function ResultadoLiquidacionPage() {
       if (idx > 0) doc.addPage();
 
       const conceptosFiltrados = (desp.conceptos ?? [])
-        .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto));
+        .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto))
+        .filter(c => {
+            const esConceptoOcultable = 
+                c.nombreConcepto === 'Salario días trabajados' ||
+                c.nombreConcepto === 'Auxilio de transporte';
+            if (esConceptoOcultable && (!c.valorResultado || Number(c.valorResultado) === 0)) {
+                return false;
+            }
+            return true;
+        })
 
       renderDesprendible(desp, 0, mitad, pageHeight, conceptosFiltrados);
   
@@ -267,7 +310,7 @@ export default function ResultadoLiquidacionPage() {
               <div style={styles.infoFila}>
                 <span style={styles.infoLabel}>Periodo:</span>
                 <span style={styles.infoValor}>
-                  {proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
+                  {proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo?.replace(/-31$/, '-30')}
                 </span>
               </div>
               <div style={styles.infoFila}>
@@ -333,7 +376,7 @@ export default function ResultadoLiquidacionPage() {
                   </p>
                   <p style={styles.empInfoFila}>
                     <strong>Periodo</strong> &nbsp;
-                    {desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
+                    {desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo?.replace(/-31$/, '-30')}
                   </p>
                   <p style={styles.empInfoFila}>
                     <strong>Nombre</strong> &nbsp;
@@ -375,10 +418,24 @@ export default function ResultadoLiquidacionPage() {
                   <tbody>
                     {(desp.conceptos ?? [])
                       .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto))
+                      .filter(c => {
+                          if (c.nombreConcepto === 'Licencias no remuneradas') {
+                              console.log('LNR concepto:', c);
+                          }
+                          const esConceptoOcultable = 
+                              c.nombreConcepto === 'Salario días trabajados' ||
+                              c.nombreConcepto === 'Auxilio de transporte';
+                          if (esConceptoOcultable && (!c.valorResultado || Number(c.valorResultado) === 0)) {
+                              return false;
+                          }
+                          return true;
+                      })
                       .map((c, i) => (
                       <tr key={i} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
                         <td style={{ ...styles.td, textAlign: 'left' }}>
-                          {c.nombreConcepto}
+                            {CONCEPTOS_CON_DESCRIPCION.includes(c.nombreConcepto) && c.observacion
+                                ? c.observacion
+                                : c.nombreConcepto}
                         </td>
                         <td style={styles.td}>
                             {c.cantidad != null
@@ -431,6 +488,23 @@ export default function ResultadoLiquidacionPage() {
                   </tbody>
                 </table>
               </div>
+              {desp.advertenciaNoSalarial && (
+                <div style={{
+                  backgroundColor: '#FEF3C7',
+                  border: '1px solid #D97706',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  marginTop: '12px',
+                  fontSize: '12px',
+                  color: '#92400E',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'flex-start',
+                }}>
+                  <span>⚠️</span>
+                  <span>{desp.advertenciaNoSalarial}</span>
+                </div>
+              )}
             </div>
           );
         })

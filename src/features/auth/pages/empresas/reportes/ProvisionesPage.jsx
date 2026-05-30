@@ -13,7 +13,6 @@ const TABS = [
   { id: 'parafEmpl',     label: 'Aportes parafiscales'        },
   { id: 'totalParaf',    label: 'Total aportes parafiscales'  },
   { id: 'cargas',        label: 'Cargas prestacionales'       },
-  { id: 'totalReportes', label: 'Total reportes empleador'    },
 ];
 
 const OPCIONES_PAGINA = [10, 25, 50];
@@ -24,7 +23,6 @@ const TITULOS = {
   parafEmpl:     'Histórico Detalles Aportes Parafiscales por Empleado (Reporte del Empleador)',
   totalParaf:    'Histórico Aportes Parafiscales por Periodo (Reporte del Empleador)',
   cargas:        'Histórico Cargas Prestacionales por Empleado (Reporte del Empleador)',
-  totalReportes: 'Histórico Total de Conceptos a Reportar por Empleador',
 };
 
 export default function ProvisionesPage() {
@@ -51,7 +49,6 @@ export default function ProvisionesPage() {
   const { datos: datosParafEmp,   total: totPEmp,   cargando: cPEmp   } = useHistoricos(historicosService.getAportesParafXEmpleado,   paramsEmpleado);
   const { datos: datosParafTot,   total: totPTot,   cargando: cPTot   } = useHistoricos(historicosService.getAportesParafTotal,       paramsPeriodo);
   const { datos: datosCargasTot,  total: totCTot,   cargando: cCTot   } = useHistoricos(historicosService.getCargasPrestacionales,    paramsPeriodo);
-  const { datos: datosConsolidado,total: totCons,   cargando: cCons   } = useHistoricos(historicosService.getConsolidadoEmpleador,    paramsPeriodo);
 
   const mapaData = {
     segSocEmpl:    { datos: datosSegSocEmp,   total: totSSEmp,  cargando: cSSEmp  },
@@ -59,7 +56,6 @@ export default function ProvisionesPage() {
     parafEmpl:     { datos: datosParafEmp,    total: totPEmp,   cargando: cPEmp   },
     totalParaf:    { datos: datosParafTot,    total: totPTot,   cargando: cPTot   },
     cargas:        { datos: datosCargasTot,   total: totCTot,   cargando: cCTot   },
-    totalReportes: { datos: datosConsolidado, total: totCons,   cargando: cCons   },
   };
 
   const { datos: datosActivos, total: totalActual, cargando } = mapaData[tabActual];
@@ -96,14 +92,7 @@ export default function ProvisionesPage() {
       );
       case 'cargas': return (
         <tr>
-          {['Año','Periodo','Cesantías (informativo)','Primas','Vacaciones','Intereses de cesantías']
-            .map(h => <th key={h} style={styles.thP}>{h}</th>)}
-        </tr>
-      );
-      case 'totalReportes': return (
-        <tr>
-          {['Año','Periodo','Total seg. social','Total aportes parafiscales',
-            'Total primas','Total vacaciones','Total intereses de cesantías']
+          {['Año','Semestre','Cesantías (informativo)','Primas','Intereses de cesantías']
             .map(h => <th key={h} style={styles.thP}>{h}</th>)}
         </tr>
       );
@@ -172,19 +161,7 @@ export default function ProvisionesPage() {
           <td style={styles.tdP}>{r.periodo}</td>
           <td style={styles.tdP}>{fmt(r.cargPresCesantiasInformativo)}</td>
           <td style={styles.tdP}>{fmt(r.cargPresPrimas)}</td>
-          <td style={styles.tdP}>{fmt(r.cargPresVacaciones)}</td>
-          <td style={{ ...styles.tdP, fontWeight: '700' }}>{fmt(r.cargPresIntCesantias)}</td>
-        </tr>
-      );
-      case 'totalReportes': return (
-        <tr key={index} style={bg}>
-          <td style={styles.tdP}>{r.anio}</td>
-          <td style={styles.tdP}>{r.periodo}</td>
-          <td style={styles.tdP}>{fmt(r.totalSegSocialEmpr)}</td>
-          <td style={styles.tdP}>{fmt(r.totalAportesParafEmpr)}</td>
-          <td style={styles.tdP}>{fmt(r.cargPresPrimas)}</td>
-          <td style={styles.tdP}>{fmt(r.cargPresVacaciones)}</td>
-          <td style={{ ...styles.tdP, fontWeight: '700' }}>{fmt(r.cargPresIntCesantias)}</td>
+          <td style={styles.tdP}>{fmt(r.cargPresIntCesantias)}</td>
         </tr>
       );
       default: return null;

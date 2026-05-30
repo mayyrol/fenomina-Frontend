@@ -7,6 +7,12 @@ import historicosService from '../../../../../../services/historicosService';
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
+const fmtEstado = (v) => {
+  if (!v) return '-';
+  if (v === 'PENDIENTE_PAGO') return 'Pendiente por pagar';
+  if (v === 'PAGADO') return 'Pagado';
+  return v;
+};
 const TABS_PRINCIPAL = [
   { id: 'cesantias', label: 'Cesantías e intereses de empleados'     },
   { id: 'periodo',   label: 'Total cesantías e intereses por periodo' },
@@ -137,7 +143,8 @@ export default function ReportesCesantiasPage() {
                   <th style={styles.th}>Salario base liqui.</th>
                   <th style={styles.th}>Cesantías</th>
                   <th style={styles.th}>Intereses cesantías</th>
-                  <th style={styles.th}>Fondo de pensiones</th>
+                  <th style={styles.th}>Fondo de cesantías</th>
+                  <th style={styles.th}>Estado proceso</th>
                 </tr>
               )}
               {tabPrincipal === 'periodo' && (
@@ -147,6 +154,7 @@ export default function ReportesCesantiasPage() {
                   <th style={styles.th}>Total cesantías</th>
                   <th style={styles.th}>Total intereses cesantías</th>
                   <th style={styles.th}>Total empleados</th>
+                  <th style={styles.th}>Estado proceso</th>
                 </tr>
               )}
             </thead>
@@ -171,14 +179,16 @@ export default function ReportesCesantiasPage() {
                     <td style={styles.td}>{fmt(r.baseLiquiTotal)}</td>
                     <td style={styles.td}>{fmt(r.cesantias)}</td>
                     <td style={styles.td}>{fmt(r.interesesCesantias)}</td>
-                    <td style={{ ...styles.td, fontWeight: '700' }}>{r.fondoPensionEmp ?? '-'}</td>
+                    <td style={styles.td}>{r.fondoCesantiasEmp ?? '-'}</td>
+                    <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
                   {tabPrincipal === 'periodo' && <>
                     <td style={styles.td}>{r.anio}</td>
                     <td style={styles.td}>{r.periodo}</td>
                     <td style={styles.td}>{fmt(r.totalCesantias)}</td>
                     <td style={styles.td}>{fmt(r.totalInteresesCesantias)}</td>
-                    <td style={{ ...styles.td, fontWeight: '700' }}>{r.totalEmpleados}</td>
+                    <td style={styles.td}>{r.totalEmpleados}</td>
+                    <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
                 </tr>
               ))}

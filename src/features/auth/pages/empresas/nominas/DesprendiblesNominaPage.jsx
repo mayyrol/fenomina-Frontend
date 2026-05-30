@@ -47,6 +47,7 @@ export default function DesprendiblesNominaPage() {
   const [hoverPDF,      setHoverPDF]      = useState(false);
   const [descargando,   setDescargando]   = useState(false);
   const [mensajeError, setMensajeError] = useState('');
+  const [pendienteNavegar, setPendienteNavegar] = useState(false);
 
   useEffect(() => {
     if (!nominaId || !id) return;
@@ -493,12 +494,23 @@ export default function DesprendiblesNominaPage() {
           }
 
           try {
-            await payrollService.cambiarEstado(nominaId, 'CERRADO');
-            setConfirmarCerrar(false);
-            navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+              const { data } = await payrollService.cambiarEstado(nominaId, 'CERRADO');
+              setConfirmarCerrar(false);
+
+              if (data.advertencias && data.advertencias.length > 0) {
+                  setMensajeError(
+                      'El proceso fue cerrado con las siguientes advertencias:\n\n' +
+                      data.advertencias.join('\n\n')
+                  );
+                  setPendienteNavegar(true);
+                  setModal('advertencia');
+                  // Navegar después de que el usuario cierre el modal
+              } else {
+                  navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+              }
           } catch {
-            setConfirmarCerrar(false);
-            setModal('error');
+              setConfirmarCerrar(false);
+              setModal('error');
           }
         }}
         titulo="¿Deseas cerrar este proceso de nómina?"
@@ -545,7 +557,14 @@ export default function DesprendiblesNominaPage() {
       <MensajeModal
         tipo={modal}
         mensaje={mensajeError || undefined}
-        onClose={() => { setModal(null); setMensajeError(''); }}
+        onClose={() => {
+            setModal(null);
+            setMensajeError('');
+            if (pendienteNavegar) {
+                setPendienteNavegar(false);
+                navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+            }
+        }}
       />
 
       {/* Modal descarga */}

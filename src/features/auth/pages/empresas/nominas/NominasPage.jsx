@@ -7,14 +7,14 @@ import MensajeModal from '../../../../../components/MensajeModal';
 import { useNominas } from '../../../hooks/useNominas';
 import payrollService from '../../../../../services/payrollService';
 
-const TABS = ['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado', 'Anulado'];
+const TABS = ['Borrador', 'Cerrado', 'Pendiente por pagar', 'Finalizado', 'Anulado'];
 const PAGE_SIZE = 10;
 
 const OPCIONES_POR_ESTADO = {
   'Borrador':            ['Borrador', 'Cerrado', 'Anulado'],
   'Cerrado':             ['Cerrado', 'Borrador', 'Anulado'],
-  'Pendiente por pagar': ['Pendiente por pagar', 'Pagado', 'Anulado'],
-  'Pagado':              ['Pagado', 'Anulado'],
+  'Pendiente por pagar': ['Pendiente por pagar', 'Finalizado', 'Anulado'],
+  'Finalizado':              ['Finalizado', 'Anulado'],
   'Anulado':             ['Anulado'],
 };
 
@@ -48,7 +48,7 @@ const ESTADO_LABEL = {
   BORRADOR:         'Borrador',
   CERRADO:          'Cerrado',
   PENDIENTE_PAGO:   'Pendiente por pagar',
-  PAGADO:           'Pagado',
+  PAGADO:           'Finalizado',
   ANULADO:          'Anulado',
 };
 
@@ -56,7 +56,7 @@ const ESTADO_BACK = {
   'Borrador':           'BORRADOR',
   'Cerrado':            'CERRADO',
   'Pendiente por pagar':'PENDIENTE_PAGO',
-  'Pagado':             'PAGADO',
+  'Finalizado':             'PAGADO',
   'Anulado':            'ANULADO',
 };
 
@@ -253,7 +253,7 @@ export default function NominasPage() {
                 )}
                 <th style={styles.th}>Fecha de creación proceso</th>
                 <th style={styles.th}>Estado</th>
-                {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
+                {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Finalizado'].includes(tab) && (
                   <th style={styles.th}>Acciones</th>
                 )}
               </tr>
@@ -264,7 +264,7 @@ export default function NominasPage() {
                   <td
                     colSpan={
                       ['Borrador', 'Cerrado'].includes(tab) ? 4 :
-                      ['Pendiente por pagar', 'Pagado'].includes(tab) ? 6 :
+                      ['Pendiente por pagar', 'Finalizado'].includes(tab) ? 6 :
                       tab === 'Anulado' ? 5 : 4
                     }
                     style={{ textAlign: 'center', padding: '20px', color: '#A3A3A3' }}
@@ -294,7 +294,7 @@ export default function NominasPage() {
                           />
                       }
                     </td>
-                    {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
+                    {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Finalizado'].includes(tab) && (
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
                           {p.estadoProcNomina === 'BORRADOR' && (

@@ -98,7 +98,7 @@ export default function ResultadoCesantiasPage() {
 
     autoTable(doc, {
       startY: y,
-      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS', 'FECHA INICIO', 'FECHA FIN', 'SALARIO BASE', 'AUX TRANSPORTE', 'BASE LIQ.', 'CESANTÍAS', 'INTERESES', 'FONDO PENSIONES']],
+      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS', 'FECHA INICIO', 'FECHA FIN', 'SALARIO BASE', 'AUX TRANSPORTE', 'BASE LIQ.', 'CESANTÍAS', 'INTERESES', 'FONDO DE CESANTÍAS']],
       body: [
         ...desprendibles.map((desp, i) => [
           i + 1,
@@ -112,7 +112,7 @@ export default function ResultadoCesantiasPage() {
           fmt(desp.baseLiquidacion),
           fmt(desp.valorPrestacion),
           fmt(desp.valorInteresesCesantias),
-          desp.fondoPension ?? '',
+          desp.fondoCesantias ?? '',
         ]),
         [{ content: 'TOTAL', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
         { content: fmt(totalCesantias), styles: { fontStyle: 'bold' } },
@@ -287,7 +287,7 @@ export default function ResultadoCesantiasPage() {
                 <th style={styles.th}>Base Liquidación</th>
                 <th style={styles.th}>Cesantías</th>
                 <th style={styles.th}>Intereses Cesantías</th>
-                <th style={styles.th}>Fondo Pensiones</th>
+                <th style={styles.th}>Fondo de Cesantías</th>
               </tr>
             </thead>
             <tbody>
@@ -310,7 +310,7 @@ export default function ResultadoCesantiasPage() {
                   <td style={styles.td}>{fmt(desp.baseLiquidacion)}</td>
                   <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
                   <td style={styles.td}>{fmt(desp.valorInteresesCesantias)}</td>
-                  <td style={styles.td}>{desp.fondoPension ?? ''}</td>
+                  <td style={styles.td}>{desp.fondoCesantias ?? ''}</td>
                 </tr>
               ))}
               <tr style={{ backgroundColor: '#E8F5EE' }}>

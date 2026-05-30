@@ -7,6 +7,13 @@ import historicosService from '../../../../../../services/historicosService';
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
+const fmtEstado = (v) => {
+  if (!v) return '-';
+  if (v === 'PENDIENTE_PAGO') return 'Pendiente por pagar';
+  if (v === 'PAGADO') return 'Finalizado';
+  return v;
+};
+
 const TABS_PRINCIPAL = [
   { id: 'nominas',  label: 'Nóminas de empleados'     },
   { id: 'periodo',  label: 'Total nóminas por periodo' },
@@ -33,14 +40,12 @@ export default function ReportesNominasPage() {
   const paramsEmpleados = {
     empresaId: id,
     nombres:   busqueda || undefined,
-    estado:    'PAGADO',
     page:      pagina,
     size:      porPagina,
   };
 
   const paramsPeriodo = {
     empresaId: id,
-    estado:    'PAGADO',
     page:      pagina,
     size:      porPagina,
   };
@@ -141,6 +146,7 @@ export default function ReportesNominasPage() {
                   <th style={styles.th}>Total devengado</th>
                   <th style={styles.th}>Total deducciones</th>
                   <th style={styles.th}>Total neto a pagar</th>
+                  <th style={styles.th}>Estado proceso</th>
                 </tr>
               )}
               {tabPrincipal === 'periodo' && (
@@ -154,6 +160,7 @@ export default function ReportesNominasPage() {
                   <th style={styles.th}>Total neto</th>
                   <th style={styles.th}>Costo total empresa</th>
                   <th style={styles.th}>Total empleados</th>
+                  <th style={styles.th}>Estado proceso</th>
                 </tr>
               )}
             </thead>
@@ -175,6 +182,7 @@ export default function ReportesNominasPage() {
                     <td style={styles.td}>{fmt(r.totalDevengado)}</td>
                     <td style={styles.td}>{fmt(r.totalDeducciones)}</td>
                     <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.netoNomina)}</td>
+                    <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
                   {tabPrincipal === 'periodo' && <>
                     <td style={styles.td}>{r.anio}</td>
@@ -185,7 +193,8 @@ export default function ReportesNominasPage() {
                     <td style={styles.td}>{fmt(r.totalDeducciones)}</td>
                     <td style={styles.td}>{fmt(r.totalNeto)}</td>
                     <td style={styles.td}>{fmt(r.totalCostoEmpresa)}</td>
-                    <td style={{ ...styles.td, fontWeight: '700' }}>{r.totalEmpleados}</td>
+                    <td style={styles.td}>{r.totalEmpleados}</td>
+                    <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
                 </tr>
               ))}

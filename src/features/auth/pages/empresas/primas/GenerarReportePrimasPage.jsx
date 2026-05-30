@@ -99,18 +99,25 @@ export default function GenerarReportePrimasPage() {
   const { id }      = useParams();
   const { usuario } = useAuthStore();
 
+  const { 
+    semestreSeleccionado, 
+    anioSeleccionado, 
+    setSemestreSeleccionado, 
+    setAnioSeleccionado,
+    seleccionados, 
+    setSeleccionados
+  } = usePrimaStore();
+  
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
-  const { semestreSeleccionado, anioSeleccionado, setSemestreSeleccionado, setAnioSeleccionado } = usePrimaStore();
-
   const [anio, setAnio]         = useState(anioSeleccionado || new Date().getFullYear());
   const [semestre, setSemestre] = useState(semestreSeleccionado || '');
-  const [seleccionados, setSeleccionados] = useState([]);
   const [modal, setModal]                 = useState(null);
   const [hoverSeguir, setHoverSeguir]     = useState(false);
   const [empleados,   setEmpleados]   = useState([]);
   const [cargandoEmp, setCargandoEmp] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
+
   
   const todosSeleccionados =
     seleccionados.length === empleados.length && empleados.length > 0;
@@ -121,10 +128,10 @@ export default function GenerarReportePrimasPage() {
   };
 
   const toggleEmpleado = (empId) => {
-    setSeleccionados(prev =>
-      prev.includes(empId)
-        ? prev.filter(i => i !== empId)
-        : [...prev, empId]
+    setSeleccionados(
+      seleccionados.includes(empId)
+        ? seleccionados.filter(i => i !== empId)
+        : [...seleccionados, empId]
     );
   };
 
@@ -150,6 +157,7 @@ export default function GenerarReportePrimasPage() {
       const { data } = await payrollService.crearProceso(payload);
       usePrimaStore.getState().setProcesoActual(data);
       usePrimaStore.getState().setEmpleadosSeleccionados(seleccionados);
+      setSeleccionados([]);
       navigate(`/empresas/${id}/primas/${data.procesoLiquiId}/desprendibles`);
     } catch (err) {
       const mensaje = err?.response?.data?.mensaje ?? 'Ocurrió un error al crear el proceso.';
@@ -296,7 +304,15 @@ export default function GenerarReportePrimasPage() {
         >
           Seguir proceso de liquidación
         </button>
-        <button style={styles.btnCancelar} onClick={() => navigate(-1)}>Cancelar</button>
+        <button 
+          style={styles.btnCancelar} 
+          onClick={() => { 
+            setSeleccionados([]); 
+            navigate(-1); 
+          }}
+        >
+          Cancelar
+        </button>
       </div>
 
       <MensajeModal

@@ -26,12 +26,12 @@ export default function GenerarReporteCesantiasPage() {
   const { id }      = useParams();
   const { usuario } = useAuthStore();
 
+  const { anioSeleccionado, setAnioSeleccionado, seleccionados, setSeleccionados } = useCesantiaStore();
+  
+  const [año, setAño] = useState(anioSeleccionado || '');
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const { anioSeleccionado, setAnioSeleccionado } = useCesantiaStore();
-  const [año, setAño] = useState('');
-  const [seleccionados, setSeleccionados]     = useState([]);
   const [modal, setModal]                     = useState(null);
   const [hoverGenerar, setHoverGenerar]       = useState(false);
 
@@ -44,17 +44,17 @@ export default function GenerarReporteCesantiasPage() {
   const todosSeleccionados =
     seleccionados.length === empleados.length && empleados.length > 0;
 
+  const toggleEmpleado = (empId) => {
+    setSeleccionados(
+      seleccionados.includes(empId)
+        ? seleccionados.filter(i => i !== empId)
+        : [...seleccionados, empId]
+    );
+  };
+
   const toggleTodos = () => {
     if (todosSeleccionados) setSeleccionados([]);
     else setSeleccionados(empleados.map(e => e.empleadoId));
-  };
-
-  const toggleEmpleado = (empId) => {
-    setSeleccionados(prev =>
-      prev.includes(empId)
-        ? prev.filter(i => i !== empId)
-        : [...prev, empId]
-    );
   };
 
   const camposCompletos = año && seleccionados.length > 0;
@@ -94,6 +94,7 @@ export default function GenerarReporteCesantiasPage() {
       useCesantiaStore.getState().setProcesosInteresesActual(dataIntereses);
       useCesantiaStore.getState().setEmpleadosSeleccionados(seleccionados);
       useCesantiaStore.getState().setAnioSeleccionado(año);
+      setSeleccionados([]);
 
       navigate(
         `/empresas/${id}/cesantias/${dataCesantias.procesoLiquiId}/desprendibles`
@@ -104,10 +105,6 @@ export default function GenerarReporteCesantiasPage() {
       setModal('error');
     }
   };
-
-  useEffect(() => {
-    useCesantiaStore.getState().limpiarProceso();
-  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -225,7 +222,12 @@ export default function GenerarReporteCesantiasPage() {
         >
           Generar Desprendibles
         </button>
-        <button style={styles.btnCancelar} onClick={() => navigate(`/empresas/${id}/cesantias`)}>Regresar</button>
+        <button style={styles.btnCancelar} onClick={() => { 
+          useCesantiaStore.getState().limpiarProceso(); 
+          navigate(`/empresas/${id}/cesantias`); 
+        }}>
+          Regresar
+        </button>
       </div>
 
       <MensajeModal

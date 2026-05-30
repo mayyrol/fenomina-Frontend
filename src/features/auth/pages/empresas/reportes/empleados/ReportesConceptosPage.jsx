@@ -99,7 +99,7 @@ export default function ReportesConceptosPage() {
       case 'incapacidades': return (
         <tr>
           {['#','Nombre(s)','Apellidos','Doc.','Año','Periodo',
-            'Pago por','Días incap. común','Días incap. laboral',
+            'Días incap. común','Días incap. laboral',
             'Total incap. común','Total incap. laboral'].map(h => <th key={h} style={styles.th}>{h}</th>)}
         </tr>
       );
@@ -132,7 +132,7 @@ export default function ReportesConceptosPage() {
       );
       case 'vacaciones': return (
         <tr>
-          {['#','Nombre(s)','Apellidos','Doc.',
+          {['#','Nombre(s)','Apellidos','Doc.','Año','Periodo',
             'Fecha inicio','Fecha fin','Tipo','Días','Valor'].map(h => <th key={h} style={styles.th}>{h}</th>)}
         </tr>
       );
@@ -140,9 +140,8 @@ export default function ReportesConceptosPage() {
         <tr>
           <th style={styles.th}>Año</th>
           <th style={styles.th}>Periodo</th>
-          <th style={styles.th}>Total vacaciones remuneradas</th>
-          <th style={styles.th}>Total vacaciones no remuneradas</th>
-          <th style={styles.th}>Total vacaciones</th>
+          <th style={styles.th}>Total vacaciones compensadas en dinero</th>
+          <th style={styles.th}>Total vacaciones disfrutadas</th>
         </tr>
       );
       default: return null;
@@ -193,11 +192,10 @@ export default function ReportesConceptosPage() {
           <td style={styles.td}>{r.documentoEmp}</td>
           <td style={styles.td}>{r.anio}</td>
           <td style={styles.td}>{r.periodo}</td>
-          <td style={styles.td}>{r.pagoPor ?? '-'}</td>
           <td style={styles.td}>{r.diasIncapacidadComun}</td>
           <td style={styles.td}>{r.diasIncapacidadLaboral}</td>
           <td style={styles.td}>{fmt(r.totalIncapacidadComun)}</td>
-          <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.totalIncapacidadLaboral)}</td>
+          <td style={styles.td}>{fmt(r.totalIncapacidadLaboral)}</td>
         </tr>
       );
       case 'totalIncap': return (
@@ -205,7 +203,7 @@ export default function ReportesConceptosPage() {
           <td style={styles.td}>{r.anio}</td>
           <td style={styles.td}>{r.periodo}</td>
           <td style={styles.td}>{fmt(r.totalIncapacidadComun)}</td>
-          <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.totalIncapacidadLaboral)}</td>
+          <td style={styles.td}>{fmt(r.totalIncapacidadLaboral)}</td>
         </tr>
       );
       case 'licencias': return (
@@ -233,7 +231,7 @@ export default function ReportesConceptosPage() {
           <td style={styles.td}>{r.diasOtrosPermisosRemunerados}</td>
           <td style={styles.td}>{fmt(r.valorOtrosPermisosRemunerados)}</td>
           <td style={styles.td}>{r.diasLicenciasNoRemuneradas}</td>
-          <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.valorLicenciasNoRemuneradas)}</td>
+          <td style={styles.td}>{fmt(r.valorLicenciasNoRemuneradas)}</td>
         </tr>
       );
       case 'totalLicencias': return (
@@ -250,10 +248,12 @@ export default function ReportesConceptosPage() {
           <td style={styles.td}>{r.nombresEmp}</td>
           <td style={styles.td}>{r.apellidosEmp}</td>
           <td style={styles.td}>{r.documentoEmp}</td>
+          <td style={styles.td}>{r.anio}</td>
+          <td style={styles.td}>{r.periodo}</td>
           <td style={styles.td}>{r.fechaInicioVac ?? '-'}</td>
           <td style={styles.td}>{r.fechaFinVac ?? '-'}</td>
           <td style={styles.td}>{r.tipoVacaciones ?? '-'}</td>
-          <td style={styles.td}>{r.diasTomados}</td>
+          <td style={styles.td}>{r.diasTomados ?? '-'}</td>
           <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.valorPagoVac)}</td>
         </tr>
       );
@@ -261,9 +261,8 @@ export default function ReportesConceptosPage() {
         <tr key={index} style={bg}>
           <td style={styles.td}>{r.anio}</td>
           <td style={styles.td}>{r.periodo}</td>
-          <td style={styles.td}>{fmt(r.totalVacacionesRemuneradas)}</td>
-          <td style={styles.td}>{fmt(r.totalVacacionesNoRemuneradas)}</td>
-          <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.totalVacaciones)}</td>
+          <td style={styles.td}>{fmt(r.totalVacacionesCompensadas)}</td>
+          <td style={styles.td}>{fmt(r.totalVacacionesDisfrutadas)}</td>
         </tr>
       );
       default: return null;

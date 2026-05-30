@@ -138,7 +138,7 @@ const soloNumeros = (e) => {
 const filaVaciaLicencia  = () => ({ concepNominaId: '', fechaInicio: '', fechaFin: '' });
 const filaVaciaHoras     = () => ({ concepNominaId: '', fecha: '', cantidad: '' });
 const filaVaciaPagos     = () => ({ concepNominaId: '', fecha: '', monto: '' });
-const filaVaciaVacacion = () => ({ concepNominaId: '', diasVacaciones: '' });
+const filaVaciaVacacion = () => ({ concepNominaId: '', diasVacaciones: '', fechaInicio: '', fechaFin: '' });
 const filaVaciaOtros     = () => ({ descripcion: '', monto: '', fecha: '', constituyeSalario: 'si' });
 const filaVaciaReten     = () => ({ descripcion: '', monto: '', fecha: '' });
 
@@ -262,10 +262,9 @@ export default function NovedadesPage() {
         ).map(toOpcion));
 
         // Si viene con días pre-llenados desde el store
-        if (tipoPre === 'dias') {
-          const diasStore = useNominaStore.getState()
-            .diasLaborados[Number(empleadoId)];
-          if (diasStore) setDiasLaborados(String(diasStore));
+        const diasStore = useNominaStore.getState().diasLaborados[Number(empleadoId)];
+        if (diasStore !== undefined && diasStore !== null) {
+            setDiasLaborados(String(diasStore));
         }
 
         const procesoEncontrado = procesos.find(
@@ -284,6 +283,107 @@ export default function NovedadesPage() {
       .then(({ data }) => setNovedadEdit(data))
       .catch(() => {});
   }, [novedadId]);
+
+  useEffect(() => {
+      if (!novedadEdit) return;
+      console.log('novedadEdit cargado:', novedadEdit);
+      const isoToDisplay = (iso) => {
+          if (!iso) return '';
+          const [a, m, d] = iso.split('-');
+          return `${d}/${m}/${a}`;
+      };
+
+      const nombre = novedadEdit.nombreConcepto ?? '';
+
+      const esLicencia = [
+          'Incapacidad por enfermedad general',
+          'Incapacidad por origen laboral',
+          'Licencia de maternidad',
+          'Licencia de paternidad',
+          'Licencia por calamidad doméstica',
+          'Licencia por matrimonio',
+          'Licencia Ley ISAAC',
+          'Licencia por sufragio',
+          'Cargos transitorios',
+          'Citaciones judiciales',
+          'Otros permisos remunerados pactados',
+          'Licencias no remuneradas',
+      ].includes(nombre);
+
+      const esHoras = [
+          'Recargo nocturno ordinario',
+          'Recargo diurno dominical o festivo',
+          'Recargo nocturno dominical o festivo',
+          'Hora extra diurna ordinaria',
+          'Hora extra nocturna ordinaria',
+          'Hora extra diurna dominical o festiva',
+          'Hora extra nocturna dominical o festiva',
+      ].includes(nombre);
+
+      const esVacacion = [
+          'Vacaciones disfrutadas',
+          'Vacaciones compensadas en dinero',
+      ].includes(nombre);
+
+      const esPago = [
+          'Comisiones',
+          'Bonificaciones ocasionales o por mera liberalidad',
+          'Beneficios o extralegales no salariales',
+      ].includes(nombre);
+
+      const esOtroDevengSalarial = nombre === 'Otro concepto a devenir salarial';
+      const esOtroDevengNoSalarial = nombre === 'Otro concepto a devenir no salarial';
+      const esRetencion = nombre === 'Retención en la fuente';
+      const esOtroDeducirSalarial = nombre === 'Otros conceptos a deducir salariales';
+      const esOtroDeducirNoSalarial = nombre === 'Otros conceptos a deducir no salariales';
+
+      if (esLicencia) {
+          setTiempoLic([{
+              concepNominaId: String(novedadEdit.fkConcepNominaId ?? ''),
+              fechaInicio: isoToDisplay(novedadEdit.fechaInicioAusen),
+              fechaFin: isoToDisplay(novedadEdit.fechaFinAusen),
+          }]);
+      } else if (esHoras) {
+          setHorasExtra([{
+              concepNominaId: String(novedadEdit.fkConcepNominaId ?? ''),
+              fecha: isoToDisplay(novedadEdit.fechaNovedad),
+              cantidad: String(novedadEdit.cantidadHorasNovedad ?? ''),
+          }]);
+      } else if (esVacacion) {
+          setVacaciones([{
+              concepNominaId: String(novedadEdit.fkConcepNominaId ?? ''),
+              diasVacaciones: String(novedadEdit.cantidadDiasNovedad ?? ''),
+              fechaInicio: isoToDisplay(novedadEdit.fechaInicioAusen), 
+              fechaFin: isoToDisplay(novedadEdit.fechaFinAusen), 
+          }]);
+      } else if (esPago) {
+          setPagosExtra([{
+              concepNominaId: String(novedadEdit.fkConcepNominaId ?? ''),
+              fecha: isoToDisplay(novedadEdit.fechaNovedad),
+              monto: String(novedadEdit.valorRefNovedad ?? ''),
+          }]);
+      } else if (esOtroDevengSalarial || esOtroDevengNoSalarial) {
+          setOtrosDeveng([{
+              descripcion: novedadEdit.observaciones ?? '',
+              monto: String(novedadEdit.valorRefNovedad ?? ''),
+              fecha: isoToDisplay(novedadEdit.fechaNovedad),
+              constituyeSalario: esOtroDevengSalarial ? 'si' : 'no',
+          }]);
+      } else if (esRetencion) {
+          setRetencion([{
+              descripcion: novedadEdit.observaciones ?? '',
+              monto: String(novedadEdit.valorRefNovedad ?? ''),
+              fecha: isoToDisplay(novedadEdit.fechaNovedad),
+          }]);
+      } else if (esOtroDeducirSalarial || esOtroDeducirNoSalarial) {
+          setOtrosDeducir([{
+              descripcion: novedadEdit.observaciones ?? '',
+              monto: String(novedadEdit.valorRefNovedad ?? ''),
+              fecha: isoToDisplay(novedadEdit.fechaNovedad),
+              constituyeSalario: esOtroDeducirSalarial ? 'si' : 'no',
+          }]);
+      }
+  }, [novedadEdit]);
 
   const updateFila = (setter, arr, i, campo, valor) => {
     const n = [...arr]; n[i] = { ...n[i], [campo]: valor }; setter(n);
@@ -417,17 +517,42 @@ export default function NovedadesPage() {
           if (dias > 30) {
             throw new Error('Los días de vacaciones no pueden superar 30 días por período');
           }
+
+          const esVacDisfrutadas = opcionesVacaciones
+              .find(o => String(o.value) === String(f.concepNominaId))
+              ?.label === 'Vacaciones disfrutadas';
+
+          if (esVacDisfrutadas && f.fechaInicio && f.fechaFin) {
+              if (!fechaEstaEnPeriodo(f.fechaInicio)) {
+                  throw new Error(
+                      `La fecha de inicio de vacaciones (${f.fechaInicio}) está fuera del periodo ` +
+                      `(${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`
+                  );
+              }
+              if (!fechaEstaEnPeriodo(f.fechaFin)) {
+                  throw new Error(
+                      `La fecha de fin de vacaciones (${f.fechaFin}) está fuera del periodo ` +
+                      `(${procesoPeriodo.fechaInicioPeriodo} - ${procesoPeriodo.fechaFinPeriodo})`
+                  );
+              }
+          }
+              
           novedadesAGuardar.push({
-            fkEmpleadoId:        Number(empleadoId),
-            fkConcepNominaId:    Number(f.concepNominaId),
-            procesoLiquid:       procesoActual?.procesoLiquiId,
-            anio:                procesoActual?.anio,
-            periodo:             procesoActual?.periodo,
-            fechaInicioAusen:    null,
-            fechaFinAusen:       null,
-            cantidadDiasNovedad: dias,
-            cantidadHorasNovedad: null,
-            valorRefNovedad:     null,
+              fkEmpleadoId:         Number(empleadoId),
+              fkConcepNominaId:     Number(f.concepNominaId),
+              procesoLiquid:        procesoActual?.procesoLiquiId,
+              anio:                 procesoActual?.anio,
+              periodo:              procesoActual?.periodo,
+              fechaInicioAusen:     esVacDisfrutadas && f.fechaInicio
+                                        ? fechaToISO(f.fechaInicio) : null,
+              fechaFinAusen:        esVacDisfrutadas && f.fechaFin
+                                        ? fechaToISO(f.fechaFin) : null,
+              cantidadDiasNovedad:  dias,
+              cantidadHorasNovedad: null,
+              valorRefNovedad:      null,
+              tipoVacacion:         opcionesVacaciones
+                                        .find(o => String(o.value) === String(f.concepNominaId))
+                                        ?.label ?? null,
           });
         }
       }
@@ -486,9 +611,7 @@ export default function NovedadesPage() {
       // Otros conceptos a deducir
       for (const f of otrosDeducir) {
         if (f.monto) {
-          const nombreConcepto = f.constituyeSalario === 'si'
-            ? 'Otros conceptos a deducir salariales'
-            : 'Otros conceptos a deducir no salariales';
+          const nombreConcepto = 'Otros conceptos a deducir no salariales';
           const concepId = conceptoMap[nombreConcepto];
           if (concepId) {
             if (!fechaEstaEnPeriodo(f.fecha)) {
@@ -579,7 +702,7 @@ export default function NovedadesPage() {
             value={diasLaborados}
             onChange={(e) => {
               const val = Number(e.target.value);
-              if (val > 30) return;
+              if (val > 30 || val < 0) return;
               setDiasLaborados(e.target.value);
             }}
             onKeyDown={soloNumeros}
@@ -696,32 +819,53 @@ export default function NovedadesPage() {
       </div>
 
       {/* Card 5: Vacaciones */}
-      {vacaciones.map((f, i) => (
-        <div key={i} style={styles.filaRow}>
-          {campo('Tipo de vacación',
-            <SelectWrapper
-              value={f.concepNominaId}
-              onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'concepNominaId', v)}
-              options={opcionesVacaciones}
-            />, i)}
-          {campo('Días de vacaciones',
-            <input
-              type="number"
-              min="1"
-              max="30"
-              value={f.diasVacaciones}
-              onChange={(e) => updateFila(setVacaciones, vacaciones, i, 'diasVacaciones', e.target.value)}
-              onKeyDown={soloNumeros}
-              style={styles.input}
-              placeholder="Ej: 15"
-            />, i)}
-          {iconos(
-            () => addFila(setVacaciones, vacaciones, filaVaciaVacacion),
-            () => removeFila(setVacaciones, vacaciones, i),
-            vacaciones.length === 1, i
-          )}
-        </div>
-      ))}
+      <div style={styles.card}>
+        <p style={styles.seccionTitulo}>Vacaciones</p>
+        <p style={styles.descripcion}>
+          Registre los días de vacaciones del trabajador en el período.
+        </p>
+        {vacaciones.map((f, i) => (
+            <div key={i} style={styles.filaRow}>
+                {campo('Tipo de vacación',
+                    <SelectWrapper
+                        value={f.concepNominaId}
+                        onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'concepNominaId', v)}
+                        options={opcionesVacaciones}
+                    />, i)}
+                {campo('Días de vacaciones',
+                    <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={f.diasVacaciones}
+                        onChange={(e) => updateFila(setVacaciones, vacaciones, i, 'diasVacaciones', e.target.value)}
+                        onKeyDown={soloNumeros}
+                        style={styles.input}
+                        placeholder="Ej: 15"
+                    />, i)}
+                {opcionesVacaciones.find(o => String(o.value) === String(f.concepNominaId))
+                        ?.label === 'Vacaciones disfrutadas' && (
+                    <>
+                        {campo('Fecha de inicio',
+                            <CalendarioInput
+                                value={f.fechaInicio}
+                                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaInicio', v)}
+                            />, i)}
+                        {campo('Fecha de fin',
+                            <CalendarioInput
+                                value={f.fechaFin}
+                                onChange={(v) => updateFila(setVacaciones, vacaciones, i, 'fechaFin', v)}
+                            />, i)}
+                    </>
+                )}
+                {iconos(
+                    () => addFila(setVacaciones, vacaciones, filaVaciaVacacion),
+                    () => removeFila(setVacaciones, vacaciones, i),
+                    vacaciones.length === 1, i
+                )}
+            </div>
+        ))}
+      </div>
 
       {/* Card 6: Otros conceptos a devengar */}
       <div style={styles.card}>
@@ -850,31 +994,6 @@ export default function NovedadesPage() {
                 value={f.fecha}
                 onChange={(v) => updateFila(setOtrosDeducir, otrosDeducir, i, 'fecha', v)}
               />, i)}
-            <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {i === 0 && <label style={styles.label}>¿Constituye salario?</label>}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', height: '43px' }}>
-                <label style={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name={`deducir-sal-${i}`}
-                    value="si"
-                    checked={f.constituyeSalario === 'si'}
-                    onChange={() => updateFila(setOtrosDeducir, otrosDeducir, i, 'constituyeSalario', 'si')}
-                    style={styles.radio}
-                  /> Sí
-                </label>
-                <label style={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name={`deducir-sal-${i}`}
-                    value="no"
-                    checked={f.constituyeSalario === 'no'}
-                    onChange={() => updateFila(setOtrosDeducir, otrosDeducir, i, 'constituyeSalario', 'no')}
-                    style={styles.radio}
-                  /> No
-                </label>
-              </div>
-            </div>
             {iconos(
               () => addFila(setOtrosDeducir, otrosDeducir, filaVaciaOtros),
               () => removeFila(setOtrosDeducir, otrosDeducir, i),

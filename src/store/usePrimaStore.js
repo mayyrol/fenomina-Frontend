@@ -8,14 +8,17 @@ export const usePrimaStore = create(
       empleadosSeleccionados: [],
       semestreSeleccionado:  '',
       anioSeleccionado:      new Date().getFullYear(),
+      seleccionados: [],
 
       setProcesoActual:          (proceso)   => set({ procesoActual: proceso }),
       setEmpleadosSeleccionados: (empleados) => set({ empleadosSeleccionados: empleados }),
       setSemestreSeleccionado:   (semestre)  => set({ semestreSeleccionado: semestre }),
       setAnioSeleccionado:       (anio)      => set({ anioSeleccionado: anio }),
 
+      setSeleccionados: (ids) => set({ seleccionados: ids }),
+      
       limpiarProceso: () =>
-        set({ procesoActual: null, empleadosSeleccionados: [] }),
+        set({ procesoActual: null, empleadosSeleccionados: [], seleccionados: [] }),
     }),
     {
       name: 'prima-store',

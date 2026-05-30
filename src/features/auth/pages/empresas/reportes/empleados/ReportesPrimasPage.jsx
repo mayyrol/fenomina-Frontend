@@ -7,6 +7,13 @@ import historicosService from '../../../../../../services/historicosService';
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
+const fmtEstado = (v) => {
+  if (!v) return '-';
+  if (v === 'PENDIENTE_PAGO') return 'Pendiente por pagar';
+  if (v === 'PAGADO') return 'Pagado';
+  return v;
+};
+
 const TABS_PRINCIPAL = [
   { id: 'primas',  label: 'Primas de empleados'     },
   { id: 'periodo', label: 'Total primas por periodo' },
@@ -137,9 +144,9 @@ export default function ReportesPrimasPage() {
                   <th style={styles.th}>Días laborados</th>
                   <th style={styles.th}>Salario base</th>
                   <th style={styles.th}>Aux. transporte</th>
-                  <th style={styles.th}>Otros (variables)</th>
                   <th style={styles.th}>Base liquidación</th>
                   <th style={styles.th}>Total prima</th>
+                  <th style={styles.th}>Estado proceso</th>
                 </tr>
               )}
               {tabPrincipal === 'periodo' && (
@@ -148,6 +155,7 @@ export default function ReportesPrimasPage() {
                   <th style={styles.th}>Semestre</th>
                   <th style={styles.th}>Total neto primas</th>
                   <th style={styles.th}>Total empleados</th>
+                  <th style={styles.th}>Estado proceso</th>
                 </tr>
               )}
             </thead>
@@ -172,15 +180,16 @@ export default function ReportesPrimasPage() {
                     <td style={styles.td}>{r.diasLiquidados}</td>
                     <td style={styles.td}>{fmt(r.salarioBase)}</td>
                     <td style={styles.td}>{r.tieneAuxTransporte ? fmt(r.salarioBase) : '-'}</td>
-                    <td style={styles.td}>{fmt(r.promedioVarPeriodo)}</td>
                     <td style={styles.td}>{fmt(r.baseLiquiTotal)}</td>
                     <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.valorNetoPrima)}</td>
+                    <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
                   {tabPrincipal === 'periodo' && <>
                     <td style={styles.td}>{r.anio}</td>
                     <td style={styles.td}>{r.periodo}</td>
                     <td style={styles.td}>{fmt(r.totalNetoPrimas)}</td>
-                    <td style={{ ...styles.td, fontWeight: '700' }}>{r.totalEmpleados}</td>
+                    <td style={styles.td}>{r.totalEmpleados}</td>
+                    <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
                 </tr>
               ))}
