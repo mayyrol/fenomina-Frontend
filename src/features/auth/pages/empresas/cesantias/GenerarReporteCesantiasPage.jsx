@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, ChevronLeft, UserRound, ChevronDown } from 'lucide-react';
+import { Coins, ChevronLeft, UserRound, ChevronDown, Eye  } from 'lucide-react';
 import MensajeModal from '../../../../../components/MensajeModal';
-
+import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
+import payrollService from '../../../../../services/payrollService';
 
 const AÑOS = ['2023', '2024', '2025', '2026', '2027'];
 
@@ -19,45 +20,100 @@ function SelectAño({ value, onChange }) {
   );
 }
 
-const MOCK_EMPLEADOS = [
-  { id: 1, nombres: 'Pepito',          apellidos: 'Perez',            fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 2, nombres: 'Carlos Andres',   apellidos: 'Rodriguez Ochoa',  fechaIngreso: '30/12/2023', documento: '10528967' },
-  { id: 3, nombres: 'Alejandra Maria', apellidos: 'Anibal Leon',       fechaIngreso: '30/11/2022', documento: '10528967' },
-  { id: 4, nombres: 'Carlos Alberto',  apellidos: 'Domingo Rodriguez', fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 5, nombres: 'Samuel',          apellidos: 'Martinez Ramos',    fechaIngreso: '30/01/2023', documento: '10528967' },
-];
 
 export default function GenerarReporteCesantiasPage() {
   const navigate    = useNavigate();
   const { id }      = useParams();
   const { usuario } = useAuthStore();
 
+  const { anioSeleccionado, setAnioSeleccionado, seleccionados, setSeleccionados } = useCesantiaStore();
+  
+  const [año, setAño] = useState(anioSeleccionado || '');
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [año, setAño]                         = useState('');
-  const [seleccionados, setSeleccionados]     = useState([]);
   const [modal, setModal]                     = useState(null);
   const [hoverGenerar, setHoverGenerar]       = useState(false);
 
-  const todosSeleccionados = seleccionados.length === MOCK_EMPLEADOS.length;
+  const [empleados,   setEmpleados]   = useState([]);
+  const [cargandoEmp, setCargandoEmp] = useState(false);
+
+  const [mensajeError, setMensajeError] = useState('');
+
+
+  const todosSeleccionados =
+    seleccionados.length === empleados.length && empleados.length > 0;
+
+  const toggleEmpleado = (empId) => {
+    setSeleccionados(
+      seleccionados.includes(empId)
+        ? seleccionados.filter(i => i !== empId)
+        : [...seleccionados, empId]
+    );
+  };
 
   const toggleTodos = () => {
     if (todosSeleccionados) setSeleccionados([]);
-    else setSeleccionados(MOCK_EMPLEADOS.map(e => e.id));
-  };
-
-  const toggleEmpleado = (empId) => {
-    setSeleccionados(prev => prev.includes(empId) ? prev.filter(i => i !== empId) : [...prev, empId]);
+    else setSeleccionados(empleados.map(e => e.empleadoId));
   };
 
   const camposCompletos = año && seleccionados.length > 0;
 
-  const handleGenerar = () => {
+  const handleGenerar = async () => {
     if (!camposCompletos) { setModal('error'); return; }
-    const cesantiaId = Date.now();
-    navigate(`/empresas/${id}/cesantias/${cesantiaId}/desprendibles`);
+
+    try {
+      const fechaInicio = `${año}-01-01`;
+        const fechaFin    = `${año}-12-31`;
+
+      const payloadCesantias = {
+        empresaId:   Number(id),
+        tipoProceso: 'CESANTIAS_ANUAL',
+        anio:        Number(año),
+        periodo:     1,
+        fechaInicio,
+        fechaFin,
+      };
+
+      const payloadIntereses = {
+        empresaId:   Number(id),
+        tipoProceso: 'INTERESES_CESANTIAS_ANUAL',
+        anio:        Number(año),
+        periodo:     1,
+        fechaInicio,
+        fechaFin,
+      };
+
+      const [{ data: dataCesantias }, { data: dataIntereses }] =
+        await Promise.all([
+          payrollService.crearProceso(payloadCesantias),
+          payrollService.crearProceso(payloadIntereses),
+        ]);
+
+      useCesantiaStore.getState().setProcesosCesantiasActual(dataCesantias);
+      useCesantiaStore.getState().setProcesosInteresesActual(dataIntereses);
+      useCesantiaStore.getState().setEmpleadosSeleccionados(seleccionados);
+      useCesantiaStore.getState().setAnioSeleccionado(año);
+      setSeleccionados([]);
+
+      navigate(
+        `/empresas/${id}/cesantias/${dataCesantias.procesoLiquiId}/desprendibles`
+      );
+    } catch (err) {
+      const mensaje = err?.response?.data?.mensaje ?? 'Ocurrió un error al crear el proceso.';
+      setMensajeError(mensaje);
+      setModal('error');
+    }
   };
+
+  useEffect(() => {
+    if (!id) return;
+    setCargandoEmp(true);
+    payrollService.getEmpleadosActivos(id)
+      .then(({ data }) => setEmpleados(data))
+      .catch(() => {})
+      .finally(() => setCargandoEmp(false));
+  }, [id]);
 
   return (
     <div style={styles.container}>
@@ -87,7 +143,7 @@ export default function GenerarReporteCesantiasPage() {
         <div style={styles.filaFechas}>
           <div style={styles.campoBox}>
             <label style={styles.label}>Año <span style={styles.req}>*</span></label>
-            <SelectAño value={año} onChange={setAño} />
+            <SelectAño value={año} onChange={(val) => { setAño(val); setAnioSeleccionado(val); }} />
           </div>
         </div>
       </div>
@@ -107,6 +163,7 @@ export default function GenerarReporteCesantiasPage() {
                 <th style={styles.th}>Apellidos</th>
                 <th style={styles.th}>Fecha de ingreso</th>
                 <th style={styles.th}>Número de documento</th>
+                <th style={styles.th}>Ver cesantía</th>
                 <th style={styles.th}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                     <span>Seleccionar</span>
@@ -119,14 +176,35 @@ export default function GenerarReporteCesantiasPage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_EMPLEADOS.map((emp, i) => (
-                <tr key={emp.id} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombres}</td>
-                  <td style={styles.td}>{emp.apellidos}</td>
-                  <td style={styles.td}>{emp.fechaIngreso}</td>
-                  <td style={styles.td}>{emp.documento}</td>
+              {cargandoEmp ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
+                    Cargando empleados...
+                  </td>
+                </tr>
+              ) : empleados.map((emp, i) => (
+                <tr key={emp.empleadoId}
+                  style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombresEmp}</td>
+                  <td style={styles.td}>{emp.apellidosEmp}</td>
+                  <td style={styles.td}>{emp.fechaIngresoEmp}</td>
+                  <td style={styles.td}>{emp.documentoEmp}</td>
                   <td style={styles.td}>
-                    <input type="checkbox" checked={seleccionados.includes(emp.id)} onChange={() => toggleEmpleado(emp.id)} style={styles.checkbox} />
+                    <button
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                      onClick={() => navigate(`/empresas/${id}/cesantias/ver-cesantia/${emp.empleadoId}?anio=${año}`)}
+                      title="Ver cesantía"
+                    >
+                      <Eye size={16} color="#0B662A" />
+                    </button>
+                  </td>
+                  <td style={styles.td}>
+                    <input
+                      type="checkbox"
+                      checked={seleccionados.includes(emp.empleadoId)}
+                      onChange={() => toggleEmpleado(emp.empleadoId)}
+                      style={styles.checkbox}
+                    />
                   </td>
                 </tr>
               ))}
@@ -144,10 +222,19 @@ export default function GenerarReporteCesantiasPage() {
         >
           Generar Desprendibles
         </button>
-        <button style={styles.btnCancelar} onClick={() => navigate(-1)}>Regresar</button>
+        <button style={styles.btnCancelar} onClick={() => { 
+          useCesantiaStore.getState().limpiarProceso(); 
+          navigate(`/empresas/${id}/cesantias`); 
+        }}>
+          Regresar
+        </button>
       </div>
 
-      <MensajeModal tipo={modal} mensaje="Por favor completa todos los campos obligatorios y selecciona al menos un empleado." onClose={() => setModal(null)} />
+      <MensajeModal
+        tipo={modal}
+        mensaje={mensajeError || 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.'}
+        onClose={() => { setModal(null); setMensajeError(''); }}
+      />
 
     </div>
   );

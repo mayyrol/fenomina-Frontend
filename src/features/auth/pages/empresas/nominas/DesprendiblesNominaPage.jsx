@@ -1,57 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { FileText, ChevronLeft, UserRound, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useNominaStore } from '../../../../../store/useNominaStore';
+import payrollService from '../../../../../services/payrollService';
+import payrollAxios from '../../../../../api/payrollAxiosInstance';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import {
+  FileText, ChevronLeft, UserRound, Search,
+  Plus, Pencil, Trash2, ChevronDown, ChevronUp
+} from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-
-const MOCK_PROCESO = {
-  nombreEmpresa: 'PRIIGO SAS',
-  nit: '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo: '1 al 15 de Diciembre de 2026',
-  mes: 'Diciembre',
-  estadoProceso: 'Borrador',
-  logoUrl: null, // reemplazar con URL del backend cuando esté disponible
-};
-
-const MOCK_EMPLEADOS = [
-  {
-    id: 1,
-    nombre: 'Juan Pérez',
-    documento: '123456',
-    cargo: 'Contador',
-    salario: 2500000,
-    diasLaborados: 30,
-    novedades: [
-      { id: 1, tipo: 'Hora extra diurna ordinaria', detalle: '20 horas × $13,021 = $260,416' },
-      { id: 2, tipo: 'Incapacidad origen común', detalle: 'Del 10/03 al 12/03 (3 días)' },
-    ],
-  },
-  {
-    id: 2,
-    nombre: 'María López',
-    documento: '789012',
-    cargo: 'Asistente',
-    salario: 1500000,
-    diasLaborados: 28,
-    novedades: [],
-  },
-  {
-    id: 3,
-    nombre: 'Carlos Martínez',
-    documento: '345678',
-    cargo: 'Analista',
-    salario: 2000000,
-    diasLaborados: 30,
-    novedades: [
-      { id: 3, tipo: 'Bonificación por desempeño', detalle: '$150.000' },
-    ],
-  },
-];
+import * as XLSX from 'xlsx';
 
 const formatMiles = (valor) => {
   const str = String(Math.round(valor));
@@ -66,25 +28,68 @@ export default function DesprendiblesNominaPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [empleados, setEmpleados]                               = useState(MOCK_EMPLEADOS);
-  const [busqueda, setBusqueda]                                 = useState('');
-  const [expandidos, setExpandidos]                             = useState({});
-  const [modal, setModal]                                       = useState(null);
+  const [proceso,      setProceso]      = useState(null);
+  const [empresa,      setEmpresa]      = useState(null);
+  const [empleados,    setEmpleados]    = useState([]);
+  const [novedades,    setNovedades]    = useState({});
+  const [cargando,     setCargando]     = useState(false);
+  const [busqueda,     setBusqueda]     = useState('');
+  const [expandidos,   setExpandidos]   = useState({});
+  const [modal,        setModal]        = useState(null);
+  const [novedadEliminar,          setNovedadEliminar]          = useState(null);
   const [confirmarEliminarNovedad, setConfirmarEliminarNovedad] = useState(false);
-  const [confirmarCerrar, setConfirmarCerrar]                   = useState(false);
-  const [confirmarAnular, setConfirmarAnular]                   = useState(false);
-  const [confirmarEliminar, setConfirmarEliminar]               = useState(false);
-  const [novedadEliminar, setNovedadEliminar]                   = useState(null);
-  const [hoverCerrar, setHoverCerrar]                           = useState(false);
-  const [hoverAnular, setHoverAnular]                           = useState(false);
-  const [hoverEliminar, setHoverEliminar]                       = useState(false);
-  const [hoverPDF, setHoverPDF]                                 = useState(false);
-  const [descargando, setDescargando]                           = useState(false);
-  const [fueAnulado, setFueAnulado]                             = useState(false);
-  const empleadosFiltrados = empleados.filter(e =>
-    e.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    e.documento.includes(busqueda)
-  );
+  const [confirmarCerrar,          setConfirmarCerrar]          = useState(false);
+  const [confirmarAnular,          setConfirmarAnular]          = useState(false);
+  const [confirmarEliminar,        setConfirmarEliminar]        = useState(false);
+  const [hoverCerrar,   setHoverCerrar]   = useState(false);
+  const [hoverAnular,   setHoverAnular]   = useState(false);
+  const [hoverEliminar, setHoverEliminar] = useState(false);
+  const [hoverPDF,      setHoverPDF]      = useState(false);
+  const [descargando,   setDescargando]   = useState(false);
+  const [mensajeError, setMensajeError] = useState('');
+  const [pendienteNavegar, setPendienteNavegar] = useState(false);
+
+  useEffect(() => {
+    if (!nominaId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      payrollService.getProcesos(id),
+      payrollService.getEmpleadosActivos(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emps }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(nominaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+
+        const seleccionados = useNominaStore.getState().empleadosSeleccionados;
+        const empsAMostrar  = emps.filter(e =>
+          seleccionados.includes(e.empleadoId)
+        );
+        setEmpleados(empsAMostrar);
+
+        return Promise.all(
+          empsAMostrar.map(e =>
+            payrollAxios
+              .get(`/api/payroll/novedades/proceso/${nominaId}/empleado/${e.empleadoId}`)
+              .then(({ data }) => ({ empleadoId: e.empleadoId, data }))
+              .catch(() => ({ empleadoId: e.empleadoId, data: [] }))
+          )
+        );
+      })
+      .then((resultados) => {
+        const mapa = {};
+        resultados.forEach(({ empleadoId, data }) => {
+          mapa[empleadoId] = data;
+        });
+        setNovedades(mapa);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [nominaId, id]);
 
   const toggleExpandido = (empId) =>
     setExpandidos(prev => ({ ...prev, [empId]: !prev[empId] }));
@@ -94,63 +99,78 @@ export default function DesprendiblesNominaPage() {
     setConfirmarEliminarNovedad(true);
   };
 
-  const handleConfirmarEliminarNovedad = () => {
-    setEmpleados(empleados.map(e =>
-      e.id === novedadEliminar.empId
-        ? { ...e, novedades: e.novedades.filter(n => n.id !== novedadEliminar.novedadId) }
-        : e
-    ));
-    setConfirmarEliminarNovedad(false);
-    setModal('exito');
+  const handleConfirmarEliminarNovedad = async () => {
+    try {
+      await payrollAxios.delete(`/api/payroll/novedades/${novedadEliminar.novedadId}`);
+      setNovedades(prev => ({
+        ...prev,
+        [novedadEliminar.empId]: prev[novedadEliminar.empId]
+          .filter(n => n.novedadId !== novedadEliminar.novedadId),
+      }));
+      setConfirmarEliminarNovedad(false);
+      setModal('exito');
+    } catch {
+      setConfirmarEliminarNovedad(false);
+      setModal('error');
+    }
   };
 
-  const handleEditarDias    = (empId)            => navigate(`/empresas/${id}/nominas/${nominaId}/novedades?empleado=${empId}&tipo=dias`);
-  const handleEditarNovedad = (empId, novedadId) => navigate(`/empresas/${id}/nominas/${nominaId}/novedades?empleado=${empId}&novedad=${novedadId}`);
-  const handleAgregarNovedad= (empId)            => navigate(`/empresas/${id}/nominas/${nominaId}/novedades?empleado=${empId}`);
+  const handleEditarDias = (empId) =>
+    navigate(`/empresas/${id}/nominas/${nominaId}/novedades?empleado=${empId}&tipo=dias`);
 
-  const handleDescargarPDF = () => {
-    const doc = new jsPDF();
-    let y = 14;
+  const handleEditarNovedad = (empId, novId) =>
+    navigate(`/empresas/${id}/nominas/${nominaId}/novedades?empleado=${empId}&novedad=${novId}`);
 
-    // Logo en el reporte (solo si existe URL del backend)
-    if (MOCK_PROCESO.logoUrl) {
-      doc.addImage(MOCK_PROCESO.logoUrl, 'PNG', 14, y, 30, 30);
-      y += 34;
-    }
+  const handleAgregarNovedad = (empId) =>
+    navigate(`/empresas/${id}/nominas/${nominaId}/novedades?empleado=${empId}`);
 
-    // Encabezado
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text('Desprendibles Nómina', 14, y); y += 8;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Empresa: ${MOCK_PROCESO.nombreEmpresa}`, 14, y); y += 6;
-    doc.text(`NIT: ${MOCK_PROCESO.nit}`, 14, y); y += 6;
-    doc.text(`Periodo: ${MOCK_PROCESO.periodo}`, 14, y); y += 6;
-    doc.text(`Mes: ${MOCK_PROCESO.mes}`, 14, y); y += 6;
-    doc.text(`Estado: ${MOCK_PROCESO.estadoProceso}`, 14, y); y += 10;
+  const empleadosFiltrados = empleados.filter(e =>
+    `${e.nombresEmp} ${e.apellidosEmp}`.toLowerCase().includes(busqueda.toLowerCase()) ||
+    e.documentoEmp.includes(busqueda)
+  );
 
-    // Tabla
-    const filas = empleados.flatMap(e => {
-      const base = [e.nombre, e.documento, e.cargo, formatMiles(e.salario), String(e.diasLaborados)];
-      if (e.novedades.length === 0) return [[...base, '-', '-']];
-      return e.novedades.map(n => [...base, n.tipo, n.detalle]);
-    });
-
-    autoTable(doc, {
-      startY: y,
-      head: [['Nombre', 'Documento', 'Cargo', 'Salario', 'Días', 'Tipo novedad', 'Detalle']],
-      body: filas,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
-
+  const handleDescargarExcel = () => {
     setDescargando(true);
-    setTimeout(() => {
-      doc.save(`desprendibles_${MOCK_PROCESO.periodo.replace(/ /g, '_')}.pdf`);
-      setDescargando(false);
-    }, 100);
+
+    const filas = empleados.flatMap(emp => {
+      const novsEmp = novedades[emp.empleadoId] ?? [];
+      const dias = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? 30;
+
+      if (novsEmp.length === 0) {
+        return [{
+          'Nombre': `${emp.nombresEmp} ${emp.apellidosEmp}`,
+          'Documento': emp.documentoEmp,
+          'Cargo': emp.cargoEmp,
+          'Salario': emp.salarioBascMensual,
+          'Días laborados': dias,
+          'Tipo novedad': '-',
+          'Detalle': '-',
+        }];
+      }
+
+      return novsEmp.map(n => ({
+        'Nombre': `${emp.nombresEmp} ${emp.apellidosEmp}`,
+        'Documento': emp.documentoEmp,
+        'Cargo': emp.cargoEmp,
+        'Salario': emp.salarioBascMensual,
+        'Días laborados': dias,
+        'Tipo novedad': n.observaciones ?? n.nombreConcepto ?? `Novedad ${n.novedadId}`,
+        'Detalle': n.cantidadDiasNovedad
+          ? `${n.cantidadDiasNovedad} días`
+          : n.cantidadHorasNovedad
+          ? `${n.cantidadHorasNovedad} horas`
+          : n.valorRefNovedad
+          ? formatMiles(n.valorRefNovedad)
+          : '-',
+      }));
+    });
+
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Novedades');
+    XLSX.writeFile(wb, `novedades_nomina_${nominaId}.xlsx`);
+
+    setTimeout(() => setDescargando(false), 500);
   };
 
   return (
@@ -162,7 +182,7 @@ export default function DesprendiblesNominaPage() {
           <FileText size={18} color="#0B662A" />
           <div>
             <h2 style={styles.titulo}>Desprendibles Nómina</h2>
-            <p style={styles.subtitulo}>Ver desprendibles de nómina</p>
+            <p style={styles.subtitulo}>Gestión de novedades del proceso</p>
           </div>
         </div>
         <div style={styles.perfilBox}>
@@ -174,23 +194,37 @@ export default function DesprendiblesNominaPage() {
         </div>
       </div>
 
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
-
       {/* Info del proceso */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Desprendibles Nómina</h3>
-        <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Mes:</span><span style={styles.infoValor}>{MOCK_PROCESO.mes}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{MOCK_PROCESO.estadoProceso}</span></div>
-        </div>
+        {cargando ? (
+          <p style={{ color: '#A3A3A3' }}>Cargando información del proceso...</p>
+        ) : (
+          <div style={styles.infoGrid}>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Nombre Empresa:</span>
+              <span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>NIT:</span>
+              <span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Fecha de generación:</span>
+              <span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Periodo:</span>
+              <span style={styles.infoValor}>
+                {proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}
+              </span>
+            </div>
+            <div style={styles.infoFila}>
+              <span style={styles.infoLabel}>Estado proceso:</span>
+              <span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Buscador */}
@@ -208,56 +242,101 @@ export default function DesprendiblesNominaPage() {
 
       {/* Cards empleados */}
       <div style={styles.empleadosBox}>
-        {empleadosFiltrados.map((emp) => {
-          const expandido = expandidos[emp.id] ?? true;
+        {cargando ? (
+          <p style={{ textAlign: 'center', color: '#A3A3A3' }}>Cargando empleados...</p>
+        ) : empleadosFiltrados.map((emp) => {
+          const expandido = expandidos[emp.empleadoId] ?? true;
+          const novsEmp   = novedades[emp.empleadoId] ?? [];
+          const dias      = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? 30;
+
           return (
-            <div key={emp.id} style={styles.empCard}>
+            <div key={emp.empleadoId} style={styles.empCard}>
               <div style={styles.empHeader}>
                 <div>
-                  <span style={styles.empNombre}>{emp.nombre}</span>
-                  <span style={styles.empDoc}> ({emp.documento})</span>
+                  <span style={styles.empNombre}>
+                    {emp.nombresEmp} {emp.apellidosEmp}
+                  </span>
+                  <span style={styles.empDoc}> ({emp.documentoEmp})</span>
                 </div>
-                <button style={styles.iconBtn} onClick={() => toggleExpandido(emp.id)}>
-                  {expandido ? <ChevronUp size={16} color="#A3A3A3" /> : <ChevronDown size={16} color="#A3A3A3" />}
+                <button style={styles.iconBtn} onClick={() => toggleExpandido(emp.empleadoId)}>
+                  {expandido
+                    ? <ChevronUp size={16} color="#A3A3A3" />
+                    : <ChevronDown size={16} color="#A3A3A3" />}
                 </button>
               </div>
 
               {expandido && (
                 <>
                   <div style={styles.empInfo}>
-                    <span style={styles.empDetalle}>Cargo: {emp.cargo}</span>
+                    <span style={styles.empDetalle}>Cargo: {emp.cargoEmp}</span>
                     <span style={styles.empSeparador}>|</span>
-                    <span style={styles.empDetalle}>Salario: {formatMiles(emp.salario)}</span>
+                    <span style={styles.empDetalle}>
+                      Salario: {formatMiles(emp.salarioBascMensual)}
+                    </span>
                   </div>
 
                   <div style={styles.diasRow}>
-                    <span style={styles.empDetalle}>Días laborados: <strong>{emp.diasLaborados}</strong></span>
-                    <button style={styles.btnIconoVerde} onClick={() => handleEditarDias(emp.id)} title="Editar días laborados">
+                    <span style={styles.empDetalle}>
+                      Días laborados: <strong>{dias}</strong>
+                    </span>
+                    <button
+                      style={styles.btnIconoVerde}
+                      onClick={() => handleEditarDias(emp.empleadoId)}
+                      title="Editar días laborados"
+                    >
                       <Pencil size={13} color="#0B662A" />
                     </button>
                   </div>
 
                   <div style={styles.novedadesBox}>
-                    <p style={styles.novedadesTitulo}>Novedades registradas ({emp.novedades.length})</p>
-                    {emp.novedades.length === 0 ? (
+                    <p style={styles.novedadesTitulo}>
+                      Novedades registradas ({novsEmp.length})
+                    </p>
+                    {novsEmp.length === 0 ? (
                       <p style={styles.sinNovedades}>No hay novedades registradas</p>
                     ) : (
-                      emp.novedades.map((nov) => (
-                        <div key={nov.id} style={styles.novedadFila}>
+                      novsEmp.map((nov) => (
+                        <div key={nov.novedadId} style={styles.novedadFila}>
                           <div style={{ flex: 1 }}>
-                            <p style={styles.novedadTipo}>✓ {nov.tipo}</p>
-                            <p style={styles.novedadDetalle}>{nov.detalle}</p>
+                            <p style={styles.novedadTipo}>
+                              ✓ {nov.observaciones ?? nov.nombreConcepto ?? `Novedad ${nov.novedadId}`}
+                            </p>
+                            <p style={styles.novedadDetalle}>
+                              {nov.cantidadDiasNovedad
+                                ? `${nov.cantidadDiasNovedad} días`
+                                : nov.cantidadHorasNovedad
+                                ? `${nov.cantidadHorasNovedad} horas`
+                                : nov.valorRefNovedad
+                                ? formatMiles(nov.valorRefNovedad)
+                                : ''}
+                              {nov.fechaInicioAusen && nov.fechaFinAusen
+                                ? ` — Del ${nov.fechaInicioAusen} al ${nov.fechaFinAusen}`
+                                : ''}
+                            </p>
                           </div>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <button style={styles.btnAccionNovedad} onClick={() => handleEditarNovedad(emp.id, nov.id)}>Editar</button>
-                            <button style={{ ...styles.btnAccionNovedad, ...styles.btnEliminarNovedad }} onClick={() => handleEliminarNovedad(emp.id, nov.id)}>Eliminar</button>
+                            <button
+                              style={styles.btnAccionNovedad}
+                              onClick={() => handleEditarNovedad(emp.empleadoId, nov.novedadId)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              style={{ ...styles.btnAccionNovedad, ...styles.btnEliminarNovedad }}
+                              onClick={() => handleEliminarNovedad(emp.empleadoId, nov.novedadId)}
+                            >
+                              Eliminar
+                            </button>
                           </div>
                         </div>
                       ))
                     )}
                   </div>
 
-                  <button style={styles.btnAgregarNovedad} onClick={() => handleAgregarNovedad(emp.id)}>
+                  <button
+                    style={styles.btnAgregarNovedad}
+                    onClick={() => handleAgregarNovedad(emp.empleadoId)}
+                  >
                     <Plus size={13} color="#0B662A" />
                     <span>Agregar novedad</span>
                   </button>
@@ -268,30 +347,46 @@ export default function DesprendiblesNominaPage() {
         })}
       </div>
 
-      {/* Descargar PDF */}
+      {/* Descargar excel borrador */}
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
         <button
-          style={{ ...styles.btnPDF, background: hoverPDF ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
+          style={{
+            ...styles.btnPDF,
+            background: hoverPDF
+              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
+              : '#0B662A',
+            transition: 'background 0.3s ease',
+          }}
           onMouseEnter={() => setHoverPDF(true)}
           onMouseLeave={() => setHoverPDF(false)}
-          onClick={handleDescargarPDF}
+          onClick={handleDescargarExcel}
         >
-          Descargar reporte en PDF
+          Descargar reporte en Excel
         </button>
       </div>
 
       {/* Acciones */}
       <div style={styles.accionesBar}>
         <button
-          style={{ ...styles.btnCerrar, background: hoverCerrar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
+          style={{
+            ...styles.btnCerrar,
+            background: hoverCerrar
+              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
+              : '#0B662A',
+            transition: 'background 0.3s ease',
+          }}
           onMouseEnter={() => setHoverCerrar(true)}
           onMouseLeave={() => setHoverCerrar(false)}
-          onClick={() => navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`)}
+          onClick={() => setConfirmarCerrar(true)}
         >
           Cerrar proceso
         </button>
         <button
-          style={{ ...styles.btnAnular, transition: 'background 0.3s ease', ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}) }}
+          style={{
+            ...styles.btnAnular,
+            transition: 'background 0.3s ease',
+            ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}),
+          }}
           onMouseEnter={() => setHoverAnular(true)}
           onMouseLeave={() => setHoverAnular(false)}
           onClick={() => setConfirmarAnular(true)}
@@ -299,35 +394,206 @@ export default function DesprendiblesNominaPage() {
           Anular
         </button>
         <button
-          style={{ ...styles.btnEliminar, transition: 'background 0.3s ease', ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}) }}
+          style={{
+            ...styles.btnEliminar,
+            transition: 'background 0.3s ease',
+            ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}),
+          }}
           onMouseEnter={() => setHoverEliminar(true)}
           onMouseLeave={() => setHoverEliminar(false)}
           onClick={() => setConfirmarEliminar(true)}
         >
           Eliminar
         </button>
+        <button
+          style={styles.btnAnular}
+          onClick={() => navigate(`/empresas/${id}/nominas`)}
+        >
+          Cancelar
+        </button>
       </div>
 
       {/* Modales */}
-      <ConfirmarCambiosModal visible={confirmarEliminarNovedad} onCancelar={() => setConfirmarEliminarNovedad(false)} onConfirmar={handleConfirmarEliminarNovedad} titulo="¿Deseas eliminar esta novedad?" descripcion="La novedad será removida del desprendible de este empleado." />
-      <ConfirmarCambiosModal visible={confirmarCerrar} onCancelar={() => setConfirmarCerrar(false)} onConfirmar={() => { setConfirmarCerrar(false); setModal('exito'); }} titulo="¿Deseas cerrar este proceso de nómina?" descripcion="Al cerrar el proceso, el estado cambiará a Cerrado y no podrá editarse." />
-      <ConfirmarCambiosModal visible={confirmarAnular} onCancelar={() => setConfirmarAnular(false)} onConfirmar={() => { setConfirmarAnular(false); setFueAnulado(true); setModal('exito'); }}titulo="¿Estás seguro de que deseas anular este proceso?" descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo." tipo="error" />
-      <ConfirmarCambiosModal visible={confirmarEliminar} onCancelar={() => setConfirmarEliminar(false)} onConfirmar={() => { setConfirmarEliminar(false); navigate(-1); }} titulo="¿Deseas eliminar este proceso de nómina?" descripcion="Esta acción registrará la fecha de eliminación y el proceso dejará de mostrarse en la lista." />
-      <MensajeModal tipo={modal} onClose={() => { setModal(null); if (fueAnulado) navigate(-1); }} />
+      <ConfirmarCambiosModal
+        visible={confirmarEliminarNovedad}
+        onCancelar={() => setConfirmarEliminarNovedad(false)}
+        onConfirmar={handleConfirmarEliminarNovedad}
+        titulo="¿Deseas eliminar esta novedad?"
+        descripcion="La novedad será removida del proceso."
+      />
 
-      {/* Modal descarga en curso */}
+      <ConfirmarCambiosModal
+        visible={confirmarCerrar}
+        onCancelar={() => setConfirmarCerrar(false)}
+        onConfirmar={async () => {
+          const diasStore = useNominaStore.getState().diasLaborados;
+          const esQuincenal = proceso?.tipoProceso === 'NOMINA_QUINCENAL';
+          const maxDias = esQuincenal ? 15 : 30;
+
+          const fechaInicioPeriodo = new Date(proceso.fechaInicioPeriodo + 'T00:00:00');
+          const fechaFinPeriodo = new Date(proceso.fechaFinPeriodo + 'T00:00:00');
+          const calcularDiasComerciales = (inicio, fin) => {
+            const meses = (fin.getFullYear() - inicio.getFullYear()) * 12
+              + (fin.getMonth() - inicio.getMonth());
+
+            // Si fin es el último día del mes, contar como día 30
+            const ultimoDiaMesFin = new Date(fin.getFullYear(), fin.getMonth() + 1, 0).getDate();
+            const diaFin = fin.getDate() === ultimoDiaMesFin ? 30 : Math.min(fin.getDate(), 30);
+            const diaInicio = Math.min(inicio.getDate(), 30);
+
+            return meses * 30 + (diaFin - diaInicio) + 1;
+          };
+
+          const diasDelPeriodo = calcularDiasComerciales(fechaInicioPeriodo, fechaFinPeriodo);
+          console.log('fechaInicioPeriodo:', fechaInicioPeriodo);
+          console.log('fechaFinPeriodo:', fechaFinPeriodo);
+          console.log('fin.getDate():', fechaFinPeriodo.getDate());
+          console.log('ultimoDiaMesFin:', new Date(fechaFinPeriodo.getFullYear(), fechaFinPeriodo.getMonth() + 1, 0).getDate());
+          console.log('diasDelPeriodo calculado:', diasDelPeriodo);
+          for (const emp of empleados) {
+            // Si no hay valor en el store, asumir 30 (valor por defecto)
+            const diasIngresados = diasStore[emp.empleadoId] ?? 30;
+
+            // Validar máximo según tipo de proceso
+            if (Number(diasIngresados) > maxDias) {
+              setMensajeError(
+                `${emp.nombresEmp} ${emp.apellidosEmp} tiene ${diasIngresados} días laborados registrados, pero el máximo para nómina ${esQuincenal ? 'quincenal' : 'mensual'} es ${maxDias} días. Por favor ingresa a novedades y corrige los días laborados.`
+              );
+              setModal('error');
+              setConfirmarCerrar(false);
+              return;
+            }
+
+            // Validar días laborados vs días reales del periodo
+            if (Number(diasIngresados) > diasDelPeriodo) {
+              setMensajeError(
+                `${emp.nombresEmp} ${emp.apellidosEmp} tiene ${diasIngresados} días laborados pero el periodo solo cubre ${diasDelPeriodo} días (${proceso.fechaInicioPeriodo} - ${proceso.fechaFinPeriodo}).`
+              );
+              setModal('error');
+              setConfirmarCerrar(false);
+              return;
+            }
+
+            // Validar días laborados vs fecha de ingreso
+            if (emp.fechaIngresoEmp) {
+              const fechaIngreso = new Date(emp.fechaIngresoEmp + 'T00:00:00');
+              if (fechaIngreso > fechaInicioPeriodo && fechaIngreso <= fechaFinPeriodo) {
+                const diasValidos = Math.round(
+                  (fechaFinPeriodo - fechaIngreso) / (1000 * 60 * 60 * 24)
+                ) + 1;
+                if (Number(diasIngresados) > diasValidos) {
+                  setMensajeError(
+                    `${emp.nombresEmp} ${emp.apellidosEmp} ingresó el ${emp.fechaIngresoEmp}. Los días laborados no pueden superar ${diasValidos} días válidos del periodo.`
+                  );
+                  setModal('error');
+                  setConfirmarCerrar(false);
+                  return;
+                }
+              }
+            }
+          }
+
+          try {
+              const { data } = await payrollService.cambiarEstado(nominaId, 'CERRADO');
+              setConfirmarCerrar(false);
+
+              if (data.advertencias && data.advertencias.length > 0) {
+                  setMensajeError(
+                      'El proceso fue cerrado con las siguientes advertencias:\n\n' +
+                      data.advertencias.join('\n\n')
+                  );
+                  setPendienteNavegar(true);
+                  setModal('advertencia');
+                  // Navegar después de que el usuario cierre el modal
+              } else {
+                  navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+              }
+          } catch {
+              setConfirmarCerrar(false);
+              setModal('error');
+          }
+        }}
+        titulo="¿Deseas cerrar este proceso de nómina?"
+        descripcion="Al cerrar el proceso, el estado cambiará a Cerrado y no podrá editarse."
+      />
+
+      <ConfirmarCambiosModal
+        visible={confirmarAnular}
+        onCancelar={() => setConfirmarAnular(false)}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(nominaId, 'ANULADO');
+            useNominaStore.getState().limpiarProceso();
+            setConfirmarAnular(false);
+            navigate(-1);
+          } catch {
+            setConfirmarAnular(false);
+            setModal('error');
+          }
+        }}
+        titulo="¿Estás seguro de que deseas anular este proceso?"
+        descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo."
+        tipo="error"
+      />
+
+      <ConfirmarCambiosModal
+        visible={confirmarEliminar}
+        onCancelar={() => setConfirmarEliminar(false)}
+        onConfirmar={async () => {
+          try {
+            await payrollService.eliminarProceso(nominaId);
+            useNominaStore.getState().limpiarProceso();
+            setConfirmarEliminar(false);
+            navigate(-1);
+          } catch {
+            setConfirmarEliminar(false);
+            setModal('error');
+          }
+        }}
+        titulo="¿Deseas eliminar este proceso de nómina?"
+        descripcion="Esta acción eliminará el proceso y todas sus novedades asociadas."
+      />
+
+      <MensajeModal
+        tipo={modal}
+        mensaje={mensajeError || undefined}
+        onClose={() => {
+            setModal(null);
+            setMensajeError('');
+            if (pendienteNavegar) {
+                setPendienteNavegar(false);
+                navigate(`/empresas/${id}/nominas/${nominaId}/liquidar`);
+            }
+        }}
+      />
+
+      {/* Modal descarga */}
       {descargando && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '40px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#E8F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+        }}>
+          <div style={{
+            backgroundColor: '#fff', borderRadius: '16px', padding: '40px 48px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: '16px', maxWidth: '320px', textAlign: 'center',
+          }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%',
+              backgroundColor: '#E8F5EE', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
               <FileText size={28} color="#0B662A" />
             </div>
-            <p style={{ fontSize: '16px', fontWeight: '800', color: '#272525', margin: 0 }}>Descarga en curso</p>
-            <p style={{ fontSize: '13px', color: '#A3A3A3', margin: 0 }}>La descarga de los desprendibles tomará unos segundos.</p>
+            <p style={{ fontSize: '16px', fontWeight: '800', color: '#272525', margin: 0 }}>
+              Descarga en curso
+            </p>
+            <p style={{ fontSize: '13px', color: '#A3A3A3', margin: 0 }}>
+              La descarga tomará unos segundos.
+            </p>
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -341,7 +607,7 @@ const styles = {
   avatar:             { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre:       { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:        { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:          { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   card:               { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
   cardTitulo:         { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 20px 0' },
   infoGrid:           { display: 'flex', flexDirection: 'column', gap: '10px' },

@@ -11,9 +11,6 @@ const parametrosService = {
   getParametroById: (id) =>
     masterAxios.get(`/api/master/parametros/${id}`),
 
-  // POST /api/master/parametros
-  // body: { nombreParamGeneral, descripcionParam, fechaParamGeneral,
-  //         valorParamGeneral | porcentajeParamGeneral }
   crearParametro: (parametroDTO) =>
     masterAxios.post('/api/master/parametros', parametroDTO),
 };

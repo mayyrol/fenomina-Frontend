@@ -1,17 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, ChevronLeft, UserRound } from 'lucide-react';
+import { Coins, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
+import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import MensajeModal from '../../../../../components/MensajeModal';
 
-
-const MOCK_PROCESO = {
-  nombreEmpresa:   'PRIIGO SAS',
-  nit:             '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo:         '2025',
-  estado:          'Cerrado',
-};
 
 export default function LiquidarCesantiasPage() {
   const navigate              = useNavigate();
@@ -24,6 +20,36 @@ export default function LiquidarCesantiasPage() {
   const [confirmarLiquidar, setConfirmarLiquidar] = useState(false);
   const [hoverLiquidar, setHoverLiquidar]         = useState(false);
   const [hoverCancelar, setHoverCancelar]         = useState(false);
+
+  const [proceso,  setProceso]  = useState(null);
+  const [empresa,  setEmpresa]  = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [modal,    setModal]    = useState(null);
+
+ 
+
+  useEffect(() => {
+    const state = useCesantiaStore.getState();
+    console.log('Estado del store de cesantías:', state);
+    console.log('Empleados seleccionados:', state.empleadosSeleccionados);
+    console.log('sessionStorage cesantia-store:', sessionStorage.getItem('cesantia-store'));
+    if (!cesantiaId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      payrollService.getProcesosCesantias(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(cesantiaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [cesantiaId, id]);
 
   return (
     <div style={styles.container}>
@@ -42,18 +68,14 @@ export default function LiquidarCesantiasPage() {
         </div>
       </div>
 
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-      </button>
-
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Liquidar Cesantías e Intereses</h3>
         <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado:</span><span style={styles.infoValor}>{MOCK_PROCESO.estado}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{proceso?.anio ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
         </div>
         <hr style={styles.divider} />
       </div>
@@ -69,7 +91,7 @@ export default function LiquidarCesantiasPage() {
         <button
           style={{ ...styles.btnCancelar, background: hoverCancelar ? '#f5f5f5' : '#fff', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverCancelar(true)} onMouseLeave={() => setHoverCancelar(false)}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/empresas/${id}/cesantias`)}
         >
           Cancelar
         </button>
@@ -78,11 +100,54 @@ export default function LiquidarCesantiasPage() {
       <ConfirmarCambiosModal
         visible={confirmarLiquidar}
         onCancelar={() => setConfirmarLiquidar(false)}
-        onConfirmar={() => { setConfirmarLiquidar(false); navigate(`/empresas/${id}/cesantias/${cesantiaId}/resultado`); }}
+        onConfirmar={async () => {
+          setConfirmarLiquidar(false);
+          try {
+            const { procesoInteresesActual, empleadosSeleccionados } =
+              useCesantiaStore.getState();
+
+            let empleados = empleadosSeleccionados;
+            if (!empleados || empleados.length === 0) {
+              const { data: empleadosActivos } =
+                await payrollService.getEmpleadosActivos(id);
+              empleados = empleadosActivos.map(e => e.empleadoId);
+            }
+
+            await payrollService.liquidarCesantias(cesantiaId, {
+              empleadosSeleccionados: empleados,
+            });
+
+            let procesoIntereses = procesoInteresesActual;
+            if (!procesoIntereses) {
+              const { data: procesos } = await payrollService.getProcesosIntereses(id);
+              procesoIntereses = procesos.find(
+                p => p.anio === proceso?.anio &&
+                  p.estadoProcNomina !== 'ANULADO' &&
+                  p.estadoProcNomina !== 'PAGADO'
+              ) ?? null;
+            }
+
+            if (procesoIntereses) {
+              await payrollService.liquidarIntereses(
+                procesoIntereses.procesoLiquiId,
+                { empleadosSeleccionados: empleados }
+              );
+            }
+
+            useCesantiaStore.getState().limpiarProceso();
+            navigate(`/empresas/${id}/cesantias/${cesantiaId}/resultado`);
+          } catch {
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas calcular y liquidar estas cesantías?"
         descripcion="Una vez confirmes, se procesará la liquidación del periodo seleccionado."
       />
+
+      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
+        
     </div>
+    
   );
 }
 
@@ -95,7 +160,6 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '36px 40px' },
   cardTitulo:   { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 32px 0' },
   infoGrid:     { display: 'flex', flexDirection: 'column', gap: '14px' },

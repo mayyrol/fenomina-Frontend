@@ -33,7 +33,6 @@ import DesprendiblesPrimaPage from "../features/auth/pages/empresas/primas/Despr
 import LiquidarPrimaPage from "../features/auth/pages/empresas/primas/LiquidarPrimaPage";
 import ResultadoPrimaPage from "../features/auth/pages/empresas/primas/ResultadoPrimaPage";
 
-
 import CesantiasPage from "../features/auth/pages/empresas/cesantias/CesantiasPage";
 import GenerarReporteCesantiasPage from "../features/auth/pages/empresas/cesantias/GenerarReporteCesantiasPage";
 import VerCesantiaPage from "../features/auth/pages/empresas/cesantias/VerCesantiaPage";
@@ -41,6 +40,7 @@ import DesprendiblesCesantiasPage from "../features/auth/pages/empresas/cesantia
 import LiquidarCesantiasPage from "../features/auth/pages/empresas/cesantias/LiquidarCesantiasPage";
 import ResultadoCesantiasPage from "../features/auth/pages/empresas/cesantias/ResultadoCesantiasPage";
 
+// NUEVOS IMPORTS
 import ReportesPage from "../features/auth/pages/empresas/reportes/ReportesPage";
 import ProvisionesPage from "../features/auth/pages/empresas/reportes/ProvisionesPage";
 import ReportesEmpleadosPage from "../features/auth/pages/empresas/reportes/empleados/ReportesEmpleadosPage";
@@ -49,7 +49,6 @@ import ReportesPrimasPage from "../features/auth/pages/empresas/reportes/emplead
 import ReportesCesantiasPage from "../features/auth/pages/empresas/reportes/empleados/ReportesCesantiasPage";
 import ReportesConceptosPage from "../features/auth/pages/empresas/reportes/empleados/ReportesConceptosPage";
 import ReportesRetencionPage from "../features/auth/pages/empresas/reportes/empleados/ReportesRetencionPage";
-
 import LogsPage from '../features/auth/pages/LogsPage';
 
 function RutaRaiz() {
@@ -76,6 +75,8 @@ export default function AppRouter() {
               <Route path="/usuarios/crear" element={<CrearUsuarioPage />} />
               <Route path="/usuarios/:id" element={<VerUsuarioPage />} />
               <Route path="/usuarios/:id/editar" element={<EditarUsuarioPage />} />
+              {/* Parámetros */}
+              <Route path="/parametros" element={<ParametrosGeneralesPage />} />
             </Route>
 
             {/* Empresas */}
@@ -115,8 +116,6 @@ export default function AppRouter() {
             <Route path="/empresas/:id/cesantias/:cesantiaId/liquidar" element={<LiquidarCesantiasPage />} />
             <Route path="/empresas/:id/cesantias/:cesantiaId/resultado" element={<ResultadoCesantiasPage />} />
 
-
-
             {/* Reportes */}
             <Route path="/empresas/:id/reportes" element={<ReportesPage />} />
             <Route path="/empresas/:id/reportes/provisiones" element={<ProvisionesPage />} />
@@ -127,12 +126,8 @@ export default function AppRouter() {
             <Route path="/empresas/:id/reportes/empleados/conceptos" element={<ReportesConceptosPage />} />
             <Route path="/empresas/:id/reportes/empleados/retencion" element={<ReportesRetencionPage />} />
 
-            {/* Parámetros */}
-            <Route path="/parametros" element={<ParametrosGeneralesPage />} />
-
             {/* Logs */}
             <Route path="/logs" element={<LogsPage />} />
-
 
           </Route>
         </Route>

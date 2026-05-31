@@ -1,19 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, ChevronLeft, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
-
-
-const MOCK_PROCESO = {
-  nombreEmpresa:   'PRIIGO SAS',
-  nit:             '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo:         'Diciembre de 2026',
-  semestre:        'Segundo semestre',
-  estado:          'Cerrado',
-};
+import { usePrimaStore } from '../../../../../store/usePrimaStore';
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
 
 export default function LiquidarPrimaPage() {
   const navigate             = useNavigate();
@@ -26,6 +19,30 @@ export default function LiquidarPrimaPage() {
   const [confirmarLiquidar, setConfirmarLiquidar] = useState(false);
   const [hoverLiquidar, setHoverLiquidar]         = useState(false);
   const [hoverCancelar, setHoverCancelar]         = useState(false);
+
+  const [proceso,  setProceso]  = useState(null);
+  const [empresa,  setEmpresa]  = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [modal,    setModal]    = useState(null);
+
+  useEffect(() => {
+    if (!primaId || !id) return;
+    setCargando(true);
+
+    Promise.all([
+      payrollService.getProcesosPrima(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(primaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [primaId, id]);
 
   return (
     <div style={styles.container}>
@@ -48,22 +65,15 @@ export default function LiquidarPrimaPage() {
         </div>
       </div>
 
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
-
       {/* Card */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Liquidar Prima</h3>
         <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Semestre:</span><span style={styles.infoValor}>{MOCK_PROCESO.semestre}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado:</span><span style={styles.infoValor}>{MOCK_PROCESO.estado}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo}</span></div>
+          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
         </div>
         <hr style={styles.divider} />
       </div>
@@ -82,7 +92,7 @@ export default function LiquidarPrimaPage() {
           style={{ ...styles.btnCancelar, background: hoverCancelar ? '#f5f5f5' : '#fff', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverCancelar(true)}
           onMouseLeave={() => setHoverCancelar(false)}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/empresas/${id}/primas`)}
         >
           Cancelar
         </button>
@@ -91,10 +101,26 @@ export default function LiquidarPrimaPage() {
       <ConfirmarCambiosModal
         visible={confirmarLiquidar}
         onCancelar={() => setConfirmarLiquidar(false)}
-        onConfirmar={() => { setConfirmarLiquidar(false); navigate(`/empresas/${id}/primas/${primaId}/resultado`); }}
+        onConfirmar={async () => {
+          setConfirmarLiquidar(false);
+          try {
+            const { empleadosSeleccionados } = usePrimaStore.getState();
+
+            await payrollService.liquidarPrima(primaId, {
+              empleadosSeleccionados,
+            });
+
+            usePrimaStore.getState().limpiarProceso();
+            navigate(`/empresas/${id}/primas/${primaId}/resultado`);
+          } catch {
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas calcular y liquidar esta prima?"
         descripcion="Una vez confirmes, se procesará la liquidación del periodo seleccionado."
       />
+
+      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
 
     </div>
   );
@@ -109,7 +135,6 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '36px 40px' },
   cardTitulo:   { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 32px 0' },
   infoGrid:     { display: 'flex', flexDirection: 'column', gap: '14px' },

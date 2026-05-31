@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
-const masterAxios = axios.create({
-  baseURL: import.meta.env.VITE_MASTER_API_URL,
+const historicosAxios = axios.create({
+  baseURL: import.meta.env.VITE_HISTORICOS_API_URL,
   timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 let isRefreshing = false;
@@ -17,24 +20,18 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-masterAxios.interceptors.request.use(
+historicosAxios.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
-    if (config.url?.includes('/internal/')) {
-      config.headers['X-Internal-Api-Key'] = import.meta.env.VITE_INTERNAL_API_KEY;
-      delete config.headers.Authorization;
-    }
-
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-masterAxios.interceptors.response.use(
+historicosAxios.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
@@ -44,7 +41,7 @@ masterAxios.interceptors.response.use(
           failedQueue.push({ resolve, reject });
         }).then(token => {
           originalRequest.headers.Authorization = `Bearer ${token}`;
-          return masterAxios(originalRequest);
+          return historicosAxios(originalRequest);
         });
       }
       originalRequest._retry = true;
@@ -58,7 +55,7 @@ masterAxios.interceptors.response.use(
         useAuthStore.getState().setTokens(data.accessToken, data.refreshToken, data.expiresIn);
         processQueue(null, data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-        return masterAxios(originalRequest);
+        return historicosAxios(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
         useAuthStore.getState().logout();
@@ -72,4 +69,4 @@ masterAxios.interceptors.response.use(
   }
 );
 
-export default masterAxios;
+export default historicosAxios;

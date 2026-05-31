@@ -18,7 +18,7 @@ function Carpeta({ children }) {
       </foreignObject>
     </svg>
   );
-}
+}	
 
 const MODULOS = [
   {

@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, ChevronLeft, ChevronRight, UserRound, Calendar, ChevronDown } from 'lucide-react';
 import MensajeModal from '../../../../../components/MensajeModal';
-
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import { useNominaStore } from '../../../../../store/useNominaStore';
 
 // ── Calendario ──────────────────────────────────────────────────────────────
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY' }) {
@@ -89,14 +91,6 @@ function SelectMes({ value, onChange }) {
   );
 }
 
-// ── Mock empleados ────────────────────────────────────────────────────────────
-const MOCK_EMPLEADOS = [
-  { id: 1, nombres: 'Pepito',          apellidos: 'Perez',             fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 2, nombres: 'Carlos Andres',   apellidos: 'Rodriguez Ochoa',   fechaIngreso: '30/12/2023', documento: '10528967' },
-  { id: 3, nombres: 'Alejandra Maria', apellidos: 'Anibal Leon',        fechaIngreso: '30/11/2022', documento: '10528967' },
-  { id: 4, nombres: 'Carlos Alberto',  apellidos: 'Domingo Rodriguez',  fechaIngreso: '30/01/2023', documento: '10528967' },
-  { id: 5, nombres: 'Samuel',          apellidos: 'Martinez Ramos',     fechaIngreso: '30/01/2023', documento: '10528967' },
-];
 
 export default function GenerarReportePage() {
   const navigate    = useNavigate();
@@ -112,12 +106,16 @@ export default function GenerarReportePage() {
   const [seleccionados, setSeleccionados] = useState([]);
   const [modal, setModal]               = useState(null);
   const [hoverSeguir, setHoverSeguir]   = useState(false);
+  const [empleados,       setEmpleados]       = useState([]);
+  const [cargandoEmp,     setCargandoEmp]     = useState(false);
+  const [errorEmp,        setErrorEmp]        = useState(null);
+  const [mensajeError, setMensajeError] = useState('');
 
-  const todosSeleccionados = seleccionados.length === MOCK_EMPLEADOS.length;
+  const todosSeleccionados = seleccionados.length === empleados.length && empleados.length > 0;
 
   const toggleTodos = () => {
     if (todosSeleccionados) setSeleccionados([]);
-    else setSeleccionados(MOCK_EMPLEADOS.map(e => e.id));
+    else setSeleccionados(empleados.map(e => e.empleadoId));
   };
 
   const toggleEmpleado = (empId) => {
@@ -128,16 +126,85 @@ export default function GenerarReportePage() {
 
   const camposCompletos = fechaInicio && fechaFin && mesLiquidar && seleccionados.length > 0;
 
-  const handleSeguir = () => {
+  const handleSeguir = async () => {
     if (!camposCompletos) {
       setModal('error');
       return;
     }
-    // Genera un nominaId temporal (en backend vendrá del endpoint)
-    const nominaId = Date.now();
-    navigate(`/empresas/${id}/nominas/${nominaId}/desprendibles`);
+
+    try {
+      const [diaInicio, mesInicio, anioInicio] = fechaInicio.split('/');
+      const [diaFin,    mesFin,    anioFin]    = fechaFin.split('/');
+
+      const fechaInicioDate = new Date(anioInicio, mesInicio - 1, diaInicio);
+      const fechaFinDate    = new Date(anioFin, mesFin - 1, diaFin);
+      const diasPeriodo     = Math.round(
+        (fechaFinDate - fechaInicioDate) / (1000 * 60 * 60 * 24)
+      ) + 1;
+/* 
+      if (diasPeriodo < 12) {
+        setMensajeError(
+          `El periodo tiene ${diasPeriodo} día(s). El mínimo permitido es 12 días.`
+        );
+        setModal('error');
+        return;
+      }
+
+      if (diasPeriodo > 31) {
+        setMensajeError(
+          `El periodo tiene ${diasPeriodo} día(s). El máximo permitido es 31 días.`
+        );
+        setModal('error');
+        return;
+      }
+
+*/
+      const MESES_NUM = {
+        'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
+        'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12
+      };
+
+      const mesNum = MESES_NUM[mesLiquidar];
+
+      const payload = {
+        empresaId:   Number(id),
+        tipoProceso: 'NOMINA_MENSUAL',
+        anio:        Number(anioInicio),
+        periodo:     mesNum,
+        fechaInicio: `${anioInicio}-${mesInicio}-${diaInicio}`,
+        fechaFin:    `${anioFin}-${mesFin}-${diaFin}`,
+      };
+
+      console.log('payload enviado:', payload);
+
+      const { data } = await payrollService.crearProceso(payload);
+
+      // Guardar en el store para que las siguientes páginas los lean
+      useNominaStore.getState().setProcesoActual(data);
+      useNominaStore.getState().setEmpleadosSeleccionados(seleccionados);
+
+      navigate(`/empresas/${id}/nominas/${data.procesoLiquiId}/desprendibles`);
+    } catch (err) {
+      const mensaje = err?.response?.data?.mensaje 
+        ?? 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.';
+      setMensajeError(mensaje);
+      setModal('error');
+    }
   };
 
+
+
+  useEffect(() => {
+    if (!id) return;
+    setCargandoEmp(true);
+    masterAxios.get('/api/master/empleados', {
+      params: { empresaId: id, estado: 'ACTIVO' }
+    })
+      .then(({ data }) => setEmpleados(data))
+      .catch((err) => setErrorEmp(err))
+      .finally(() => setCargandoEmp(false));
+  }, [id]);
+  
   return (
     <div style={styles.container}>
 
@@ -221,17 +288,19 @@ export default function GenerarReportePage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_EMPLEADOS.map((emp, i) => (
-                <tr key={emp.id} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombres}</td>
-                  <td style={styles.td}>{emp.apellidos}</td>
-                  <td style={styles.td}>{emp.fechaIngreso}</td>
-                  <td style={styles.td}>{emp.documento}</td>
+              {cargandoEmp ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>Cargando empleados...</td></tr>
+              ) : empleados.map((emp, i) => (
+                <tr key={emp.empleadoId} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombresEmp}</td>
+                  <td style={styles.td}>{emp.apellidosEmp}</td>
+                  <td style={styles.td}>{emp.fechaIngresoEmp}</td>
+                  <td style={styles.td}>{emp.documentoEmp}</td>
                   <td style={styles.td}>
                     <input
                       type="checkbox"
-                      checked={seleccionados.includes(emp.id)}
-                      onChange={() => toggleEmpleado(emp.id)}
+                      checked={seleccionados.includes(emp.empleadoId)}
+                      onChange={() => toggleEmpleado(emp.empleadoId)}
                       style={styles.checkbox}
                     />
                   </td>
@@ -264,8 +333,8 @@ export default function GenerarReportePage() {
 
       <MensajeModal
         tipo={modal}
-        mensaje="Por favor completa todos los campos obligatorios y selecciona al menos un empleado."
-        onClose={() => setModal(null)}
+        mensaje={mensajeError || 'Por favor completa todos los campos obligatorios y selecciona al menos un empleado.'}
+        onClose={() => { setModal(null); setMensajeError(''); }}
       />
 
     </div>
@@ -281,7 +350,7 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '36px 40px' },
   cardTitulo:   { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 24px 0' },
   seccionTitulo:{ fontSize: '14px', fontWeight: '700', color: '#272525', margin: '0 0 16px 0' },
