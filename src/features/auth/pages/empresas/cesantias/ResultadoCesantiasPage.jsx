@@ -98,7 +98,7 @@ export default function ResultadoCesantiasPage() {
 
     autoTable(doc, {
       startY: y,
-      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS', 'FECHA INICIO', 'FECHA FIN', 'SALARIO BASE', 'AUX TRANSPORTE', 'BASE LIQ.', 'CESANTÍAS', 'INTERESES', 'FONDO DE CESANTÍAS']],
+      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS', 'FECHA INICIO', 'FECHA FIN', 'SALARIO BASE', 'BASE AUX TRANSP.', 'BASE LIQ.', 'CESANTÍAS', 'INTERESES DE CES.', 'FONDO DE CESANTÍAS']],
       body: [
         ...desprendibles.map((desp, i) => [
           i + 1,
@@ -166,7 +166,7 @@ export default function ResultadoCesantiasPage() {
 
       doc.text('Salario Base:', 14, cy);
       doc.text(fmt(desp.salarioBase), 70, cy); cy += 5;
-      doc.text('Auxilio de transporte:', 14, cy);
+      doc.text('Base Aux. de Transporte:', 14, cy);
       doc.text(fmt(desp.auxTransporte), 70, cy); cy += 5;
       doc.setFont(undefined, 'bold');
       doc.text('Cesantías (informativo):', 14, cy);
@@ -283,7 +283,7 @@ export default function ResultadoCesantiasPage() {
                 <th style={styles.th}>Fecha inicio</th>
                 <th style={styles.th}>Fecha fin</th>
                 <th style={styles.th}>Salario Base</th>
-                <th style={styles.th}>Aux. Transporte</th>
+                <th style={styles.th}>Base Aux. Transp.</th>
                 <th style={styles.th}>Base Liquidación</th>
                 <th style={styles.th}>Cesantías</th>
                 <th style={styles.th}>Intereses Cesantías</th>
@@ -391,7 +391,7 @@ export default function ResultadoCesantiasPage() {
                 <span style={styles.comprobanteValor}>{fmt(desp.salarioBase)}</span>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '2px' }}>
-                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>Auxilio de transporte:</span>
+                <span style={{ ...styles.comprobanteLabel, minWidth: '200px' }}>Base Aux. de transporte:</span>
                 <span style={styles.comprobanteValor}>{fmt(desp.auxTransporte)}</span>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '2px' }}>

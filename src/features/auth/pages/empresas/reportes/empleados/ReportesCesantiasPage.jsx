@@ -139,8 +139,9 @@ export default function ReportesCesantiasPage() {
                   <th style={styles.th}>Fecha inicio corte</th>
                   <th style={styles.th}>Fecha fin corte</th>
                   <th style={styles.th}>Días laborados</th>
-                  <th style={styles.th}>Salario base</th>
+                  <th style={styles.th}>Salario</th>
                   <th style={styles.th}>Salario base liqui.</th>
+                  <th style={styles.th}>Base Aux. transp.</th>
                   <th style={styles.th}>Cesantías</th>
                   <th style={styles.th}>Intereses cesantías</th>
                   <th style={styles.th}>Fondo de cesantías</th>
@@ -162,7 +163,7 @@ export default function ReportesCesantiasPage() {
               {cargando ? (
                 <tr><td colSpan={14} style={styles.tdCentro}>Cargando...</td></tr>
               ) : datosActivos.length === 0 ? (
-                <tr><td colSpan={14} style={styles.tdCentro}>Sin resultados</td></tr>
+                <tr><td colSpan={15} style={styles.tdCentro}>Sin resultados</td></tr>
               ) : datosActivos.map((r, index) => (
                 <tr key={index} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
                   {tabPrincipal === 'cesantias' && <>
@@ -177,6 +178,7 @@ export default function ReportesCesantiasPage() {
                     <td style={styles.td}>{r.diasLiquidados}</td>
                     <td style={styles.td}>{fmt(r.salarioBase)}</td>
                     <td style={styles.td}>{fmt(r.baseLiquiTotal)}</td>
+                    <td style={styles.td}>{fmt(r.promedioAuxTransporte)}</td>
                     <td style={styles.td}>{fmt(r.cesantias)}</td>
                     <td style={styles.td}>{fmt(r.interesesCesantias)}</td>
                     <td style={styles.td}>{r.fondoCesantiasEmp ?? '-'}</td>
