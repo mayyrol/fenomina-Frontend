@@ -397,7 +397,7 @@ const styles = {
   totalSub:         { fontSize: '12px', color: '#A3A3A3' },
   searchWrapper:    { position: 'relative', display: 'flex', alignItems: 'center', width: '320px', minWidth: '180px' },
   searchIcon:       { position: 'absolute', left: '12px' },
-  searchInput:      { width: '100%', padding: '9px 12px 9px 36px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', boxSizing: 'border-box' },
+  searchInput:      { width: '100%', padding: '9px 12px 9px 36px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontFamily: 'Nunito, sans-serif', boxSizing: 'border-box' },
   filaBotones:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
   creaLabel:        { fontSize: '14px', fontWeight: '800', color: '#272525' },
   btnCrear:         { color: '#ffffff', border: 'none', borderRadius: '8px', padding: '10px 60px', fontSize: '13px', fontWeight: '400', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', transition: 'background 0.3s ease' },

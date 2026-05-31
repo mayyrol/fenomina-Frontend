@@ -135,10 +135,17 @@ export default function GenerarReportePrimasPage() {
     );
   };
 
+  const anioActual = new Date().getFullYear();
+  const anioValido = anio && Number(anio) >= anioActual && Number(anio) <= anioActual + 1;
   const camposCompletos = anio && semestre && seleccionados.length > 0;
 
   const handleSeguir = async () => {
     if (!camposCompletos) { setModal('error'); return; }
+    if (!anioValido) {
+      setMensajeError(`El año ${anio} parece incorrecto. Verifica que sea ${anioActual} o ${anioActual + 1}.`);
+      setModal('error');
+      return;
+    }
 
     try {
       const esPrimerSemestre = SEMESTRE_A_PERIODO[semestre] === 1;
@@ -218,11 +225,16 @@ export default function GenerarReportePrimasPage() {
               type="number"
               value={anio}
               onChange={(e) => { setAnio(e.target.value); setAnioSeleccionado(e.target.value); }}
-              style={styles.input}
+              style={{ ...styles.input, borderColor: anio && !anioValido ? '#E53E3E' : '#D0D0D0' }}
               min={2000}
               max={2100}
               placeholder="Ej: 2026"
             />
+            {anio && !anioValido && (
+              <span style={{ fontSize: '12px', color: '#E53E3E', marginTop: '2px' }}>
+                Verifica el año: se esperaba {anioActual}–{anioActual + 1}
+              </span>
+            )}
           </div>
         </div>
       </div>

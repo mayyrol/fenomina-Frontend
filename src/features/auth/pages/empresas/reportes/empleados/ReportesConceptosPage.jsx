@@ -19,6 +19,8 @@ const TABS_PRINCIPAL = [
   { id: 'totalVacaciones', label: 'Total vacaciones'             },
 ];
 
+const TABS_EMPLEADO = new Set(['horasExtra', 'incapacidades', 'licencias', 'vacaciones']);
+
 const OPCIONES_PAGINA = [10, 25, 50];
 
 const TITULOS = {
@@ -42,37 +44,71 @@ export default function ReportesConceptosPage() {
 
   const [tabPrincipal, setTabPrincipal] = useState('horasExtra');
   const [busqueda,     setBusqueda]     = useState('');
+  const [anioFiltro,   setAnioFiltro]   = useState('');
+  const [fecha,        setFecha]         = useState('');
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
 
-  const handleTabPrincipal = (t) => { setTabPrincipal(t); setBusqueda(''); setPagina(0); };
+  const handleTabPrincipal = (t) => {
+    setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
+    setFecha(''); setPagina(0);
+  };
   const handlePorPagina    = (v) => { setPorPagina(v); setPagina(0); };
 
-  const baseParams = { empresaId: id, nombres: busqueda || undefined, page: pagina, size: porPagina };
-  const baseTotalParams = { empresaId: id, page: pagina, size: porPagina };
+  const paramsBase = { empresaId: id, page: 0, size: 500 };
 
-  const { datos: datosHoras,     total: totHoras,     cargando: cHoras }     = useHistoricos(historicosService.getHorasRecargosPorEmpleado, baseParams);
-  const { datos: datosTotHoras,  total: totTotHoras,  cargando: cTotHoras }  = useHistoricos(historicosService.getHorasRecargosConsolidado,  baseTotalParams);
-  const { datos: datosIncap,     total: totIncap,     cargando: cIncap }     = useHistoricos(historicosService.getIncapacidadesPorEmpleado,   baseParams);
-  const { datos: datosTotIncap,  total: totTotIncap,  cargando: cTotIncap }  = useHistoricos(historicosService.getIncapacidadesConsolidado,   baseTotalParams);
-  const { datos: datosLic,       total: totLic,       cargando: cLic }       = useHistoricos(historicosService.getLicenciasPorEmpleado,       baseParams);
-  const { datos: datosTotLic,    total: totTotLic,    cargando: cTotLic }    = useHistoricos(historicosService.getLicenciasConsolidado,       baseTotalParams);
-  const { datos: datosVac,       total: totVac,       cargando: cVac }       = useHistoricos(historicosService.getVacacionesPorEmpresa,       baseParams);
-  const { datos: datosTotVac,    total: totTotVac,    cargando: cTotVac }    = useHistoricos(historicosService.getVacacionesConsolidado,      baseTotalParams);
+  const { datos: datosHoras,    cargando: cHoras }    = useHistoricos(historicosService.getHorasRecargosPorEmpleado, paramsBase);
+  const { datos: datosTotHoras, cargando: cTotHoras } = useHistoricos(historicosService.getHorasRecargosConsolidado,  paramsBase);
+  const { datos: datosIncap,    cargando: cIncap }    = useHistoricos(historicosService.getIncapacidadesPorEmpleado,   paramsBase);
+  const { datos: datosTotIncap, cargando: cTotIncap } = useHistoricos(historicosService.getIncapacidadesConsolidado,   paramsBase);
+  const { datos: datosLic,      cargando: cLic }      = useHistoricos(historicosService.getLicenciasPorEmpleado,       paramsBase);
+  const { datos: datosTotLic,   cargando: cTotLic }   = useHistoricos(historicosService.getLicenciasConsolidado,       paramsBase);
+  const { datos: datosVac,      cargando: cVac }      = useHistoricos(historicosService.getVacacionesPorEmpresa,       paramsBase);
+  const { datos: datosTotVac,   cargando: cTotVac }   = useHistoricos(historicosService.getVacacionesConsolidado,      paramsBase);
+
+  const esTabEmpleado = TABS_EMPLEADO.has(tabPrincipal);
+
+  const filtrarDatos = (datos) => datos.filter(r => {
+    if (tabPrincipal === 'vacaciones') {
+      if (fecha && (r.fechaInicioVac ?? '') !== fecha && (r.fechaFinVac ?? '') !== fecha) return false;
+      if (busqueda) {
+        if (/^\d+$/.test(busqueda.trim())) {
+          if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
+        } else {
+          const nm = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
+          if (!nm.includes(busqueda.toLowerCase())) return false;
+        }
+      }
+    } else {
+      if (anioFiltro && !String(r.anio ?? '').startsWith(anioFiltro)) return false;
+      if (esTabEmpleado && busqueda) {
+        if (/^\d+$/.test(busqueda.trim())) {
+          if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
+        } else {
+          const nm = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
+          if (!nm.includes(busqueda.toLowerCase())) return false;
+        }
+      }
+    }
+    return true;
+  });
 
   const mapaData = {
-    horasExtra:      { datos: datosHoras,    total: totHoras,    cargando: cHoras    },
-    totalHoras:      { datos: datosTotHoras, total: totTotHoras, cargando: cTotHoras },
-    incapacidades:   { datos: datosIncap,    total: totIncap,    cargando: cIncap    },
-    totalIncap:      { datos: datosTotIncap, total: totTotIncap, cargando: cTotIncap },
-    licencias:       { datos: datosLic,      total: totLic,      cargando: cLic      },
-    totalLicencias:  { datos: datosTotLic,   total: totTotLic,   cargando: cTotLic   },
-    vacaciones:      { datos: datosVac,      total: totVac,      cargando: cVac      },
-    totalVacaciones: { datos: datosTotVac,   total: totTotVac,   cargando: cTotVac   },
+    horasExtra:      { rawDatos: datosHoras,    cargando: cHoras    },
+    totalHoras:      { rawDatos: datosTotHoras, cargando: cTotHoras },
+    incapacidades:   { rawDatos: datosIncap,    cargando: cIncap    },
+    totalIncap:      { rawDatos: datosTotIncap, cargando: cTotIncap },
+    licencias:       { rawDatos: datosLic,      cargando: cLic      },
+    totalLicencias:  { rawDatos: datosTotLic,   cargando: cTotLic   },
+    vacaciones:      { rawDatos: datosVac,      cargando: cVac      },
+    totalVacaciones: { rawDatos: datosTotVac,   cargando: cTotVac   },
   };
 
-  const { datos: datosActivos, total: totalActual, cargando } = mapaData[tabPrincipal];
-  const totalPaginas = Math.max(1, Math.ceil(totalActual / porPagina));
+  const { rawDatos, cargando } = mapaData[tabPrincipal];
+  const datosActivos  = filtrarDatos(rawDatos);
+  const totalFiltrado = datosActivos.length;
+  const totalPaginas  = Math.max(1, Math.ceil(totalFiltrado / porPagina));
+  const datosPagina   = datosActivos.slice(pagina * porPagina, (pagina + 1) * porPagina);
 
   const renderCabecera = () => {
     switch (tabPrincipal) {
@@ -296,17 +332,58 @@ export default function ReportesConceptosPage() {
 
       <div style={styles.toolbarCard}>
         <div>
-          <p style={styles.totalNum}>{totalActual}</p>
+          <p style={styles.totalNum}>{totalFiltrado}</p>
           <p style={styles.totalLabel}>Total registros</p>
         </div>
-        <div style={styles.searchBox}>
-          <Search size={14} color="#A3A3A3" />
-          <input
-            style={styles.searchInput}
-            placeholder="Buscar por nombre o documento"
-            value={busqueda}
-            onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
-          />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {tabPrincipal === 'vacaciones' ? (
+            <>
+              <div style={styles.searchBox}>
+                <Search size={14} color="#A3A3A3" />
+                <input
+                  style={styles.searchInput}
+                  placeholder="Buscar por nombre o n° de documento"
+                  value={busqueda}
+                  onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+                />
+              </div>
+              <div style={styles.fechaBox}>
+                <span style={styles.fechaLabel}>Fecha</span>
+                <input
+                  type="date"
+                  style={styles.fechaInput}
+                  value={fecha}
+                  onChange={(e) => { setFecha(e.target.value); setPagina(0); }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {esTabEmpleado && (
+                <div style={styles.searchBox}>
+                  <Search size={14} color="#A3A3A3" />
+                  <input
+                    style={styles.searchInput}
+                    placeholder="Buscar por nombre o n° de documento"
+                    value={busqueda}
+                    onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+                  />
+                </div>
+              )}
+              <div style={styles.fechaBox}>
+                <span style={styles.fechaLabel}>Año</span>
+                <div style={styles.filtroInputBox}>
+                  <input
+                    type="text"
+                    style={styles.filtroInput}
+                    placeholder="Ej: 2026"
+                    value={anioFiltro}
+                    onChange={(e) => { setAnioFiltro(e.target.value); setPagina(0); }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -335,9 +412,9 @@ export default function ReportesConceptosPage() {
             <tbody>
               {cargando ? (
                 <tr><td colSpan={24} style={styles.tdCentro}>Cargando...</td></tr>
-              ) : datosActivos.length === 0 ? (
+              ) : datosPagina.length === 0 ? (
                 <tr><td colSpan={24} style={styles.tdCentro}>Sin resultados</td></tr>
-              ) : datosActivos.map((r, index) => renderFila(r, index))}
+              ) : datosPagina.map((r, index) => renderFila(r, index))}
             </tbody>
           </table>
         </div>
@@ -367,11 +444,16 @@ const styles = {
   perfilNombre:    { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:     { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
   volverBtn:       { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
-  toolbarCard:     { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  toolbarCard:     { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   totalNum:        { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:      { fontSize: '12px', color: '#A3A3A3', margin: 0 },
-  searchBox:       { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '320px' },
-  searchInput:     { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  searchBox:       { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '300px' },
+  searchInput:     { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  filtroInputBox:  { display: 'flex', alignItems: 'center', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '100px' },
+  filtroInput:     { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  fechaBox:        { display: 'flex', flexDirection: 'column', gap: '4px' },
+  fechaLabel:      { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
+  fechaInput:      { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', boxShadow: 'none', backgroundColor: '#fff', cursor: 'pointer', color: '#272525' },
   tabsRow:         { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8' },
   tabsBox:         { display: 'flex', flexWrap: 'wrap' },
   tab:             { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 16px', fontSize: '13px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },

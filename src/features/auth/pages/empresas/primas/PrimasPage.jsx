@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { CreditCard, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X } from 'lucide-react';
+import { CreditCard, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
@@ -70,9 +70,8 @@ export default function PrimasPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [tab, setTab]                           = useState('Borrador');
-  const [busqueda, setBusqueda]                 = useState('');
-  const [pagina, setPagina]                     = useState(0);
+  const [tab, setTab]       = useState('Borrador');
+  const [pagina, setPagina] = useState(0);
   const [periodos,  setPeriodos]  = useState([]);
   const [cargando,  setCargando]  = useState(false);
   const [modal, setModal]                       = useState(null);
@@ -82,6 +81,8 @@ export default function PrimasPage() {
   const [cambioEstado, setCambioEstado]         = useState({ periodoId: null, nuevoEstado: null });
   const [periodoEliminar, setPeriodoEliminar]   = useState(null);
   const [hoverLiquidar, setHoverLiquidar]       = useState(false);
+  const [hoverTab, setHoverTab]                 = useState(null);
+  const [hoverIcon, setHoverIcon]               = useState(null);
 
   const [fechaBusqueda, setFechaBusqueda] = useState('');
   const [itemsPerPage, setItemsPerPage]   = useState(10);
@@ -98,7 +99,6 @@ export default function PrimasPage() {
   const periodosFiltrados = periodos.filter(p => {
     if (p.deletedAt) return false;
     if (ESTADO_LABEL[p.estadoProcNomina] !== tab) return false;
-    if (busqueda && !p.fechaInicioPeriodo?.includes(busqueda) && !p.fechaFinPeriodo?.includes(busqueda)) return false;
     if (fechaBusqueda) {
       const matchInicio   = (p.fechaInicioPeriodo ?? '').slice(0, 10) === fechaBusqueda;
       const matchCreacion = (p.createdAt ?? '').slice(0, 10) === fechaBusqueda;
@@ -198,13 +198,13 @@ export default function PrimasPage() {
           <p style={styles.totalLabel}>Total reportes</p>
         </div>
         <div style={styles.filtrosBox}>
-          <div style={styles.searchBox}>
-            <Search size={14} color="#A3A3A3" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={styles.fechaLabel}>Fecha</span>
             <input
-              style={styles.searchInput}
-              placeholder="Buscar prima por palabra clave"
-              value={busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+              type="date"
+              style={styles.dateInput}
+              value={fechaBusqueda}
+              onChange={(e) => { setFechaBusqueda(e.target.value); setPagina(0); }}
             />
           </div>
         </div>
@@ -227,7 +227,17 @@ export default function PrimasPage() {
       <div style={styles.tabsBox}>
         <div style={{ display: 'flex' }}>
           {TABS.map((t) => (
-            <button key={t} style={{ ...styles.tab, ...(tab === t ? styles.tabActivo : {}) }} onClick={() => { setTab(t); setPagina(0); }}>{t}</button>
+            <button
+              key={t}
+              style={{
+                ...styles.tab,
+                ...(tab === t ? styles.tabActivo : {}),
+                ...(hoverTab === t && tab !== t ? { color: '#555' } : {}),
+              }}
+              onMouseEnter={() => setHoverTab(t)}
+              onMouseLeave={() => setHoverTab(null)}
+              onClick={() => { setTab(t); setPagina(0); }}
+            >{t}</button>
           ))}
         </div>
         <div style={styles.porPaginaBox}>
@@ -298,12 +308,18 @@ export default function PrimasPage() {
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
                           {p.estadoProcNomina === 'BORRADOR' && (
                             <>
-                              <button style={styles.iconBtn}
+                              <button
+                                style={{ ...styles.iconBtn, background: hoverIcon === `${p.procesoLiquiId}-edit` ? '#E8F5EE' : 'none' }}
+                                onMouseEnter={() => setHoverIcon(`${p.procesoLiquiId}-edit`)}
+                                onMouseLeave={() => setHoverIcon(null)}
                                 onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/desprendibles`)}
                                 title="Editar">
                                 <Pencil size={16} color="#0B662A" />
                               </button>
-                              <button style={styles.iconBtn}
+                              <button
+                                style={{ ...styles.iconBtn, background: hoverIcon === `${p.procesoLiquiId}-del` ? '#FFF0F0' : 'none' }}
+                                onMouseEnter={() => setHoverIcon(`${p.procesoLiquiId}-del`)}
+                                onMouseLeave={() => setHoverIcon(null)}
                                 onClick={() => handleEliminar(p)}
                                 title="Eliminar">
                                 <Trash2 size={16} color="#E53E3E" />
@@ -311,14 +327,20 @@ export default function PrimasPage() {
                             </>
                           )}
                           {p.estadoProcNomina === 'CERRADO' && (
-                            <button style={styles.iconBtn}
+                            <button
+                              style={{ ...styles.iconBtn, background: hoverIcon === `${p.procesoLiquiId}-liq` ? '#E8F5EE' : 'none' }}
+                              onMouseEnter={() => setHoverIcon(`${p.procesoLiquiId}-liq`)}
+                              onMouseLeave={() => setHoverIcon(null)}
                               onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/liquidar`)}
                               title="Liquidar">
                               <Upload size={16} color="#0B662A" />
                             </button>
                           )}
                           {['PENDIENTE_PAGO', 'PAGADO'].includes(p.estadoProcNomina) && (
-                            <button style={styles.iconBtn}
+                            <button
+                              style={{ ...styles.iconBtn, background: hoverIcon === `${p.procesoLiquiId}-ver` ? '#E8F5EE' : 'none' }}
+                              onMouseEnter={() => setHoverIcon(`${p.procesoLiquiId}-ver`)}
+                              onMouseLeave={() => setHoverIcon(null)}
                               onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/resultado`)}
                               title="Ver reportes">
                               <Eye size={16} color="#0B662A" />
@@ -384,8 +406,8 @@ const styles = {
   addBar:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px' },
   addLabel:     { fontSize: '15px', fontWeight: '700', color: '#272525' },
   btnLiquidar:  { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  tabsBox:      { display: 'flex', borderBottom: '1px solid #E8E8E8' },
-  tab:          { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  tabsBox:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8' },
+  tab:          { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', transition: 'color 0.15s ease, border-color 0.15s ease' },
   tabActivo:    { color: '#0B662A', borderBottom: '2px solid #0B662A' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '24px' },
   tableTitle:   { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 16px 0' },
@@ -401,9 +423,8 @@ const styles = {
   pageBtnActivo:{ backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
   toolbarCard:  { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   filtrosBox:   { display: 'flex', alignItems: 'center', gap: '12px' },
-  searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
-  searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
-  iconBtn:      { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },
+  fechaLabel:   { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
+  iconBtn:      { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', transition: 'background 0.15s ease' },
   dateWrapper:    { display: 'flex', alignItems: 'center', gap: '4px' },
   clearDateBtn:   { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' },
   dateInput:      { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', cursor: 'pointer', color: '#272525' },

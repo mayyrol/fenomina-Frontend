@@ -258,7 +258,7 @@ const styles = {
   campoBox:     { flex: 1, minWidth: '180px', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' },
   label:        { fontSize: '13px', fontWeight: '600', color: '#272525' },
   req:          { color: '#E53E3E' },
-  select:       { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '11px 36px 11px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', WebkitAppearance: 'none', backgroundColor: '#fff', color: '#272525', cursor: 'pointer', boxSizing: 'border-box' },
+  select:       { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '11px 36px 11px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none', backgroundColor: '#fff', color: '#272525', cursor: 'pointer', boxSizing: 'border-box' },
   tabla:        { width: '100%', borderCollapse: 'collapse', minWidth: '600px' },
   th:           { fontSize: '12px', fontWeight: '700', color: '#A3A3A3', padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #F0F0F0', whiteSpace: 'nowrap' },
   td:           { fontSize: '13px', color: '#272525', padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' },

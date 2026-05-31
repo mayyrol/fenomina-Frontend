@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Banknote, ChevronLeft, UserRound, Search } from 'lucide-react';
+import { Banknote, ChevronLeft, UserRound, Search, X } from 'lucide-react';
 import { useHistoricos } from "../../../hooks/useHistoricos";
 import historicosService from '../../../../../services/historicosService';
 
@@ -33,34 +33,56 @@ export default function ProvisionesPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [tabActual,  setTabActual]  = useState('segSocEmpl');
-  const [busqueda,   setBusqueda]   = useState('');
-  const [pagina,     setPagina]     = useState(0);
-  const [porPagina,  setPorPagina]  = useState(10);
+  const [tabActual,   setTabActual]   = useState('segSocEmpl');
+  const [busqueda,    setBusqueda]    = useState('');
+  const [anioFiltro,  setAnioFiltro]  = useState('');
+  const [fechaFiltro, setFechaFiltro] = useState('');
+  const [pagina,      setPagina]      = useState(0);
+  const [porPagina,   setPorPagina]   = useState(10);
 
-  const handleTab       = (t) => { setTabActual(t); setBusqueda(''); setPagina(0); };
+  const handleTab       = (t) => { setTabActual(t); setBusqueda(''); setAnioFiltro(''); setFechaFiltro(''); setPagina(0); };
   const handlePorPagina = (v) => { setPorPagina(v); setPagina(0); };
 
-  const paramsEmpleado = { empresaId: id, nombres: busqueda || undefined, page: pagina, size: porPagina };
-  const paramsPeriodo  = { empresaId: id, page: pagina, size: porPagina };
+  // Trae todos los datos de una vez; el filtrado se hace en cliente
+  const paramsBase = { empresaId: id, page: 0, size: 500 };
 
-  const { datos: datosSegSocEmp,  total: totSSEmp,  cargando: cSSEmp  } = useHistoricos(historicosService.getSegSocialXEmpleado,     paramsEmpleado);
-  const { datos: datosSegSocTot,  total: totSSTot,  cargando: cSSTot  } = useHistoricos(historicosService.getSegSocialTotal,          paramsPeriodo);
-  const { datos: datosParafEmp,   total: totPEmp,   cargando: cPEmp   } = useHistoricos(historicosService.getAportesParafXEmpleado,   paramsEmpleado);
-  const { datos: datosParafTot,   total: totPTot,   cargando: cPTot   } = useHistoricos(historicosService.getAportesParafTotal,       paramsPeriodo);
-  const { datos: datosCargasTot,  total: totCTot,   cargando: cCTot   } = useHistoricos(historicosService.getCargasPrestacionales,    paramsPeriodo);
+  const { datos: datosSegSocEmp,  cargando: cSSEmp  } = useHistoricos(historicosService.getSegSocialXEmpleado,   paramsBase);
+  const { datos: datosSegSocTot,  cargando: cSSTot  } = useHistoricos(historicosService.getSegSocialTotal,        paramsBase);
+  const { datos: datosParafEmp,   cargando: cPEmp   } = useHistoricos(historicosService.getAportesParafXEmpleado, paramsBase);
+  const { datos: datosParafTot,   cargando: cPTot   } = useHistoricos(historicosService.getAportesParafTotal,     paramsBase);
+  const { datos: datosCargasTot,  cargando: cCTot   } = useHistoricos(historicosService.getCargasPrestacionales,  paramsBase);
+
+  const esDetalle = ['segSocEmpl', 'parafEmpl'].includes(tabActual);
+
+  // Filtrado cliente: año por prefijo, fecha exacta, nombre o documento
+  const filtrarDatos = (datos, tipo) => datos.filter(r => {
+    if (anioFiltro && !String(r.anio ?? '').startsWith(anioFiltro)) return false;
+    if (tipo === 'empleado') {
+      if (busqueda) {
+        if (/^\d+$/.test(busqueda.trim())) {
+          if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
+        } else {
+          const nombre = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
+          if (!nombre.includes(busqueda.toLowerCase())) return false;
+        }
+      }
+      if (fechaFiltro && (r.fechaIngresoEmp ?? '').slice(0, 10) !== fechaFiltro) return false;
+    }
+    return true;
+  });
 
   const mapaData = {
-    segSocEmpl:    { datos: datosSegSocEmp,   total: totSSEmp,  cargando: cSSEmp  },
-    totalSegSoc:   { datos: datosSegSocTot,   total: totSSTot,  cargando: cSSTot  },
-    parafEmpl:     { datos: datosParafEmp,    total: totPEmp,   cargando: cPEmp   },
-    totalParaf:    { datos: datosParafTot,    total: totPTot,   cargando: cPTot   },
-    cargas:        { datos: datosCargasTot,   total: totCTot,   cargando: cCTot   },
+    segSocEmpl:  { datos: filtrarDatos(datosSegSocEmp,  'empleado'), cargando: cSSEmp  },
+    totalSegSoc: { datos: filtrarDatos(datosSegSocTot,  'periodo'),  cargando: cSSTot  },
+    parafEmpl:   { datos: filtrarDatos(datosParafEmp,   'empleado'), cargando: cPEmp   },
+    totalParaf:  { datos: filtrarDatos(datosParafTot,   'periodo'),  cargando: cPTot   },
+    cargas:      { datos: filtrarDatos(datosCargasTot,  'periodo'),  cargando: cCTot   },
   };
 
-  const { datos: datosActivos, total: totalActual, cargando } = mapaData[tabActual];
-  const totalPaginas = Math.max(1, Math.ceil(totalActual / porPagina));
-  const esDetalle    = ['segSocEmpl', 'parafEmpl'].includes(tabActual);
+  const { datos: datosActivos, cargando } = mapaData[tabActual];
+  const totalFiltrado = datosActivos.length;
+  const totalPaginas  = Math.max(1, Math.ceil(totalFiltrado / porPagina));
+  const datosPagina   = datosActivos.slice(pagina * porPagina, (pagina + 1) * porPagina);
 
   const renderCabecera = () => {
     switch (tabActual) {
@@ -194,18 +216,65 @@ export default function ProvisionesPage() {
       </button>
 
       <div style={styles.toolbarCard}>
-        <div>
-          <p style={styles.totalNum}>{totalActual}</p>
+        <div style={{ flexShrink: 0 }}>
+          <p style={styles.totalNum}>{totalFiltrado}</p>
           <p style={styles.totalLabel}>Total registros</p>
         </div>
-        <div style={styles.searchBox}>
-          <Search size={14} color="#A3A3A3" />
-          <input
-            style={styles.searchInput}
-            placeholder="Buscar por nombre o documento"
-            value={busqueda}
-            onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
-          />
+
+        <div style={styles.filtrosBox}>
+          {/* Búsqueda nombre/documento — solo tabs de detalle */}
+          {esDetalle && (
+            <div style={styles.searchBox}>
+              <Search size={14} color="#A3A3A3" />
+              <input
+                style={styles.searchInput}
+                placeholder="Buscar por nombre o n° de documento"
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+              />
+              {busqueda && (
+                <button style={styles.clearBtn} onClick={() => { setBusqueda(''); setPagina(0); }}>
+                  <X size={12} color="#A3A3A3" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Filtro por año — todos los tabs */}
+          <div style={styles.filtroItem}>
+            <label style={styles.filtroLabel}>Año</label>
+            <div style={styles.filtroInputBox}>
+              <input
+                style={styles.filtroInput}
+                type="number"
+                min="2000"
+                max="2100"
+                placeholder="Ej: 2026"
+                value={anioFiltro}
+                onChange={(e) => { setAnioFiltro(e.target.value); setPagina(0); }}
+              />
+              {anioFiltro && (
+                <button style={styles.clearBtn} onClick={() => { setAnioFiltro(''); setPagina(0); }}>
+                  <X size={12} color="#A3A3A3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtro por fecha de ingreso — solo tabs de detalle */}
+          {esDetalle && (
+            <div style={styles.filtroItem}>
+              <label style={styles.filtroLabel}>Fecha ingreso</label>
+              <div style={styles.filtroInputBox}>
+                <input
+                  style={{ ...styles.filtroInput, minWidth: '130px', colorScheme: 'light' }}
+                  type="date"
+                  value={fechaFiltro}
+                  onChange={(e) => { setFechaFiltro(e.target.value); setPagina(0); }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -236,7 +305,7 @@ export default function ProvisionesPage() {
                 <tr><td colSpan={11} style={styles.tdCentro}>Cargando...</td></tr>
               ) : datosActivos.length === 0 ? (
                 <tr><td colSpan={11} style={styles.tdCentro}>Sin resultados</td></tr>
-              ) : datosActivos.map((r, index) => renderFila(r, index))}
+              ) : datosPagina.map((r, index) => renderFila(r, index))}
             </tbody>
           </table>
         </div>
@@ -266,11 +335,17 @@ const styles = {
   perfilNombre:    { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:     { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
   volverBtn:       { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
-  toolbarCard:     { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  toolbarCard:     { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' },
   totalNum:        { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:      { fontSize: '12px', color: '#A3A3A3', margin: 0 },
-  searchBox:       { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '320px' },
-  searchInput:     { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  filtrosBox:      { display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' },
+  searchBox:       { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '220px' },
+  searchInput:     { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  filtroItem:      { display: 'flex', flexDirection: 'column', gap: '4px' },
+  filtroLabel:     { fontSize: '11px', fontWeight: '700', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif' },
+  filtroInputBox:  { display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 10px', backgroundColor: '#fff' },
+  filtroInput:     { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', fontFamily: 'Nunito, sans-serif', color: '#272525', width: '80px' },
+  clearBtn:        { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 },
   tabsRow:         { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8', flexWrap: 'wrap', gap: '8px' },
   tabsBox:         { display: 'flex', flexWrap: 'wrap' },
   tab:             { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 14px', fontSize: '13px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },
