@@ -150,7 +150,7 @@ export default function ResultadoLiquidacionPage() {
       doc.text(`Nombre: ${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 14, y); y += 5;
       doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
       doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
-      doc.text(`Salario básico  ${fmt(desp.salarioBasico)}`, 196, y - 15, { align: 'right' });
+      doc.text(`Salario base  ${fmt(desp.salarioBasico)}`, 196, y - 15, { align: 'right' });
 
       const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
 
@@ -234,7 +234,73 @@ export default function ResultadoLiquidacionPage() {
       doc.setTextColor(0, 0, 0);
     };
 
+    let y = 14;
+    if (logoBase64) doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+    doc.setFontSize(12); doc.setFont(undefined, 'bold');
+    doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 105, y + 12, { align: 'center' });
+    doc.setFontSize(10); doc.setFont(undefined, 'bold');
+    doc.text(
+      `PLANILLA NÓMINA — ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`,
+      105, y + 20, { align: 'center' }
+    );
+
+    const totalNeto = desprendibles.reduce((s, d) => s + (d.netoAPagar ?? 0), 0);
+
+    autoTable(doc, {
+      startY: y + 28,
+      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'SALARIO BASE', 'AUX. TRANSPORTE', 'NETO A PAGAR']],
+      body: [
+        ...desprendibles.map((desp, i) => {
+          const auxTransporte = (desp.conceptos ?? [])
+            .find(c => c.nombreConcepto === 'Auxilio de transporte');
+          return [
+            i + 1,
+            desp.documentoEmpleado,
+            `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
+            fmt(desp.salarioBasico),
+            auxTransporte?.valorResultado ? fmt(auxTransporte.valorResultado) : '-',
+            fmt(desp.netoAPagar),
+          ];
+        }),
+        [
+          { content: 'TOTAL', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: fmt(totalNeto), styles: { fontStyle: 'bold' } },
+        ],
+      ],
+      styles: { fontSize: 7 },
+      headStyles: {
+        fillColor: [11, 102, 42],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 7,
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      columnStyles: {
+        0: { halign: 'center' },
+        1: { halign: 'center' },
+        2: { halign: 'left' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+      },
+      margin: { left: 14, right: 14 },
+      didParseCell: (data) => {
+        const lastRow = data.table.body.length - 1;
+        if (data.row.index === lastRow) {
+          data.cell.styles.fillColor = [232, 245, 238];
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [11, 102, 42];
+        }
+      },
+      
+    });
+
+    doc.addPage();
+
     desprendibles.forEach((desp, idx) => {
+      //doc.addPage();
       if (idx > 0) doc.addPage();
 
       const conceptosFiltrados = (desp.conceptos ?? [])
@@ -325,6 +391,69 @@ export default function ResultadoLiquidacionPage() {
         )}
       </div>
 
+      {/* Planilla resumen nómina */}
+      {!cargando && desprendibles.length > 0 && (
+        <div style={styles.card}>
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <p style={{ fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 4px 0' }}>
+              {empresa?.nombreEmpresa ?? ''}
+            </p>
+            <p style={{ fontSize: '13px', color: '#272525', margin: '0 0 2px 0' }}>
+              NIT: {empresa?.empresaNit ?? ''}
+            </p>
+            <p style={{ fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 }}>
+              PLANILLA NÓMINA — {NOMBRE_MES[proceso?.periodo] ?? ''} {proceso?.anio ?? ''}
+            </p>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={styles.tabla}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>No</th>
+                  <th style={styles.th}>CC</th>
+                  <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
+                  <th style={styles.th}>Salario base</th>
+                  <th style={styles.th}>Auxilio de transporte</th>
+                  <th style={styles.th}>Neto a pagar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {desprendibles.map((desp, i) => {
+                  const auxTransporte = (desp.conceptos ?? [])
+                    .find(c => c.nombreConcepto === 'Auxilio de transporte');
+                  return (
+                    <tr key={desp.cabecNominaId} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
+                      <td style={styles.td}>{i + 1}</td>
+                      <td style={styles.td}>{desp.documentoEmpleado}</td>
+                      <td style={{ ...styles.td, textAlign: 'left' }}>
+                        {desp.nombresEmpleado} {desp.apellidosEmpleado}
+                      </td>
+                      <td style={styles.td}>{fmt(desp.salarioBasico)}</td>
+                      <td style={styles.td}>
+                        {auxTransporte?.valorResultado
+                          ? fmt(auxTransporte.valorResultado)
+                          : '-'}
+                      </td>
+                      <td style={{ ...styles.td, fontWeight: '700', color: '#0B662A' }}>
+                        {fmt(desp.netoAPagar)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{ backgroundColor: '#E8F5EE' }}>
+                  <td colSpan={5} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>
+                    TOTAL
+                  </td>
+                  <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>
+                    {fmt(desprendibles.reduce((s, d) => s + (d.netoAPagar ?? 0), 0))}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Desprendibles por empleado */}
       {cargando ? (
         <p style={{ textAlign: 'center', color: '#A3A3A3', marginTop: '20px' }}>
@@ -391,7 +520,7 @@ export default function ResultadoLiquidacionPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={styles.empInfoFila}>
-                    <strong>Salario básico</strong> &nbsp; {fmt(desp.salarioBasico)}
+                    <strong>Salario base</strong> &nbsp; {fmt(desp.salarioBasico)}
                   </p>
                   <p style={{
                     ...styles.empInfoFila,

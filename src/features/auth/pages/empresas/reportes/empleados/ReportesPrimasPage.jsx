@@ -143,7 +143,7 @@ export default function ReportesPrimasPage() {
                   <th style={styles.th}>Fecha fin corte prima</th>
                   <th style={styles.th}>Días laborados</th>
                   <th style={styles.th}>Salario base</th>
-                  <th style={styles.th}>Aux. transporte</th>
+                  <th style={styles.th}>Base Aux. transp.</th>
                   <th style={styles.th}>Base liquidación</th>
                   <th style={styles.th}>Total prima</th>
                   <th style={styles.th}>Estado proceso</th>
@@ -179,7 +179,7 @@ export default function ReportesPrimasPage() {
                     <td style={styles.td}>{r.fechaFinCorte ?? '-'}</td>
                     <td style={styles.td}>{r.diasLiquidados}</td>
                     <td style={styles.td}>{fmt(r.salarioBase)}</td>
-                    <td style={styles.td}>{r.tieneAuxTransporte ? fmt(r.salarioBase) : '-'}</td>
+                    <td style={styles.td}>{fmt(r.promedioAuxTransporte)}</td>
                     <td style={styles.td}>{fmt(r.baseLiquiTotal)}</td>
                     <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.valorNetoPrima)}</td>
                     <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>

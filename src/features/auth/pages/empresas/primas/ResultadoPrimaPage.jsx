@@ -113,12 +113,13 @@ export default function ResultadoPrimaPage() {
 
     autoTable(doc, {
       startY: y,
-      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'FECHA INICIO', 'FECHA FIN', 'DÍAS', 'SALARIO BASE', 'AUX. TRANSPORTE', 'NETO']],
+      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'CARGO', 'FECHA INICIO', 'FECHA FIN', 'DÍAS', 'SALARIO BASE', 'BASE AUX. TRANSPORTE', 'NETO']],
       body: [
         ...desprendibles.map((desp, i) => [
           i + 1,
           desp.documentoEmpleado,
           `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
+          desp.cargoEmpleado ?? '',
           desp.fechaInicioCorte,
           desp.fechaFinCorte,
           desp.diasLiquidados,
@@ -126,7 +127,7 @@ export default function ResultadoPrimaPage() {
           fmt(desp.auxTransporte),
           fmt(desp.valorPrestacion),
         ]),
-        [{ content: 'TOTAL', colSpan: 8, styles: { halign: 'right', fontStyle: 'bold' } },
+        [{ content: 'TOTAL', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
         { content: fmt(totalGeneral), styles: { fontStyle: 'bold' } }],
       ],
       styles: { fontSize: 7 },
@@ -161,8 +162,10 @@ export default function ResultadoPrimaPage() {
       doc.text('Nombre:', 14, cy);
       doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 55, cy); cy += 5;
       doc.text('Cédula:', 14, cy);
-      doc.text(desp.documentoEmpleado, 55, cy); cy += 8;
+      doc.text(desp.documentoEmpleado, 55, cy); cy += 5;
 
+      doc.text('Cargo:', 14, cy);
+      doc.text(desp.cargoEmpleado ?? '', 55, cy); cy += 5;
       // Título centrado
       doc.setFont(undefined, 'bold');
       doc.text(
@@ -182,7 +185,7 @@ export default function ResultadoPrimaPage() {
       // Salario y auxilio
       doc.text('Salario Base:', 14, cy);
       doc.text(fmt(desp.salarioBase), 70, cy); cy += 5;
-      doc.text('Auxilio de transporte:', 14, cy);
+      doc.text('Base Aux. de Transporte:', 14, cy);
       doc.text(fmt(desp.auxTransporte), 70, cy); cy += 8;
 
       // Valor prima y letras
@@ -292,11 +295,12 @@ export default function ResultadoPrimaPage() {
                   <th style={styles.th}>No</th>
                   <th style={styles.th}>CC</th>
                   <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
+                  <th style={{ ...styles.th, textAlign: 'left' }}>Cargo</th>
                   <th style={styles.th}>Fecha inicio</th>
                   <th style={styles.th}>Fecha fin</th>
                   <th style={styles.th}>Días</th>
                   <th style={styles.th}>Salario Base</th>
-                  <th style={styles.th}>Aux. Transporte</th>
+                  <th style={styles.th}>Base Aux. Transporte</th>
                   <th style={styles.th}>Neto</th>
                 </tr>
               </thead>
@@ -314,6 +318,9 @@ export default function ResultadoPrimaPage() {
                     <td style={styles.td}>{desp.documentoEmpleado}</td>
                     <td style={{ ...styles.td, textAlign: 'left' }}>
                       {desp.nombresEmpleado} {desp.apellidosEmpleado}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: 'left' }}>
+                        {desp.cargoEmpleado ?? ''}
                     </td>
                     <td style={styles.td}>{calcularFechaInicio(desp)}</td>
                     <td style={styles.td}>{desp.fechaFinCorte}</td>
@@ -368,6 +375,10 @@ export default function ResultadoPrimaPage() {
                   <span style={styles.comprobanteLabel}>Cédula:</span>
                   <span style={styles.comprobanteValor}>{desp.documentoEmpleado}</span>
                 </div>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <span style={styles.comprobanteLabel}>Cargo:</span>
+                  <span style={styles.comprobanteValor}>{desp.cargoEmpleado ?? ''}</span>
+                </div>
               </div>
 
               <p style={{
@@ -405,7 +416,7 @@ export default function ResultadoPrimaPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '2px' }}>
                   <span style={{ ...styles.comprobanteLabel, width: '160px' }}>
-                    Auxilio de transporte:
+                    Base Aux. de Transporte:
                   </span>
                   <span style={styles.comprobanteValor}>{fmt(desp.auxTransporte)}</span>
                 </div>
