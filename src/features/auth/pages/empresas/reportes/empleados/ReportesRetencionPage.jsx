@@ -18,24 +18,33 @@ export default function ReportesRetencionPage() {
   const cargo  = usuario?.cargoUsuario ?? '';
 
   const [busqueda,  setBusqueda]  = useState('');
+  const [anioFiltro, setAnioFiltro] = useState('');
   const [pagina,    setPagina]    = useState(0);
   const [porPagina, setPorPagina] = useState(10);
 
   const handlePorPagina = (v) => { setPorPagina(v); setPagina(0); };
 
-  const params = {
-    empresaId: id,
-    nombres:   busqueda || undefined,
-    page:      pagina,
-    size:      porPagina,
-  };
+  const paramsBase = { empresaId: id, page: 0, size: 500 };
 
-  const { datos, total, cargando } = useHistoricos(
-    historicosService.getRetefuente,
-    params
-  );
+  const { datos: rawDatos, cargando } = useHistoricos(historicosService.getRetefuente, paramsBase);
 
-  const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
+  const filtrarDatos = (datos) => datos.filter(r => {
+    if (anioFiltro && !String(r.anio ?? '').startsWith(anioFiltro)) return false;
+    if (busqueda) {
+      if (/^\d+$/.test(busqueda.trim())) {
+        if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
+      } else {
+        const nm = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
+        if (!nm.includes(busqueda.toLowerCase())) return false;
+      }
+    }
+    return true;
+  });
+
+  const datosActivos  = filtrarDatos(rawDatos);
+  const totalFiltrado = datosActivos.length;
+  const totalPaginas  = Math.max(1, Math.ceil(totalFiltrado / porPagina));
+  const datosPagina   = datosActivos.slice(pagina * porPagina, (pagina + 1) * porPagina);
 
   return (
     <div style={styles.container}>
@@ -64,17 +73,31 @@ export default function ReportesRetencionPage() {
 
       <div style={styles.toolbarCard}>
         <div>
-          <p style={styles.totalNum}>{total}</p>
+          <p style={styles.totalNum}>{totalFiltrado}</p>
           <p style={styles.totalLabel}>Total registros</p>
         </div>
-        <div style={styles.searchBox}>
-          <Search size={14} color="#A3A3A3" />
-          <input
-            style={styles.searchInput}
-            placeholder="Buscar por nombre o documento"
-            value={busqueda}
-            onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
-          />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+          <div style={styles.searchBox}>
+            <Search size={14} color="#A3A3A3" />
+            <input
+              style={styles.searchInput}
+              placeholder="Buscar por nombre o n° de documento"
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '11px', color: '#A3A3A3', fontWeight: '600' }}>Año</span>
+            <div style={styles.filtroInputBox}>
+              <input
+                type="text"
+                style={styles.filtroInput}
+                placeholder="Ej: 2026"
+                value={anioFiltro}
+                onChange={(e) => { setAnioFiltro(e.target.value); setPagina(0); }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -106,9 +129,9 @@ export default function ReportesRetencionPage() {
             <tbody>
               {cargando ? (
                 <tr><td colSpan={7} style={styles.tdCentro}>Cargando...</td></tr>
-              ) : datos.length === 0 ? (
+              ) : datosPagina.length === 0 ? (
                 <tr><td colSpan={7} style={styles.tdCentro}>Sin resultados</td></tr>
-              ) : datos.map((r, index) => (
+              ) : datosPagina.map((r, index) => (
                 <tr key={index} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
                   <td style={styles.td}>{String(index + 1 + pagina * porPagina).padStart(2, '0')}</td>
                   <td style={styles.td}>{r.nombresEmp}</td>
@@ -151,8 +174,10 @@ const styles = {
   toolbarCard:     { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   totalNum:        { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:      { fontSize: '12px', color: '#A3A3A3', margin: 0 },
-  searchBox:       { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
-  searchInput:     { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  searchBox:       { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '320px' },
+  searchInput:     { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  filtroInputBox:  { display: 'flex', alignItems: 'center', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '100px' },
+  filtroInput:     { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   tabsRow:         { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8' },
   tabsBox:         { display: 'flex' },
   tab:             { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 16px', fontSize: '13px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },

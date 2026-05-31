@@ -102,8 +102,10 @@ const OPCIONES = {
 const filaVacia = () => ({ nombre: '', fecha: '', valor: '', porcentaje: '', descripcion: '' });
 
 function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpenDropdown, onChange, onAdd, onRemove }) {
-  const dropKey = `${seccionKey}-${index}`;
-  const isOpen  = openDropdown === dropKey;
+  const dropKey         = `${seccionKey}-${index}`;
+  const isOpen          = openDropdown === dropKey;
+  const valorTiene      = fila.valor      !== '' && fila.valor      != null;
+  const porcentajeTiene = fila.porcentaje !== '' && fila.porcentaje != null;
 
   return (
     <div style={styles.filaWrapper}>
@@ -161,11 +163,15 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
 
         {/* Valor — con formateo de miles */}
         <div style={styles.campo}>
-          <label style={styles.label}>Valor</label>
+          <label style={{ ...styles.label, color: porcentajeTiene ? '#A3A3A3' : '#272525' }}>
+            Valor
+            {porcentajeTiene && <span style={{ fontSize: '11px', fontWeight: '400', color: '#A3A3A3', marginLeft: '6px' }}>(no disponible — ya ingresaste porcentaje)</span>}
+          </label>
           <input
-            style={styles.input}
+            style={{ ...styles.input, ...(porcentajeTiene ? styles.inputDisabled : {}) }}
             placeholder="Ingresar valor"
             inputMode="numeric"
+            disabled={porcentajeTiene}
             value={formatearMiles(fila.valor)}
             onChange={e => onChange(index, 'valor', limpiarMiles(e.target.value))}
           />
@@ -175,12 +181,16 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
       <div style={styles.filaInferior}>
         {/* Porcentaje — type text con restricción de caracteres */}
         <div style={{ ...styles.campo, width: '220px', flexShrink: 0 }}>
-          <label style={styles.label}>Porcentaje (Ej: 4% = 0.04)</label>
+          <label style={{ ...styles.label, color: valorTiene ? '#A3A3A3' : '#272525' }}>
+            Porcentaje (Ej: 4% = 0.04)
+            {valorTiene && <span style={{ fontSize: '11px', fontWeight: '400', color: '#A3A3A3', marginLeft: '6px' }}>(no disponible — ya ingresaste valor)</span>}
+          </label>
           <input
-            style={styles.input}
+            style={{ ...styles.input, ...(valorTiene ? styles.inputDisabled : {}) }}
             placeholder="Ingresar número"
             type="text"
             inputMode="decimal"
+            disabled={valorTiene}
             value={fila.porcentaje}
             onChange={e => onChange(index, 'porcentaje', e.target.value)}
             onKeyPress={e => { if (!/[\d.]/.test(e.key)) e.preventDefault(); }}
@@ -206,6 +216,10 @@ function FilaParametro({ fila, index, opciones, seccionKey, openDropdown, setOpe
           </button>
         </div>
       </div>
+
+      <p style={{ fontSize: '11px', color: '#A3A3A3', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+        ⚠ Ingresa solo <strong>Valor</strong> o <strong>Porcentaje</strong>, no ambos a la vez.
+      </p>
     </div>
   );
 }
@@ -214,7 +228,10 @@ function SeccionParametros({ titulo, descripcion, opciones, filas, setter, secci
   const handleChange = (index, field, value) => {
     setter(prev => {
       const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
+      const updated = { ...copy[index], [field]: value };
+      if (field === 'valor'      && value !== '') updated.porcentaje = '';
+      if (field === 'porcentaje' && value !== '') updated.valor      = '';
+      copy[index] = updated;
       return copy;
     });
   };
@@ -508,6 +525,7 @@ const styles = {
   label:            { fontSize: '13px', fontWeight: '600', color: '#272525' },
   req:              { color: '#E53E3E', marginLeft: '2px' },
   input:            { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', color: '#272525', width: '100%', boxSizing: 'border-box' },
+  inputDisabled:    { backgroundColor: '#F5F5F5', borderColor: '#E8E8E8', color: '#A3A3A3', cursor: 'not-allowed' },
   selectWrapper:    { position: 'relative' },
   selectBtn:        { border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontFamily: 'Nunito, sans-serif', outline: 'none', backgroundColor: '#fff', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', boxSizing: 'border-box' },
   chevronIcon:      { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },

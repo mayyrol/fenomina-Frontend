@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X  } from 'lucide-react';
+import { FileText, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { useNominas } from '../../../hooks/useNominas';
@@ -68,9 +68,8 @@ export default function NominasPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [tab, setTab]                           = useState('Borrador');
-  const [busqueda, setBusqueda]                 = useState('');
-  const [pagina, setPagina]                     = useState(0);
+  const [tab, setTab]   = useState('Borrador');
+  const [pagina, setPagina] = useState(0);
   const { procesos, cargando, error, recargar } = useNominas(id);
   const [periodos, setPeriodos] = useState([]);
   const [modal, setModal]                       = useState(null);
@@ -90,7 +89,6 @@ export default function NominasPage() {
 
   const periodosFiltrados = periodos.filter(p => {
     if (ESTADO_LABEL[p.estadoProcNomina] !== tab) return false;
-    if (busqueda && !p.fechaInicioPeriodo?.includes(busqueda) && !p.fechaFinPeriodo?.includes(busqueda)) return false;
     if (fechaBusqueda) {
       const matchInicio   = (p.fechaInicioPeriodo ?? '').slice(0, 10) === fechaBusqueda;
       const matchCreacion = (p.createdAt ?? '').slice(0, 10) === fechaBusqueda;
@@ -193,13 +191,13 @@ export default function NominasPage() {
           <p style={styles.totalLabel}>Total reportes</p>
         </div>
         <div style={styles.filtrosBox}>
-          <div style={styles.searchBox}>
-            <Search size={14} color="#A3A3A3" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={styles.fechaLabel}>Fecha</span>
             <input
-              style={styles.searchInput}
-              placeholder="Buscar nómina por palabra clave"
-              value={busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+              type="date"
+              style={styles.dateInput}
+              value={fechaBusqueda}
+              onChange={(e) => { setFechaBusqueda(e.target.value); setPagina(0); }}
             />
           </div>
         </div>
@@ -445,8 +443,7 @@ const styles = {
   pageBtnActivo:{ backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
   toolbarCard:  { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
   filtrosBox:   { display: 'flex', alignItems: 'center', gap: '12px' },
-  searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
-  searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  fechaLabel:   { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
   iconBtn:      { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },
   dateWrapper:    { display: 'flex', alignItems: 'center', gap: '4px' },
   clearDateBtn:   { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' },

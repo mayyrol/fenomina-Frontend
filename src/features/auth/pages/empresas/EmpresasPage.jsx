@@ -170,7 +170,7 @@ const styles = {
   totalNum:      { fontSize: '28px', fontWeight: '800', color: '#272525', margin: 0 },
   totalLabel:    { fontSize: '12px', color: '#A3A3A3', margin: 0 },
   searchBox:     { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
-  searchInput:   { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  searchInput:   { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   card:          { backgroundColor: '#fff', borderRadius: '16px', padding: '24px 32px' },  
   gridHeader:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
   gridTitle:     { fontSize: '16px', fontWeight: '700', color: '#272525' },

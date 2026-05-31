@@ -242,7 +242,7 @@ const styles = {
   infoValor:          { fontSize: '13px', color: '#272525' },
   searchCard:         { backgroundColor: '#fff', borderRadius: '12px', padding: '14px 24px', maxWidth: '900px', margin: '0 auto', width: '100%' },
   searchBox:          { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '100%' },
-  searchInput:        { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  searchInput:        { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   empleadosBox:       { display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '900px', margin: '0 auto', width: '100%' },
   empCard:            { backgroundColor: '#fff', borderRadius: '12px', padding: '20px 24px', border: '1px solid #F0F0F0' },
   empHeader:          { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
