@@ -1,16 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { Coins, UserRound } from 'lucide-react';
-
-
-const MOCK_CESANTIA = {
-  diasLaborados: 360,
-  otrosPagos: [
-    { nombre: 'RECARGO NOCTURNO DE LUNES A SÁBADO', fecha: '03/04/2024', monto: '40.000' },
-    { nombre: 'RECARGO NOCTURNO UN DOMINGO O FESTIVO', fecha: '22/05/2024', monto: '35.000' },
-  ],
-  fondoCesantias: 'Porvenir',
-};
+import payrollAxios from '../../../../../api/payrollAxiosInstance';
+import masterAxios from '../../../../../api/masterAxiosInstance';
+import payrollService from '../../../../../services/payrollService';
 
 export default function VerCesantiaPage() {
   const navigate   = useNavigate();
@@ -18,6 +12,83 @@ export default function VerCesantiaPage() {
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
+
+  const { id, empleadoId } = useParams();
+  const [empleado,  setEmpleado]  = useState(null);
+  const [novedades, setNovedades] = useState([]);
+  const [cargando,  setCargando]  = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const anio = Number(searchParams.get('anio'));
+
+  const [diasCalculados, setDiasCalculados] = useState(0);
+
+  const fmt = (v) =>
+    v != null
+      ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+      : '';
+
+  useEffect(() => {
+    if (!empleadoId || !id || !anio) return;
+    setCargando(true);
+
+    Promise.all([
+      masterAxios.get('/api/master/empleados', {
+        params: { empresaId: id, estado: 'ACTIVO' },
+      }),
+      payrollService.getProcesos(id), // nóminas pagadas del año
+    ])
+      .then(([{ data: emps }, { data: procesosNomina }]) => {
+        const encontrado = emps.find(
+          e => String(e.empleadoId) === String(empleadoId)
+        );
+        setEmpleado(encontrado ?? null);
+
+        // Nóminas pagadas del año seleccionado
+        const nominasDelAnio = procesosNomina.filter(p =>
+          (p.estadoProcNomina === 'PAGADO' || p.estadoProcNomina === 'PENDIENTE_PAGO') &&
+          p.anio === anio
+        );
+
+        return Promise.all(
+          nominasDelAnio.map(p =>
+            payrollAxios
+              .get(`/api/payroll/novedades/proceso/${p.procesoLiquiId}/empleado/${empleadoId}`)
+              .then(({ data }) => ({ novedades: data, procesoLiquiId: p.procesoLiquiId }))
+              .catch(() => ({ novedades: [], procesoLiquiId: p.procesoLiquiId }))
+          )
+        ).then(resultados => {
+          const todasNovedades = resultados.flatMap(r => r.novedades);
+          setNovedades(todasNovedades);
+
+          // Calcular días laborados sumando cantidad_concept donde concepto ID=1
+          // desde los detalles de nómina
+          return Promise.all(
+            nominasDelAnio.map(p =>
+              payrollAxios
+                .get(`/api/payroll/desprendibles/nomina/${p.procesoLiquiId}`)
+                .then(({ data: desps }) => {
+                  const despEmpleado = desps.find(
+                    d => String(d.empleadoId) === String(empleadoId)
+                  );
+                  if (!despEmpleado) return 0;
+                  const conceptoSalario = despEmpleado.conceptos?.find(
+                    c => c.concepNominaId === 1
+                  );
+                  return conceptoSalario?.cantidad ?? 0;
+                })
+                .catch(() => 0)
+            )
+          );
+        });
+      })
+      .then(diasPorNomina => {
+        const totalDias = diasPorNomina.reduce((s, d) => s + d, 0);
+        setDiasCalculados(Math.min(totalDias, 360));
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [empleadoId, id, anio]);
 
   return (
     <div style={styles.container}>
@@ -46,7 +117,11 @@ export default function VerCesantiaPage() {
         </p>
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Días laborados <span style={{ color: '#E53E3E' }}>*</span></label>
-          <input value={MOCK_CESANTIA.diasLaborados} readOnly style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }} />
+          <input
+            value={diasCalculados}
+            readOnly
+            style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }}
+          />
         </div>
       </div>
 
@@ -57,17 +132,48 @@ export default function VerCesantiaPage() {
           Valores adicionales que, por ley o acuerdo, deben sumarse a la base de las cesantías (como comisiones, recargos o bonificaciones salariales) que no estén reflejados en el sueldo fijo.
         </p>
 
-        {MOCK_CESANTIA.otrosPagos.map((p, i) => (
-          <div key={i} style={{ marginBottom: '16px' }}>
+        {cargando ? (
+          <p style={{ color: '#A3A3A3' }}>Cargando novedades...</p>
+        ) : novedades.length === 0 ? (
+          <p style={{ color: '#A3A3A3' }}>
+            No hay novedades registradas en el periodo.
+          </p>
+        ) : novedades.map((nov, i) => (
+          <div key={nov.novedadId ?? i} style={{ marginBottom: '16px' }}>
             <div style={styles.gridFila}>
               <span style={styles.label}>Nombre de novedad</span>
               <span style={styles.label}>Fecha de novedad</span>
-              <span style={styles.label}>Monto (valor del pago o compensación)</span>
+              <span style={styles.label}>Monto / Valor</span>
             </div>
             <div style={styles.gridFila}>
-              <input readOnly value={p.nombre} style={{ ...styles.input, textTransform: 'uppercase', fontSize: '12px', backgroundColor: '#F9F9F9' }} />
-              <input readOnly value={p.fecha}  style={{ ...styles.input, backgroundColor: '#F9F9F9' }} />
-              <input readOnly value={p.monto}  style={{ ...styles.input, textAlign: 'right', backgroundColor: '#F9F9F9' }} />
+              <input
+                readOnly
+                value={nov.observaciones ?? nov.nombreConcepto ?? `Novedad ${nov.novedadId}`}
+                style={{
+                  ...styles.input,
+                  textTransform: 'uppercase',
+                  fontSize: '12px',
+                  backgroundColor: '#F9F9F9',
+                }}
+              />
+              <input
+                readOnly
+                value={nov.fechaNovedad ?? nov.fechaInicioAusen ?? ''}
+                style={{ ...styles.input, backgroundColor: '#F9F9F9' }}
+              />
+              <input
+                readOnly
+                value={
+                  nov.valorRefNovedad != null
+                    ? fmt(nov.valorRefNovedad)
+                    : nov.cantidadHorasNovedad != null
+                    ? `${nov.cantidadHorasNovedad} horas`
+                    : nov.cantidadDiasNovedad != null
+                    ? `${nov.cantidadDiasNovedad} días`
+                    : ''
+                }
+                style={{ ...styles.input, textAlign: 'right', backgroundColor: '#F9F9F9' }}
+              />
             </div>
           </div>
         ))}
@@ -86,7 +192,12 @@ export default function VerCesantiaPage() {
         </p>
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Fondo de cesantías <span style={{ color: '#E53E3E' }}>*</span></label>
-          <input value={MOCK_CESANTIA.fondoCesantias} readOnly style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }} placeholder="Porvenir" />
+          <input
+            value={empleado?.fondoCesantiasEmp ?? ''}
+            readOnly
+            style={{ ...styles.input, backgroundColor: '#F9F9F9', color: '#A3A3A3' }}
+            placeholder="Fondo de cesantías"
+          />
         </div>
       </div>
 

@@ -19,11 +19,16 @@ const processQueue = (error, token = null) => {
 
 masterAxios.interceptors.request.use(
   (config) => {
-    // getState() NO es un hook, es una función estática de Zustand — esto está bien
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (config.url?.includes('/internal/')) {
+      config.headers['X-Internal-Api-Key'] = import.meta.env.VITE_INTERNAL_API_KEY;
+      delete config.headers.Authorization;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

@@ -1,24 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, ChevronLeft, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
-
-
-const MOCK_PROCESO = {
-  nombreEmpresa:   'PRIIGO SAS',
-  nit:             '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo:         '1 al 15 de Diciembre de 2026',
-  mes:             'Diciembre',
-  estado:          'Cerrado',
-};
+import payrollService from '../../../../../services/payrollService';
+import { useNominaStore } from '../../../../../store/useNominaStore';
 
 export default function LiquidarNominaPage() {
   const navigate             = useNavigate();
   const { id, nominaId }     = useParams();
   const { usuario }          = useAuthStore();
+
+  const [mensajeError, setMensajeError] = useState('');
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
@@ -27,6 +21,21 @@ export default function LiquidarNominaPage() {
   const [confirmarLiquidar, setConfirmarLiquidar] = useState(false);
   const [hoverLiquidar, setHoverLiquidar]       = useState(false);
   const [hoverCancelar, setHoverCancelar]       = useState(false);
+
+  const [proceso, setProceso] = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (!nominaId) return;
+    setCargando(true);
+    payrollService.getProcesos(id)
+      .then(({ data }) => {
+        const encontrado = data.find(p => String(p.procesoLiquiId) === String(nominaId));
+        setProceso(encontrado ?? null);
+      })
+      .catch(() => setProceso(null))
+      .finally(() => setCargando(false));
+  }, [nominaId, id]);
 
   return (
     <div style={styles.container}>
@@ -51,40 +60,38 @@ export default function LiquidarNominaPage() {
         </div>
       </div>
 
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
-
       {/* Card info proceso */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Liquidar Nómina</h3>
 
         <div style={styles.infoGrid}>
           <div style={styles.infoFila}>
-            <span style={styles.infoLabel}>Nombre Empresa:</span>
-            <span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span>
-          </div>
-          <div style={styles.infoFila}>
-            <span style={styles.infoLabel}>Nit:</span>
-            <span style={styles.infoValor}>{MOCK_PROCESO.nit}</span>
-          </div>
-          <div style={styles.infoFila}>
-            <span style={styles.infoLabel}>Fecha de Generación de Reporte:</span>
-            <span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span>
-          </div>
-          <div style={styles.infoFila}>
-            <span style={styles.infoLabel}>Periodo:</span>
-            <span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span>
-          </div>
-          <div style={styles.infoFila}>
-            <span style={styles.infoLabel}>Mes:</span>
-            <span style={styles.infoValor}>{MOCK_PROCESO.mes}</span>
+            <span style={styles.infoLabel}>Tipo de proceso:</span>
+            <span style={styles.infoValor}>{proceso?.tipoProceso ?? '-'}</span>
           </div>
           <div style={styles.infoFila}>
             <span style={styles.infoLabel}>Estado:</span>
-            <span style={styles.infoValor}>{MOCK_PROCESO.estado}</span>
+            <span style={styles.infoValor}>{proceso?.estadoProcNomina ?? '-'}</span>
+          </div>
+          <div style={styles.infoFila}>
+            <span style={styles.infoLabel}>Año:</span>
+            <span style={styles.infoValor}>{proceso?.anio ?? '-'}</span>
+          </div>
+          <div style={styles.infoFila}>
+            <span style={styles.infoLabel}>Periodo:</span>
+            <span style={styles.infoValor}>{proceso?.periodo ?? '-'}</span>
+          </div>
+          <div style={styles.infoFila}>
+            <span style={styles.infoLabel}>Fecha de inicio:</span>
+            <span style={styles.infoValor}>{proceso?.fechaInicioPeriodo ?? '-'}</span>
+          </div>
+          <div style={styles.infoFila}>
+            <span style={styles.infoLabel}>Fecha de fin:</span>
+            <span style={styles.infoValor}>{proceso?.fechaFinPeriodo ?? '-'}</span>
+          </div>
+          <div style={styles.infoFila}>
+            <span style={styles.infoLabel}>Fecha de creación:</span>
+            <span style={styles.infoValor}>{proceso?.createdAt?.split('T')[0] ?? '-'}</span>
           </div>
         </div>
 
@@ -113,7 +120,7 @@ export default function LiquidarNominaPage() {
           }}
           onMouseEnter={() => setHoverCancelar(true)}
           onMouseLeave={() => setHoverCancelar(false)}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/empresas/${id}/nominas`)}
         >
           Cancelar
         </button>
@@ -123,14 +130,46 @@ export default function LiquidarNominaPage() {
       <ConfirmarCambiosModal
         visible={confirmarLiquidar}
         onCancelar={() => setConfirmarLiquidar(false)}
-        onConfirmar={() => { setConfirmarLiquidar(false); navigate(`/empresas/${id}/nominas/${nominaId}/resultado`); }}
+        onConfirmar={async () => {
+          setConfirmarLiquidar(false);
+          try {
+            const { empleadosSeleccionados, diasLaborados } =
+              useNominaStore.getState();
+
+            const esQuincenal = proceso?.tipoProceso === 'NOMINA_QUINCENAL';
+            const maxDias = esQuincenal ? 15 : 30;
+
+            const empleadoExcede = Object.entries(diasLaborados).find(
+              ([, dias]) => Number(dias) > maxDias
+            );
+
+            if (empleadoExcede) {
+              setModal('error');
+              return;
+            }
+
+            await payrollService.liquidarNomina(nominaId, {
+              empleadosSeleccionados,
+              diasLaborados,
+            });
+
+            useNominaStore.getState().limpiarProceso();
+            navigate(`/empresas/${id}/nominas/${nominaId}/resultado`);
+          } catch (err) {
+            const mensaje = err?.response?.data?.mensaje
+              ?? 'Ocurrió un error al liquidar la nómina.';
+            setMensajeError(mensaje);
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas calcular y liquidar esta nómina?"
         descripcion="Una vez confirmes, se procesará la liquidación del periodo seleccionado."
       />
 
       <MensajeModal
         tipo={modal}
-        onClose={() => { setModal(null); if (modal === 'exito') navigate(-1); }}
+        mensaje={mensajeError || undefined}
+        onClose={() => { setModal(null); setMensajeError(''); if (modal === 'exito') navigate(-1); }}
       />
 
     </div>
@@ -146,7 +185,7 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '36px 40px' },
   cardTitulo:   { fontSize: '20px', fontWeight: '800', color: '#272525', margin: '0 0 32px 0' },
   infoGrid:     { display: 'flex', flexDirection: 'column', gap: '14px' },

@@ -5,7 +5,7 @@ import { Users, ChevronLeft, UserRound, FileText, CreditCard, Coins, Layers, Per
 
 function Carpeta({ children }) {
   return (
-    <svg viewBox="0 0 160 130" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 160 130" width="100%" xmlns="http://www.w3.org/2000/svg">
       <path
         d="M0,18 Q0,12 6,12 L58,12 Q64,12 67,18 L72,24 L154,24 Q160,24 160,30 L160,124 Q160,130 154,130 L6,130 Q0,130 0,124 Z"
         fill="#DDE8DC"
@@ -95,7 +95,7 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'Nunito, sans-serif', marginTop: '4px', marginBottom: '16px', padding: 0, transition: 'color 0.2s' },
+  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0, width: 'fit-content' },
   areaContenido:{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '60px 40px', width: '100%', boxSizing: 'border-box' },
   grid:         { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '40px 32px' },

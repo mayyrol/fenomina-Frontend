@@ -1,19 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, ChevronLeft, UserRound } from 'lucide-react';
+import { Coins, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
+import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
+import payrollService from '../../../../../services/payrollService';
+import masterAxios from '../../../../../api/masterAxiosInstance';
 
-
-const MOCK_PROCESO = {
-  nombreEmpresa: 'PRIIGO SAS',
-  nit: '1.001.023.958',
-  fechaGeneracion: '03-12-2026',
-  periodo: '2025',
-  estadoProceso: 'Borrador',
-  logoUrl: null,
-};
+const NOMBRE_MES = [
+  '','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+];
 
 export default function DesprendiblesCesantiasPage() {
   const navigate           = useNavigate();
@@ -23,25 +21,43 @@ export default function DesprendiblesCesantiasPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [modal, setModal]                                     = useState(null);
-  const [fueAnulado, setFueAnulado]                           = useState(false);
-  const [confirmarCerrar, setConfirmarCerrar]                 = useState(false);
-  const [confirmarAnular, setConfirmarAnular]                 = useState(false);
-  const [confirmarEliminar, setConfirmarEliminar]             = useState(false);
-  const [hoverCerrar, setHoverCerrar]                         = useState(false);
-  const [hoverAnular, setHoverAnular]                         = useState(false);
-  const [hoverEliminar, setHoverEliminar]                     = useState(false);
+  const [modal,            setModal]            = useState(null);
+  const [confirmarCerrar,  setConfirmarCerrar]  = useState(false);
+  const [confirmarAnular,  setConfirmarAnular]  = useState(false);
+  const [confirmarEliminar,setConfirmarEliminar]= useState(false);
+  const [hoverCerrar,      setHoverCerrar]      = useState(false);
+  const [hoverAnular,      setHoverAnular]      = useState(false);
+  const [hoverEliminar,    setHoverEliminar]    = useState(false);
+  const [proceso,          setProceso]          = useState(null);
+  const [empresa,          setEmpresa]          = useState(null);
+  const [cargando,         setCargando]         = useState(false);
+
+  useEffect(() => {
+    if (!cesantiaId || !id) return;
+    setCargando(true);
+    Promise.all([
+      payrollService.getProcesosCesantias(id),
+      masterAxios.get(`/api/master/empresas/${id}`),
+    ])
+      .then(([{ data: procesos }, { data: emp }]) => {
+        const encontrado = procesos.find(
+          p => String(p.procesoLiquiId) === String(cesantiaId)
+        );
+        setProceso(encontrado ?? null);
+        setEmpresa(emp);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [cesantiaId, id]);
 
   return (
     <div style={styles.container}>
-
-      {/* Header */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Coins size={18} color="#0B662A" />
           <div>
             <h2 style={styles.titulo}>Desprendibles Cesantías e Intereses</h2>
-            <p style={styles.subtitulo}>Ver desprendibles de cesantías e intereses</p>
+            <p style={styles.subtitulo}>Gestión del proceso en borrador</p>
           </div>
         </div>
         <div style={styles.perfilBox}>
@@ -50,76 +66,103 @@ export default function DesprendiblesCesantiasPage() {
         </div>
       </div>
 
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-      </button>
-
-      {/* Info proceso */}
       <div style={styles.card}>
-        <h3 style={styles.cardTitulo}>Desprendibles Cesantías e Intereses de Cesantías</h3>
-        <div style={styles.infoGrid}>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{MOCK_PROCESO.nombreEmpresa}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{MOCK_PROCESO.nit}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación de Reporte:</span><span style={styles.infoValor}>{MOCK_PROCESO.fechaGeneracion}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Periodo:</span><span style={styles.infoValor}>{MOCK_PROCESO.periodo}</span></div>
-          <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{MOCK_PROCESO.estadoProceso}</span></div>
-        </div>
+        <h3 style={styles.cardTitulo}>Desprendibles Cesantías e Intereses</h3>
+        {cargando ? (
+          <p style={{ color: '#A3A3A3' }}>Cargando...</p>
+        ) : (
+          <div style={styles.infoGrid}>
+            <div style={styles.infoFila}><span style={styles.infoLabel}>Nombre Empresa:</span><span style={styles.infoValor}>{empresa?.nombreEmpresa ?? ''}</span></div>
+            <div style={styles.infoFila}><span style={styles.infoLabel}>Nit:</span><span style={styles.infoValor}>{empresa?.empresaNit ?? ''}</span></div>
+            <div style={styles.infoFila}><span style={styles.infoLabel}>Fecha de Generación:</span><span style={styles.infoValor}>{new Date().toLocaleDateString('es-CO')}</span></div>
+            <div style={styles.infoFila}><span style={styles.infoLabel}>Año:</span><span style={styles.infoValor}>{proceso?.anio ?? ''}</span></div>
+            <div style={styles.infoFila}><span style={styles.infoLabel}>Estado proceso:</span><span style={styles.infoValor}>{proceso?.estadoProcNomina ?? ''}</span></div>
+          </div>
+        )}
       </div>
 
-      {/* Acciones */}
       <div style={styles.accionesBar}>
         <button
           style={{ ...styles.btnCerrar, background: hoverCerrar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverCerrar(true)}
-          onMouseLeave={() => setHoverCerrar(false)}
-          onClick={() => navigate(`/empresas/${id}/cesantias/${cesantiaId}/liquidar`)}
+          onMouseEnter={() => setHoverCerrar(true)} onMouseLeave={() => setHoverCerrar(false)}
+          onClick={() => setConfirmarCerrar(true)}
         >
           Cerrar proceso
         </button>
         <button
           style={{ ...styles.btnAnular, transition: 'background 0.3s ease', ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}) }}
-          onMouseEnter={() => setHoverAnular(true)}
-          onMouseLeave={() => setHoverAnular(false)}
+          onMouseEnter={() => setHoverAnular(true)} onMouseLeave={() => setHoverAnular(false)}
           onClick={() => setConfirmarAnular(true)}
         >
           Anular
         </button>
         <button
           style={{ ...styles.btnEliminar, transition: 'background 0.3s ease', ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}) }}
-          onMouseEnter={() => setHoverEliminar(true)}
-          onMouseLeave={() => setHoverEliminar(false)}
+          onMouseEnter={() => setHoverEliminar(true)} onMouseLeave={() => setHoverEliminar(false)}
           onClick={() => setConfirmarEliminar(true)}
         >
           Eliminar
         </button>
+        <button style={styles.btnAnular} onClick={() => navigate(`/empresas/${id}/cesantias`)}>
+          Cancelar
+        </button>
       </div>
 
-      {/* Modales */}
       <ConfirmarCambiosModal
         visible={confirmarCerrar}
         onCancelar={() => setConfirmarCerrar(false)}
-        onConfirmar={() => { setConfirmarCerrar(false); setModal('exito'); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(cesantiaId, 'CERRADO');
+            setConfirmarCerrar(false);
+            navigate(`/empresas/${id}/cesantias/${cesantiaId}/liquidar`);
+          } catch {
+            setConfirmarCerrar(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas cerrar este proceso?"
         descripcion="Al cerrar el proceso, el estado cambiará a Cerrado y no podrá editarse."
       />
+
       <ConfirmarCambiosModal
         visible={confirmarAnular}
         onCancelar={() => setConfirmarAnular(false)}
-        onConfirmar={() => { setConfirmarAnular(false); setFueAnulado(true); setModal('exito'); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.cambiarEstado(cesantiaId, 'ANULADO');
+            useCesantiaStore.getState().limpiarProceso();
+            setConfirmarAnular(false);
+            navigate(`/empresas/${id}/cesantias`);
+          } catch {
+            setConfirmarAnular(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Estás seguro de que deseas anular este proceso?"
-        descripcion="Esta acción es irreversible. Una vez anulado, el proceso no podrá volver a un estado activo."
+        descripcion="Esta acción es irreversible."
         tipo="error"
       />
+
       <ConfirmarCambiosModal
         visible={confirmarEliminar}
         onCancelar={() => setConfirmarEliminar(false)}
-        onConfirmar={() => { setConfirmarEliminar(false); navigate(-1); }}
+        onConfirmar={async () => {
+          try {
+            await payrollService.eliminarProceso(cesantiaId);
+            useCesantiaStore.getState().limpiarProceso();
+            setConfirmarEliminar(false);
+            navigate(`/empresas/${id}/cesantias`);
+          } catch {
+            setConfirmarEliminar(false);
+            setModal('error');
+          }
+        }}
         titulo="¿Deseas eliminar este proceso?"
-        descripcion="Esta acción registrará la fecha de eliminación y el proceso dejará de mostrarse en la lista."
+        descripcion="Esta acción eliminará el proceso de cesantías."
       />
-      <MensajeModal tipo={modal} onClose={() => { setModal(null); if (fueAnulado) navigate(-1); }} />
 
+      <MensajeModal tipo={modal} onClose={() => setModal(null)} />
     </div>
   );
 }
@@ -133,7 +176,6 @@ const styles = {
   avatar:       { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   perfilNombre: { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
   perfilCargo:  { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  volverBtn:    { display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', padding: 0 },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
   cardTitulo:   { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 20px 0' },
   infoGrid:     { display: 'flex', flexDirection: 'column', gap: '10px' },
@@ -141,7 +183,7 @@ const styles = {
   infoLabel:    { fontSize: '13px', fontWeight: '700', color: '#272525', whiteSpace: 'nowrap' },
   infoValor:    { fontSize: '13px', color: '#272525' },
   accionesBar:  { display: 'flex', gap: '12px', justifyContent: 'center', paddingBottom: '16px', flexWrap: 'wrap' },
-  btnCerrar:    { flex: 1, maxWidth: '220px', backgroundColor: '#0B662A', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnCerrar:    { flex: 1, maxWidth: '220px', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   btnAnular:    { flex: 1, maxWidth: '220px', backgroundColor: '#fff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   btnEliminar:  { flex: 1, maxWidth: '220px', backgroundColor: '#fff', color: '#E53E3E', border: '1px solid #E53E3E', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
 };

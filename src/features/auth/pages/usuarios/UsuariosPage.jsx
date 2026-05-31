@@ -47,8 +47,8 @@ export default function UsuariosPage() {
   const [tabActiva, setTabActiva] = useState('activos');
   const [dropdownAbierto, setDropdownAbierto] = useState(null);
   const [modal, setModal] = useState(null);
-  const [paginaActual, setPaginaActual] = useState(1);
-  const [resultadosPorPagina, setResultadosPorPagina] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [hoverCrear, setHoverCrear] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -115,9 +115,9 @@ export default function UsuariosPage() {
     return coincideBusqueda && coincideFecha && coincideTab;
   });
 
-  const totalPaginas = Math.ceil(usuariosFiltrados.length / resultadosPorPagina);
-  const inicio = (paginaActual - 1) * resultadosPorPagina;
-  const usuariosPagina = usuariosFiltrados.slice(inicio, inicio + resultadosPorPagina);
+  const totalPages = Math.max(1, Math.ceil(usuariosFiltrados.length / itemsPerPage));
+  const inicio = currentPage * itemsPerPage;
+  const usuariosPagina = usuariosFiltrados.slice(inicio, inicio + itemsPerPage);
 
   const getEstadoEstilo = (u) => {
     if (u.estadoUsuario === true) return { label: 'Activo', color: '#0B662A' };
@@ -141,6 +141,23 @@ export default function UsuariosPage() {
 
   const confirmarAccion = () => { ejecutar(modal.accion, modal.id); setModal(null); };
   const cerrarModal = () => { if (modal?.tipo === 'exito') recargar(); setModal(null); };
+
+  // ── Generar botones de paginación con ellipsis ──
+  const generarPaginas = () => {
+    const paginas = [];
+    if (totalPages <= 6) {
+      for (let i = 0; i < totalPages; i++) paginas.push(i);
+    } else {
+      paginas.push(0);
+      if (currentPage > 2) paginas.push('...');
+      for (let i = Math.max(1, currentPage - 1); i <= Math.min(totalPages - 2, currentPage + 1); i++) {
+        paginas.push(i);
+      }
+      if (currentPage < totalPages - 3) paginas.push('...');
+      paginas.push(totalPages - 1);
+    }
+    return paginas;
+  };
 
   if (cargando) return <div style={styles.mensaje}>Cargando usuarios...</div>;
   if (error) return <div style={styles.mensajeError}>Error al cargar usuarios.</div>;
@@ -176,16 +193,15 @@ export default function UsuariosPage() {
             <span style={styles.totalLabel}>{usuariosFiltrados.length}</span>
             <p style={styles.totalSub}>Total usuarios</p>
           </div>
-          {/* ── CAMBIO responsive: flex-wrap para que los filtros bajen en pantallas chicas ── */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <div style={styles.searchWrapper}>
               <Search size={16} color="#A3A3A3" style={styles.searchIcon} />
               <input type="text" placeholder="Buscar usuario por palabra clave"
-                value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setPaginaActual(1); }}
+                value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setCurrentPage(0); }}
                 style={styles.searchInput} />
             </div>
             <input type="date" value={fechaBusqueda}
-              onChange={(e) => { setFechaBusqueda(e.target.value); setPaginaActual(1); }}
+              onChange={(e) => { setFechaBusqueda(e.target.value); setCurrentPage(0); }}
               style={styles.inputFecha} />
           </div>
         </div>
@@ -207,52 +223,52 @@ export default function UsuariosPage() {
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs + Resultados por página */}
       <div style={styles.tabs}>
-        {['activos', 'inactivos', 'bloqueados'].map((tab) => (
-          <button key={tab} onClick={() => { setTabActiva(tab); setPaginaActual(1); }}
-            style={{
-              ...styles.tab,
-              borderBottom: tabActiva === tab ? '2px solid #0B662A' : '2px solid transparent',
-              color: tabActiva === tab ? '#0B662A' : '#A3A3A3',
-              fontWeight: tabActiva === tab ? '700' : '400',
-            }}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Controles de tabla */}
-      <div style={styles.controlesTabla}>
-        <p style={styles.showingText}>
-          Mostrando {Math.min(inicio + 1, usuariosFiltrados.length)}–{Math.min(inicio + resultadosPorPagina, usuariosFiltrados.length)} de {usuariosFiltrados.length} resultados
-        </p>
-        <div style={styles.selectorWrapper}>
-          <label style={styles.selectorLabel}>Resultados por página:</label>
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          {['activos', 'inactivos', 'bloqueados'].map((tab) => (
+            <button key={tab} onClick={() => { setTabActiva(tab); setCurrentPage(0); }}
+              style={{
+                ...styles.tab,
+                borderBottom: tabActiva === tab ? '2px solid #0B662A' : '2px solid transparent',
+                color: tabActiva === tab ? '#0B662A' : '#A3A3A3',
+                fontWeight: tabActiva === tab ? '700' : '400',
+              }}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div style={styles.porPaginaBox}>
+          <span style={styles.porPaginaLabel}>Resultados por página:</span>
           <select
-            value={resultadosPorPagina}
-            onChange={(e) => { setResultadosPorPagina(Number(e.target.value)); setPaginaActual(1); }}
-            style={styles.selector}
+            value={itemsPerPage}
+            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(0); }}
+            style={styles.porPaginaSelect}
           >
-            {[10, 20, 30, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+            {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Tabla — ── CAMBIO responsive: overflowX auto para scroll horizontal ── */}
+      {/* Tabla */}
       <div style={styles.tablaWrapper}>
-        <h2 style={styles.tablaTitulo}>Todos los Usuarios</h2>
+
+        {/* ── Título de la tabla ── */}
+        <div style={styles.tablaHeader}>
+          <h2 style={styles.tablaTitulo}>Todos los Usuarios</h2>
+        </div>
+
         <div style={{ overflowX: 'auto', width: '100%' }}>
           <table style={styles.tabla}>
             <thead>
               <tr>
                 {tabActiva === 'bloqueados' ? (
                   ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'Empresa', 'Fecha registro', 'Estado', 'Acceso login', 'Acciones'].map((col) => (
-                    <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: '12px 16px' }}>{col}</th>
+                    <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left' }}>{col}</th>
                   ))
                 ) : (
                   ['#', 'Nombre(s)', 'Apellidos', 'Cargo', 'N° Documento', 'Usuario', 'Rol', 'Empresa', 'Fecha registro', 'Estado', 'Acciones'].map((col) => (
-                    <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left', padding: col === 'Acciones' ? '12px 16px' : col === 'Estado' ? '12px 10px' : '12px 16px' }}>{col}</th>
+                    <th key={col} style={{ ...styles.th, textAlign: col === 'Acciones' ? 'center' : 'left' }}>{col}</th>
                   ))
                 )}
               </tr>
@@ -262,7 +278,7 @@ export default function UsuariosPage() {
                 <tr><td colSpan={tabActiva === 'bloqueados' ? 12 : 11} style={styles.sinResultados}>No se encontraron usuarios.</td></tr>
               ) : (
                 usuariosPagina.map((u, index) => (
-                  <tr key={u.usuarioId} style={styles.tr}>
+                  <tr key={u.usuarioId} style={index % 2 === 0 ? styles.trPar : styles.trImpar}>
                     <td style={styles.td}>{String(inicio + index + 1).padStart(2, '0')}</td>
                     <td style={styles.td}>{u.nombresUsuario}</td>
                     <td style={styles.td}>{u.apellidosUsuario}</td>
@@ -333,7 +349,7 @@ export default function UsuariosPage() {
                     {/* COLUMNA ACCIONES */}
                     <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
                       <button onClick={() => navigate(`/usuarios/${u.usuarioId}`)} style={styles.btnAccion} title="Ver detalle">
-                        <Eye size={17} color="#777777" />
+                        <Eye size={17} color="#0B662A" />
                       </button>
                     </td>
                   </tr>
@@ -342,78 +358,88 @@ export default function UsuariosPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Paginación */}
-      {totalPaginas > 1 && (
+        {/* ── Paginación numerada ── */}
         <div style={styles.paginacion}>
-          {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((n) => (
-            <button key={n} onClick={() => setPaginaActual(n)}
-              style={{ ...styles.pageBtn, ...(n === paginaActual ? styles.pageBtnActivo : {}) }}>
-              {n}
-            </button>
-          ))}
-          {paginaActual < totalPaginas && (
-            <button onClick={() => setPaginaActual(totalPaginas)} style={styles.pageBtn}>{'>>'}</button>
+          {generarPaginas().map((p, i) =>
+            p === '...'
+              ? <span key={`e-${i}`} style={styles.ellipsis}>...</span>
+              : <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  style={{ ...styles.pageBtn, ...(currentPage === p ? styles.pageBtnActivo : {}) }}
+                >
+                  {p + 1}
+                </button>
           )}
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={currentPage >= totalPages - 1}
+            style={{ ...styles.pageBtn, opacity: currentPage >= totalPages - 1 ? 0.4 : 1 }}
+          >{'>>'}</button>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }
 
 const styles = {
-  // ── CAMBIO responsive: width 100%, boxSizing border-box, minWidth 0 ──
-  container:      { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box', minWidth: 0 },
-  mensaje:        { textAlign: 'center', padding: '40px', color: '#A3A3A3' },
-  mensajeError:   { textAlign: 'center', padding: '40px', color: '#e53e3e' },
-  encabezado:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
-  titulo:         { fontSize: '20px', fontWeight: '800', color: '#272525' },
-  subtitulo:      { fontSize: '12px', color: '#A3A3A3', marginTop: '2px' },
-  panelSuperior:  { backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px 24px', width: '100%', boxSizing: 'border-box' },
-  barraAcciones:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
-  totalLabel:     { fontSize: '28px', fontWeight: '800', color: '#272525' },
-  totalSub:       { fontSize: '12px', color: '#A3A3A3' },
-  // ── CAMBIO responsive: searchWrapper con width flexible ──
-  searchWrapper:  { position: 'relative', display: 'flex', alignItems: 'center', width: '320px', minWidth: '180px' },
-  searchIcon:     { position: 'absolute', left: '12px' },
-  searchInput:    { width: '100%', padding: '9px 12px 9px 36px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', boxSizing: 'border-box' },
-  filaBotones:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
-  creaLabel:      { fontSize: '14px', fontWeight: '800', color: '#272525' },
-  btnCrear:       { color: '#ffffff', border: 'none', borderRadius: '8px', padding: '10px 60px', fontSize: '13px', fontWeight: '400', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', transition: 'background 0.3s ease' },
-  tabs:           { display: 'flex', gap: '24px', backgroundColor: '#ffffff', padding: '0 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: '52px', alignItems: 'center', flexWrap: 'wrap', boxSizing: 'border-box' },
-  tab:            { background: 'none', border: 'none', padding: '16px 0', fontSize: '13px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
-  controlesTabla: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', flexWrap: 'wrap', gap: '8px' },
-  showingText:    { fontSize: '12px', color: '#A3A3A3' },
-  selectorWrapper:{ display: 'flex', alignItems: 'center', gap: '8px' },
-  selectorLabel:  { fontSize: '12px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif' },
-  selector:       { padding: '6px 32px 6px 12px', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', color: '#272525', outline: 'none', cursor: 'pointer', backgroundColor: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
-  // ── CAMBIO responsive: overflow hidden en wrapper, scroll horizontal en tabla ──
-  tablaWrapper:   { backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' },
-  tablaTitulo:    { fontSize: '14px', fontWeight: '700', color: '#272525', padding: '16px 20px', borderBottom: '1px solid #D0D0D0' },
-  tabla:          { width: '100%', borderCollapse: 'collapse', minWidth: '1000px' },
-  th:             { textAlign: 'left', padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#A3A3A3', borderBottom: '1px solid #D0D0D0', whiteSpace: 'nowrap' },
-  td:             { padding: '12px 16px', fontSize: '13px', color: '#272525', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' },
-  tr:             { transition: 'background-color 0.15s' },
-  sinResultados:  { textAlign: 'center', padding: '32px', color: '#A3A3A3', fontSize: '13px' },
-  estadoBadge:    { display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '400', backgroundColor: '#ffffff', border: '1px solid #D0D0D0', cursor: 'pointer', minWidth: '95px' },
-  dropdown:       { position: 'absolute', top: '110%', left: 0, backgroundColor: '#ffffff', border: '1px solid #D0D0D0', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 999, width: '110px', padding: '4px 0' },
-  dropdownItem:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: '400', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  paginacion:     { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', paddingTop: '8px', flexWrap: 'wrap' },
-  pageBtn:        { width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #D0D0D0', background: '#ffffff', fontSize: '13px', fontWeight: '600', color: '#272525', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
-  pageBtnActivo:  { backgroundColor: '#0B662A', color: '#ffffff', border: '1px solid #0B662A' },
-  userInfo:       { display: 'flex', alignItems: 'center', gap: '10px' },
-  userAvatar:     { width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e0e0e0', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px' },
-  userName:       { fontSize: '13px', fontWeight: '700', color: '#272525', lineHeight: 1.2 },
-  userCargo:      { fontSize: '11px', color: '#A3A3A3' },
-  modalOverlay:   { position: 'fixed', inset: 0, backgroundColor: 'rgba(14, 78, 30, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modalBox:       { backgroundColor: '#ffffff', borderRadius: '16px', padding: '36px 32px', maxWidth: '380px', width: '90%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
-  modalIconCircle:{ width: '72px', height: '72px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' },
-  modalTitulo:    { fontSize: '16px', fontWeight: '800', color: '#272525', marginBottom: '10px' },
-  modalMensaje:   { fontSize: '13px', color: '#555', marginBottom: '24px', lineHeight: 1.6 },
-  modalBotones:   { display: 'flex', justifyContent: 'center', gap: '12px' },
-  btnCancelar:    { padding: '10px 24px', backgroundColor: '#ffffff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
-  btnConfirmar:   { padding: '10px 24px', backgroundColor: '#0B662A', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
-  btnAccion:      { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-  inputFecha:     { padding: '9px 12px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', cursor: 'pointer' },
+  container:        { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box', minWidth: 0 },
+  mensaje:          { textAlign: 'center', padding: '40px', color: '#A3A3A3' },
+  mensajeError:     { textAlign: 'center', padding: '40px', color: '#e53e3e' },
+  encabezado:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
+  titulo:           { fontSize: '20px', fontWeight: '800', color: '#272525' },
+  subtitulo:        { fontSize: '12px', color: '#A3A3A3', marginTop: '2px' },
+  panelSuperior:    { backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px 24px', width: '100%', boxSizing: 'border-box' },
+  barraAcciones:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
+  totalLabel:       { fontSize: '28px', fontWeight: '800', color: '#272525' },
+  totalSub:         { fontSize: '12px', color: '#A3A3A3' },
+  searchWrapper:    { position: 'relative', display: 'flex', alignItems: 'center', width: '320px', minWidth: '180px' },
+  searchIcon:       { position: 'absolute', left: '12px' },
+  searchInput:      { width: '100%', padding: '9px 12px 9px 36px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', boxSizing: 'border-box' },
+  filaBotones:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', flexWrap: 'wrap', gap: '12px', boxSizing: 'border-box' },
+  creaLabel:        { fontSize: '14px', fontWeight: '800', color: '#272525' },
+  btnCrear:         { color: '#ffffff', border: 'none', borderRadius: '8px', padding: '10px 60px', fontSize: '13px', fontWeight: '400', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', transition: 'background 0.3s ease' },
+  tabs:             { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '24px', backgroundColor: '#ffffff', padding: '0 24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: '52px', flexWrap: 'wrap', boxSizing: 'border-box' },
+  tab:              { background: 'none', border: 'none', padding: '16px 0', fontSize: '13px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  tablaWrapper:     { backgroundColor: '#ffffff', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' },
+
+  // ── Fila superior tabla ──
+  tablaHeader:      { padding: '16px 20px', borderBottom: '1px solid #D0D0D0' },
+  tablaTitulo:      { fontSize: '14px', fontWeight: '700', color: '#272525', margin: 0 },
+  porPaginaBox:     { display: 'flex', alignItems: 'center', gap: '8px' },
+  porPaginaLabel:   { fontSize: '13px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },
+  porPaginaSelect:  { padding: '6px 28px 6px 10px', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23272525\' stroke-width=\'2\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundColor: '#fff' },
+
+  tabla:            { width: '100%', borderCollapse: 'collapse', minWidth: '1200px' },
+  th:               { textAlign: 'left', padding: '10px 12px', fontSize: '12px', fontWeight: '700', color: '#A3A3A3', borderBottom: '1px solid #F0F0F0', whiteSpace: 'nowrap' },
+  td:               { padding: '12px 16px', fontSize: '13px', color: '#272525', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' },
+  trPar:            { backgroundColor: '#ffffff' },
+  trImpar:          { backgroundColor: '#F7F9FB' },
+  sinResultados:    { textAlign: 'center', padding: '32px', color: '#A3A3A3', fontSize: '13px' },
+  estadoBadge:      { display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '400', backgroundColor: '#ffffff', border: '1px solid #D0D0D0', cursor: 'pointer', minWidth: '95px' },
+  dropdown:         { position: 'absolute', top: '110%', left: 0, backgroundColor: '#ffffff', border: '1px solid #D0D0D0', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 999, width: '110px', padding: '4px 0' },
+  dropdownItem:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: '400', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+
+  // ── Paginación numerada ──
+  paginacion:       { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '16px 20px', flexWrap: 'wrap' },
+  pageBtn:          { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #D0D0D0', cursor: 'pointer', fontSize: '13px', fontWeight: '600', backgroundColor: '#fff', color: '#272525', fontFamily: 'Nunito, sans-serif', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  pageBtnActivo:    { backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
+  ellipsis:         { fontSize: '13px', color: '#A3A3A3', padding: '0 4px', lineHeight: '36px' },
+
+  userInfo:         { display: 'flex', alignItems: 'center', gap: '10px' },
+  userAvatar:       { width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e0e0e0', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px' },
+  userName:         { fontSize: '13px', fontWeight: '700', color: '#272525', lineHeight: 1.2 },
+  userCargo:        { fontSize: '11px', color: '#A3A3A3' },
+  modalOverlay:     { position: 'fixed', inset: 0, backgroundColor: 'rgba(14, 78, 30, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modalBox:         { backgroundColor: '#ffffff', borderRadius: '16px', padding: '36px 32px', maxWidth: '380px', width: '90%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
+  modalIconCircle:  { width: '72px', height: '72px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' },
+  modalTitulo:      { fontSize: '16px', fontWeight: '800', color: '#272525', marginBottom: '10px' },
+  modalMensaje:     { fontSize: '13px', color: '#555', marginBottom: '24px', lineHeight: 1.6 },
+  modalBotones:     { display: 'flex', justifyContent: 'center', gap: '12px' },
+  btnCancelar:      { padding: '10px 24px', backgroundColor: '#ffffff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  btnConfirmar:     { padding: '10px 24px', backgroundColor: '#0B662A', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  btnAccion:        { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  inputFecha:       { padding: '9px 12px', border: '1.5px solid #0B662A', borderRadius: '8px', fontSize: '13px', color: '#272525', outline: 'none', fontFamily: 'Nunito, sans-serif', backgroundColor: '#F7F9FB', cursor: 'pointer' },
 };

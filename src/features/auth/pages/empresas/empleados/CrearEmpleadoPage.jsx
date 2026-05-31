@@ -8,13 +8,7 @@ import empleadosService from '../../../../../services/empleadosService';
 import contratoConceptoService from '../../../../../services/contratoConceptoService';
 import parametrosService from '../../../../../services/parametrosService';
 import conceptoNominaService from '../../../../../services/conceptoNominaService';
-
-const formatearMiles = (valor) => {
-  const soloNumeros = limpiarMiles(valor);
-  if (!soloNumeros) return '';
-  return soloNumeros.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-};
-const limpiarMiles = (valor) => String(valor).replace(/\./g, '').replace(/[^0-9]/g, '');
+import { formatearMiles, limpiarMiles } from '../../../../../utils/formatters';
 
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error }) {
   const [abierto, setAbierto] = useState(false);
@@ -137,7 +131,7 @@ export default function CrearEmpleadoPage() {
     apellidosEmpleado:'', direccion:        '', cargo:            '',
     tipoContrato:     '', jornada:          '', fechaIngreso:     '',
     fechaFinContrato: '', tipoCotizante:    '', subtipoCotizante: '',
-    salario:          '', auxTransporte:    '', eps:              '',
+    salario:          '', esSalarioIntegral: 'NO', auxTransporte:    '', eps:              '',
     fondoPensiones:   '', arl:              '', claseRiesgo:      '',
     fondoCesantias:   '', cajaCompensacion: '',
   });
@@ -207,6 +201,9 @@ export default function CrearEmpleadoPage() {
   };
 
   const handleSubmit = () => {
+    if (form.esSalarioIntegral === 'SI') {
+        setForm(f => ({ ...f, auxTransporte: 'NO' }));
+    }
     if (!validar()) return;
     const salarioNum = parseFloat(limpiarMiles(form.salario));
     if (smmlv && form.auxTransporte === 'SI' && salarioNum > smmlv * 2) {
@@ -255,6 +252,7 @@ export default function CrearEmpleadoPage() {
       fechaFinContrato:   fechaFinContratoDTO,
       cargoEmp:           form.cargo || null,
       salarioBascMensual: parseFloat(limpiarMiles(form.salario)),
+      esSalarioIntegral: form.esSalarioIntegral === 'SI',
       claseRiesgo:        MAPA_CLASE_RIESGO[form.claseRiesgo],
       tipoCotizante:      MAPA_TIPO_COTIZANTE[form.tipoCotizante],
       subtipoCotizante:   MAPA_SUBTIPO_COTIZANTE[form.subtipoCotizante],
@@ -484,9 +482,26 @@ export default function CrearEmpleadoPage() {
             {errores.salario && <span style={styles.errorMsg}>{errores.salario}</span>}
           </div>
           <div style={styles.campo}>
+              <label style={styles.label}>
+                  ¿El salario es integral?<span style={styles.req}>*</span>
+              </label>
+              <div style={styles.selectWrapper}>
+                  <select
+                      name="esSalarioIntegral"
+                      value={form.esSalarioIntegral}
+                      onChange={handleChange}
+                      style={styles.select}
+                  >
+                      <option value="NO">NO</option>
+                      <option value="SI">SI</option>
+                  </select>
+                  <ChevronDown size={16} color="#A3A3A3" style={styles.selectIcon} />
+              </div>
+          </div>
+          <div style={styles.campo}>
             <label style={styles.label}>Auxilio de transporte<span style={styles.req}>*</span></label>
             <div style={styles.selectWrapper}>
-              <select name="auxTransporte" value={form.auxTransporte} onChange={handleChange} style={selectStyle('auxTransporte')}>
+              <select name="auxTransporte" value={form.esSalarioIntegral === 'SI' ? 'NO' : form.auxTransporte} onChange={handleChange} disabled={form.esSalarioIntegral === 'SI'} style={{ ...selectStyle('auxTransporte'), opacity: form.esSalarioIntegral === 'SI' ? 0.5 : 1 }}>
                 <option value="">Seleccionar opción</option>
                 <option value="SI">SI</option>
                 <option value="NO">NO</option>
@@ -578,9 +593,10 @@ export default function CrearEmpleadoPage() {
             <div style={{ ...styles.campo, flex: 1 }}>
               {i === 0 && <label style={styles.label}>Valor neto (mensual)</label>}
               <input
-                value={c.valor}
-                onChange={(e) => handleConcepto(i, 'valor', e.target.value)}
+                value={formatearMiles(c.valor)}
+                onChange={(e) => handleConcepto(i, 'valor', limpiarMiles(e.target.value))}
                 placeholder="Ingresar valor"
+                inputMode="numeric"
                 style={styles.input}
               />
             </div>
