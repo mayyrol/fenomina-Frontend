@@ -40,7 +40,7 @@ export function useEmpleados(empresaId) {
   const totalPaginas = Math.max(1, Math.ceil(total / SIZE));
 
   return {
-    empleados: empleadosPag,
+    empleados,
     total,
     totalPaginas,
     cargando,

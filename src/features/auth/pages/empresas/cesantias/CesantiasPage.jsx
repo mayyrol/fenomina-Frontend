@@ -175,24 +175,18 @@ export default function CesantiasPage() {
           <p style={styles.totalLabel}>Total reportes</p>
         </div>
         <div style={styles.filtrosBox}>
-          <div style={styles.searchBox}>
-            <Search size={14} color="#A3A3A3" />
-            <input style={styles.searchInput} placeholder="Buscar cesantía por palabra clave" value={busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }} />
-          </div>
-          <div style={styles.dateWrapper}>
-            <input
-              type="date"
-              value={fechaBusqueda}
-              onChange={(e) => { setFechaBusqueda(e.target.value); setPagina(0); }}
-              style={styles.dateInput}
-            />
-            {fechaBusqueda && (
-              <button onClick={() => { setFechaBusqueda(''); setPagina(0); }} style={styles.clearDateBtn} title="Limpiar filtro de fecha">
-                <X size={14} color="#A3A3A3" />
-              </button>
-            )}
-          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}> 
+            <span style={styles.fechaLabel}>Fecha</span> 
+            <div style={styles.dateWrapper}> 
+              <input type="date" style={styles.dateInput} value={fechaBusqueda} 
+                onChange={(e) => { setFechaBusqueda(e.target.value); setPagina(0); }} /> 
+              {fechaBusqueda && ( 
+                <button onClick={() => { setFechaBusqueda(''); setPagina(0); }} style={styles.clearDateBtn} title="Limpiar filtro de fecha"> 
+                  <X size={14} color="#A3A3A3" /> 
+                </button> 
+              )} 
+            </div> 
+          </div> 
         </div>
       </div>
 
@@ -395,6 +389,7 @@ const styles = {
   searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   iconBtn:      { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },
   dateWrapper:    { display: 'flex', alignItems: 'center', gap: '4px' },
+  fechaLabel: { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' }, 
   clearDateBtn:   { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' },
   dateInput:      { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', cursor: 'pointer', color: '#272525' },
   tabsBox:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8', flexWrap: 'wrap', gap: '8px' },

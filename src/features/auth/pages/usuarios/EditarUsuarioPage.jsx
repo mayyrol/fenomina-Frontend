@@ -28,7 +28,7 @@ export default function EditarUsuarioPage() {
   const { empresas, cargando: cargandoEmpresas } = useEmpresasLista();
   const navigate = useNavigate();
   const { usuario: usuarioActual } = useAuthStore();
-  const [form, setForm] = useState({ nombresUsuario: '', apellidosUsuario: '', cargoUsuario: '', numIdentiUsuario: '', userName: '', contrasenaUsuario: '', rolUsuario: '', fkIdEmpresa: '' });
+  const [form, setForm] = useState({ nombresUsuario: '', apellidosUsuario: '', cargoUsuario: '', rolUsuario: '', fkIdEmpresa: '' });
   const [errores, setErrores] = useState({});
   const [errorGlobal, setErrorGlobal] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -43,9 +43,6 @@ export default function EditarUsuarioPage() {
         nombresUsuario:   data.nombresUsuario || '',
         apellidosUsuario: data.apellidosUsuario || '',
         cargoUsuario:     data.cargoUsuario || '',
-        numIdentiUsuario: data.numIdentiUsuario || '',
-        userName:         data.userName || '',
-        contrasenaUsuario: '',
         rolUsuario:       data.rolUsuario || '',
         fkIdEmpresa:      data.fkIdEmpresa ?? '',
       });
@@ -68,14 +65,6 @@ export default function EditarUsuarioPage() {
     if (!form.nombresUsuario)   e.nombresUsuario   = 'Los nombres son obligatorios.';
     if (!form.apellidosUsuario) e.apellidosUsuario = 'Los apellidos son obligatorios.';
     if (!form.cargoUsuario)     e.cargoUsuario     = 'El cargo es obligatorio.';
-    if (!form.numIdentiUsuario) e.numIdentiUsuario = 'El número de identificación es obligatorio.';
-    if (!form.userName)         e.userName         = 'El nombre de usuario es obligatorio.';
-    if (form.contrasenaUsuario) {
-      if (form.contrasenaUsuario.length < 8)
-        e.contrasenaUsuario = 'Mínimo 8 caracteres.';
-      else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(form.contrasenaUsuario))
-        e.contrasenaUsuario = 'Debe tener al menos una mayúscula y un número.';
-    }
     if (!form.rolUsuario) e.rolUsuario = 'El rol es obligatorio.';
     if (form.rolUsuario === 'CLIENTE_EMPRESA' && !form.fkIdEmpresa) {
       e.fkIdEmpresa = 'Debes seleccionar una empresa para este rol.';
@@ -153,33 +142,12 @@ export default function EditarUsuarioPage() {
           <Campo label="Apellidos Usuario*" name="apellidosUsuario" placeholder="Ingresar apellidos" value={form.apellidosUsuario} onChange={handleChange} error={errores.apellidosUsuario} />
           <Campo label="Cargo*" name="cargoUsuario" placeholder="Ingresar cargo" value={form.cargoUsuario} onChange={handleChange} error={errores.cargoUsuario} />
         </div>
-        <div style={{ marginTop: '16px', maxWidth: '32%' }}>
-          <Campo label="Número de Identificación*" name="numIdentiUsuario" placeholder="Ingresar número" value={form.numIdentiUsuario} onChange={handleChange} error={errores.numIdentiUsuario} />
-        </div>
       </div>
 
       {/* Sección 2: Datos de Usuario */}
       <div style={styles.seccion}>
         <h2 style={styles.seccionTitulo}>Datos de Usuario</h2>
         <div style={styles.grid2}>
-          <Campo label="Nombre de usuario*" name="userName" placeholder="Ingresar nombre de usuario" value={form.userName} onChange={handleChange} error={errores.userName} />
-          <div>
-            <label style={styles.label}>Nueva contraseña <span style={{ color: '#A3A3A3', fontWeight: '400' }}>(dejar vacío para no cambiar)</span></label>
-            <div style={styles.inputWrapper}>
-              <input
-                type={mostrarContrasena ? 'text' : 'password'}
-                name="contrasenaUsuario"
-                placeholder="Ingresar nueva contraseña"
-                value={form.contrasenaUsuario}
-                onChange={handleChange}
-                style={{ ...styles.input, borderColor: errores.contrasenaUsuario ? '#e53e3e' : '#D0D0D0' }}
-              />
-              <button type="button" onClick={() => setMostrarContrasena(v => !v)} style={styles.eyeButton}>
-                {mostrarContrasena ? <EyeOff size={18} color="#777777" /> : <Eye size={18} color="#777777" />}
-              </button>
-            </div>
-            {errores.contrasenaUsuario && <span style={styles.errorTexto}>{errores.contrasenaUsuario}</span>}
-          </div>
         </div>
         <div style={{ ...styles.grid2, marginTop: '16px' }}>
           <div>

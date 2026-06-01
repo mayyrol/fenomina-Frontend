@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { CreditCard, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X } from 'lucide-react';
+import { CreditCard, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
@@ -84,6 +84,8 @@ export default function PrimasPage() {
 
   const [fechaBusqueda, setFechaBusqueda] = useState('');
   const [itemsPerPage, setItemsPerPage]   = useState(10);
+  const [hoverTab,  setHoverTab]  = useState(null); 
+  const [hoverIcon, setHoverIcon] = useState(null);
 
   useEffect(() => {
     if (!id) return;
@@ -196,16 +198,16 @@ export default function PrimasPage() {
           <p style={styles.totalNum}>{periodosFiltrados.length}</p>
           <p style={styles.totalLabel}>Total reportes</p>
         </div>
-        <div style={styles.filtrosBox}>
-          <div style={styles.searchBox}>
-            <Search size={14} color="#A3A3A3" />
-            <input
-              style={styles.searchInput}
-              placeholder="Buscar prima por palabra clave"
-              value={busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
-            />
-          </div>
+        <div style={styles.filtrosBox}> 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}> 
+            <span style={styles.fechaLabel}>Fecha</span> 
+            <input 
+              type="date" 
+              style={styles.dateInput} 
+              value={fechaBusqueda} 
+              onChange={(e) => { setFechaBusqueda(e.target.value); setPagina(0); }} 
+            /> 
+          </div> 
         </div>
       </div>
 
@@ -227,11 +229,21 @@ export default function PrimasPage() {
       {/* Tabs */}
       <div style={styles.tabsBox}>
         <div style={{ display: 'flex' }}>
-          {TABS.map((t) => (
-            <button key={t} style={{ ...styles.tab, ...(tab === t ? styles.tabActivo : {}) }} onClick={() => { setTab(t); setPagina(0); }}>{t}</button>
+          {TABS.map((t) => ( 
+            <button 
+              key={t} 
+              style={{ 
+                ...styles.tab, 
+                ...(tab === t ? styles.tabActivo : {}), 
+                ...(hoverTab === t && tab !== t ? { color: '#555' } : {}), 
+              }} 
+              onMouseEnter={() => setHoverTab(t)} 
+              onMouseLeave={() => setHoverTab(null)} 
+              onClick={() => { setTab(t); setPagina(0); }} 
+            >{t}</button> 
           ))}
         </div>
-        <div style={styles.porPaginaBox}>
+        <div style={{ ...styles.porPaginaBox, marginLeft: 'auto' }}>
           <span style={styles.porPaginaLabel}>Resultados por página:</span>
           <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPagina(0); }} style={styles.porPaginaSelect}>
             {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -386,7 +398,7 @@ const styles = {
   addLabel:     { fontSize: '15px', fontWeight: '700', color: '#272525' },
   btnLiquidar:  { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   tabsBox:      { display: 'flex', borderBottom: '1px solid #E8E8E8' },
-  tab:          { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
+  tab:          { background: 'none', border: 'none', borderBottom: '2px solid transparent', transition: 'color 0.15s ease, border-color 0.15s ease', padding: '10px 20px', fontSize: '14px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' },
   tabActivo:    { color: '#0B662A', borderBottom: '2px solid #0B662A' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '24px' },
   tableTitle:   { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 16px 0' },
@@ -402,14 +414,14 @@ const styles = {
   pageBtnActivo:{ backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
   toolbarCard:  { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   filtrosBox:   { display: 'flex', alignItems: 'center', gap: '12px' },
-  searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
-  searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
-  iconBtn:      { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },
   dateWrapper:    { display: 'flex', alignItems: 'center', gap: '4px' },
   clearDateBtn:   { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' },
   dateInput:      { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', cursor: 'pointer', color: '#272525' },
   porPaginaBox:   { display: 'flex', alignItems: 'center', gap: '8px' },
+  iconBtn:  { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', transition: 'background 0.15s ease' }, 
+  fechaLabel: { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
   porPaginaLabel: { fontSize: '13px', color: '#A3A3A3', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },
   porPaginaSelect:{ padding: '6px 28px 6px 10px', border: '1px solid #D0D0D0', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#272525', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23272525\' stroke-width=\'2\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundColor: '#fff' },
   ellipsis:       { fontSize: '13px', color: '#A3A3A3', padding: '0 4px', lineHeight: '36px' },
 };
+

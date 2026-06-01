@@ -81,7 +81,6 @@ export default function LogsPage() {
           </div>
         </div>
       </div>
-
       <div style={styles.card}>
         <div style={styles.tableWrapper}>
           <table style={styles.table}>
@@ -164,7 +163,7 @@ const styles = {
   fechaBox:     { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff' },
   fechaInput:   { border: 'none', outline: 'none', fontSize: '13px', fontFamily: 'Nunito, sans-serif', color: '#272525', cursor: 'pointer' },
   searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '280px' },
-  searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
+  searchInput: { border: 'none', outline: 'none', boxShadow: 'none', backgroundColor: 'transparent', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
   card:         { backgroundColor: '#fff', borderRadius: '16px', padding: '24px' },
   tableWrapper: { overflowX: 'auto', width: '100%' },
   table:        { width: '100%', borderCollapse: 'collapse', minWidth: '600px' },

@@ -298,20 +298,22 @@ export default function ResultadoPrimaPage() {
           </p>
           <div style={{ overflowX: 'auto' }}>
             <table style={styles.tabla}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>No</th>
-                  <th style={styles.th}>CC</th>
-                  <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
-                  <th style={{ ...styles.th, textAlign: 'left' }}>Cargo</th>
-                  <th style={styles.th}>Fecha inicio</th>
-                  <th style={styles.th}>Fecha fin</th>
-                  <th style={styles.th}>Días</th>
-                  <th style={styles.th}>Salario Base</th>
-                  <th style={styles.th}>Base Aux. Transporte</th>
-                  <th style={styles.th}>Neto</th>
-                </tr>
-              </thead>
+              <thead> 
+                <tr> 
+                  <th style={{ ...styles.th, minWidth: '36px'  }}>No</th> 
+                  <th style={{ ...styles.th, minWidth: '80px'  }}>CC</th> 
+                  <th style={{ ...styles.th, textAlign: 'left', minWidth: '150px' }}>Nombres y Apellidos</th> 
+                  <th style={{ ...styles.th, textAlign: 'left', minWidth: '80px'  }}>Cargo</th> 
+                  <th style={{ ...styles.th, minWidth: '95px'  }}>Fecha inicio</th> 
+                  <th style={{ ...styles.th, minWidth: '95px'  }}>Fecha fin</th> 
+                  <th style={{ ...styles.th, minWidth: '48px'  }}>Días</th> 
+                  <th style={{ ...styles.th, minWidth: '100px' }}>Salario Base</th> 
+                  <th style={{ ...styles.th, minWidth: '130px' }}>Base Aux. Transporte</th> 
+                  <th style={{ ...styles.th, minWidth: '100px' }}>Neto</th> 
+                  <th style={{ ...styles.th, minWidth: '130px' }}>Firma Empleado</th> 
+                </tr> 
+              </thead> 
+
               <tbody>
                 {cargando ? (
                   <tr>
@@ -336,6 +338,7 @@ export default function ResultadoPrimaPage() {
                     <td style={styles.td}>{fmt(desp.salarioBase)}</td>
                     <td style={styles.td}>{fmt(desp.auxTransporte)}</td>
                     <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
+                    <td style={{ ...styles.td, minWidth: '120px', height: '40px' }}></td>
                   </tr>
                 ))}
                 <tr style={{ backgroundColor: '#E8F5EE' }}>
@@ -527,7 +530,7 @@ const styles = {
   infoValor:          { fontSize: '13px', color: '#272525' },
   divider:            { border: 'none', borderTop: '1px solid #E8E8E8', margin: '24px 0 0 0' },
   tableTitle:         { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 16px 0' },
-  tabla:              { width: '100%', borderCollapse: 'collapse', minWidth: '700px', fontSize: '12px' },
+  tabla: { width: '100%', borderCollapse: 'collapse', minWidth: '1050px', fontSize: '12px' },
   th:                 { backgroundColor: '#F0F0F0', fontWeight: '700', color: '#272525', padding: '8px 12px', textAlign: 'center', border: '1px solid #E0E0E0', whiteSpace: 'nowrap' },
   td:                 { padding: '7px 12px', textAlign: 'center', color: '#272525', border: '1px solid #E0E0E0', whiteSpace: 'nowrap' },
   trPar:              { backgroundColor: '#fff' },

@@ -193,17 +193,22 @@ export default function NominasPage() {
           <p style={styles.totalNum}>{periodosFiltrados.length}</p>
           <p style={styles.totalLabel}>Total reportes</p>
         </div>
-        <div style={styles.filtrosBox}>
-          <div style={styles.searchBox}>
-            <Search size={14} color="#A3A3A3" />
-            <input
-              style={styles.searchInput}
-              placeholder="Buscar nómina por palabra clave"
-              value={busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
-            />
-          </div>
-        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}> 
+          <span style={styles.fechaLabel}>Fecha</span> 
+          <div style={styles.dateWrapper}> 
+            <input 
+              type="date" 
+              value={fechaBusqueda} 
+              onChange={(e) => { setFechaBusqueda(e.target.value); setPagina(0); }} 
+              style={styles.dateInput} 
+            /> 
+            {fechaBusqueda && ( 
+              <button onClick={() => { setFechaBusqueda(''); setPagina(0); }} style={styles.clearDateBtn} title="Limpiar filtro de fecha"> 
+                <X size={14} color="#A3A3A3" /> 
+              </button> 
+            )} 
+          </div> 
+        </div> 
       </div>
 
       {/* Action bar */}
@@ -446,6 +451,7 @@ const styles = {
   pageBtn:      { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #D0D0D0', cursor: 'pointer', fontSize: '13px', fontWeight: '600', backgroundColor: '#fff', color: '#272525', fontFamily: 'Nunito, sans-serif' },
   pageBtnActivo:{ backgroundColor: '#0B662A', color: '#fff', border: '1px solid #0B662A' },
   toolbarCard:  { backgroundColor: '#fff', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
+  fechaLabel: { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' }, 
   filtrosBox:   { display: 'flex', alignItems: 'center', gap: '12px' },
   searchBox:    { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 14px', backgroundColor: '#fff', width: '380px' },
   searchInput:  { border: 'none', outline: 'none', fontSize: '13px', width: '100%', fontFamily: 'Nunito, sans-serif' },
