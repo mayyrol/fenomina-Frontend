@@ -3,8 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { useNominaStore } from '../../../../../store/useNominaStore';
 import payrollService from '../../../../../services/payrollService';
-import payrollAxios from '../../../../../api/payrollAxiosInstance';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance';
 import {
   FileText, ChevronDown, ChevronLeft, ChevronRight,
   Plus, Trash2, Calendar, UserRound
@@ -193,7 +192,7 @@ export default function NovedadesPage() {
     setCargando(true);
 
     Promise.all([
-      masterAxios.get('/api/master/empleados', {
+      axiosInstance.get('/api/master/empleados', {
         params: { empresaId: id, estado: 'ACTIVO' },
       }),
       payrollService.getConceptosNovedades(),
@@ -279,7 +278,7 @@ export default function NovedadesPage() {
   // Si es edición, cargar la novedad existente
   useEffect(() => {
     if (!novedadId) return;
-    payrollAxios.get(`/api/payroll/novedades/${novedadId}`)
+    axiosInstance.get(`/api/payroll/novedades/${novedadId}`)
       .then(({ data }) => setNovedadEdit(data))
       .catch(() => {});
   }, [novedadId]);
@@ -635,14 +634,14 @@ export default function NovedadesPage() {
 
       // Si es edición, hacer PUT; si es creación, hacer POST
       if (novedadId && novedadesAGuardar.length === 1) {
-        await payrollAxios.put(
+        await axiosInstance.put(
           `/api/payroll/novedades/${novedadId}`,
           novedadesAGuardar[0]
         );
       } else {
         await Promise.all(
           novedadesAGuardar.map(n =>
-            payrollAxios.post('/api/payroll/novedades', n)
+            axiosInstance.post('/api/payroll/novedades', n)
           )
         );
       }

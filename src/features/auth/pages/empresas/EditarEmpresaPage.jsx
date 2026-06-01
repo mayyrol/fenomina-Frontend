@@ -5,6 +5,7 @@ import { Building2, Camera, ChevronDown, UserRound} from 'lucide-react';
 import MensajeModal from '../../../../components/MensajeModal';
 import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal';
 import empresasService from '../../../../services/empresasService';
+import { useImagenAutenticada } from '../../hooks/useImagenAutenticada';
 
 export default function EditarEmpresaPage() {
   const navigate    = useNavigate();
@@ -25,15 +26,12 @@ export default function EditarEmpresaPage() {
     ley1607: '', reportesNomina: '', reportesPrimas: '', reportesCesantias: '',
   });
 
+  const logoInicial = useImagenAutenticada(empresa?.logoEmpresaUrl);
+
   useEffect(() => {
     empresasService.getEmpresaById(id)
       .then(({ data }) => {
         setEmpresa(data);
-        setFotoPreview(
-          data.logoEmpresaUrl
-            ? `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${data.logoEmpresaUrl}`
-            : null
-        );
         setForm({
           nitEmpresa:        data.empresaNit,
           razonSocial:       data.razonSocial,
@@ -47,6 +45,12 @@ export default function EditarEmpresaPage() {
       .catch(() => setEmpresa(null))
       .finally(() => setCargando(false));
   }, [id]);
+
+  useEffect(() => {
+    if (logoInicial && !foto) {
+      setFotoPreview(logoInicial);
+    }
+  }, [logoInicial]);
 
   if (cargando) return <p>Cargando...</p>;
   if (!empresa) return <p>Empresa no encontrada.</p>;

@@ -5,7 +5,8 @@ import { CreditCard, ChevronLeft, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import payrollService from '../../../../../services/payrollService';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
+//import { useImagenAutenticada } from '../../../hooks/useImagenAutenticada';
 
 const calcularNeto = (desp) => desp.valorPrestacion ?? 0;
 const fmt = (v) => '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -39,6 +40,8 @@ export default function ResultadoPrimaPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
+  //const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
+
   const [hoverDescargar, setHoverDescargar] = useState(false);
   const [descargando, setDescargando]       = useState(false);
 
@@ -68,8 +71,13 @@ export default function ResultadoPrimaPage() {
     let logoBase64 = null;
     if (empresa?.logoEmpresaUrl) {
       try {
-        const logoUrl = `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
-        const response = await fetch(logoUrl);
+        const logoUrl = `${import.meta.env.VITE_GATEWAY_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+        const token = useAuthStore.getState().accessToken;
+        const response = await fetch(logoUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         const blob = await response.blob();
         logoBase64 = await new Promise((resolve) => {
           const img = new Image();
@@ -226,7 +234,7 @@ export default function ResultadoPrimaPage() {
     Promise.all([
       payrollService.getDesprendiblesPrima(primaId),
       payrollService.getProcesosPrima(id),
-      masterAxios.get(`/api/master/empresas/${id}`),
+      axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: desps }, { data: procesos }, { data: emp }]) => {
         setDesprendibles(desps);
@@ -331,7 +339,7 @@ export default function ResultadoPrimaPage() {
                   </tr>
                 ))}
                 <tr style={{ backgroundColor: '#E8F5EE' }}>
-                  <td colSpan={8} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>TOTAL</td>
+                  <td colSpan={9} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>TOTAL</td>
                   <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalGeneral)}</td>
                 </tr>
               </tbody>

@@ -5,15 +5,11 @@ let refreshTimer = null;
 
 export function iniciarRefreshAutomatico() {
   const { accessToken, refreshToken, expiresIn } = useAuthStore.getState();
-  
+
   if (!accessToken || !expiresIn) return;
 
-  // Cancelar timer anterior si existe
-  if (refreshTimer) {
-    clearTimeout(refreshTimer);
-  }
+  if (refreshTimer) clearTimeout(refreshTimer);
 
-  // Refrescar 1 minuto antes de que expire 
   const tiempoHastaRefresh = (expiresIn - 60) * 1000;
 
   refreshTimer = setTimeout(async () => {

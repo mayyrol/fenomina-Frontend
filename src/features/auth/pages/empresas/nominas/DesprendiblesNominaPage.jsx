@@ -3,8 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { useNominaStore } from '../../../../../store/useNominaStore';
 import payrollService from '../../../../../services/payrollService';
-import payrollAxios from '../../../../../api/payrollAxiosInstance';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
 import {
   FileText, ChevronLeft, UserRound, Search,
   Plus, Pencil, Trash2, ChevronDown, ChevronUp
@@ -56,7 +55,7 @@ export default function DesprendiblesNominaPage() {
     Promise.all([
       payrollService.getProcesos(id),
       payrollService.getEmpleadosActivos(id),
-      masterAxios.get(`/api/master/empresas/${id}`),
+      axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: procesos }, { data: emps }, { data: emp }]) => {
         const encontrado = procesos.find(
@@ -73,7 +72,7 @@ export default function DesprendiblesNominaPage() {
 
         return Promise.all(
           empsAMostrar.map(e =>
-            payrollAxios
+            axiosInstance
               .get(`/api/payroll/novedades/proceso/${nominaId}/empleado/${e.empleadoId}`)
               .then(({ data }) => ({ empleadoId: e.empleadoId, data }))
               .catch(() => ({ empleadoId: e.empleadoId, data: [] }))
@@ -101,7 +100,7 @@ export default function DesprendiblesNominaPage() {
 
   const handleConfirmarEliminarNovedad = async () => {
     try {
-      await payrollAxios.delete(`/api/payroll/novedades/${novedadEliminar.novedadId}`);
+      await axiosInstance.delete(`/api/payroll/novedades/${novedadEliminar.novedadId}`);
       setNovedades(prev => ({
         ...prev,
         [novedadEliminar.empId]: prev[novedadEliminar.empId]

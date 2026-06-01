@@ -2,8 +2,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { CreditCard, UserRound } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import payrollAxios from '../../../../../api/payrollAxiosInstance';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
 import payrollService from '../../../../../services/payrollService';
 
 export default function VerPrimaPage() {
@@ -32,7 +31,7 @@ export default function VerPrimaPage() {
     setCargando(true);
 
     Promise.all([
-      masterAxios.get('/api/master/empleados', {
+      axiosInstance.get('/api/master/empleados', {
         params: { empresaId: id, estado: 'ACTIVO' },
       }),
       payrollService.getPreviewPrimaEmpleado(id, empleadoId, semestre, anio),

@@ -6,7 +6,7 @@ import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosMod
 import MensajeModal from '../../../../../components/MensajeModal';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
 import payrollService from '../../../../../services/payrollService';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance';
 
 const NOMBRE_MES = [
   '','Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -40,7 +40,7 @@ export default function DesprendiblesPrimaPage() {
 
     Promise.all([
       payrollService.getProcesosPrima(id),
-      masterAxios.get(`/api/master/empresas/${id}`),
+      axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: procesos }, { data: emp }]) => {
         const encontrado = procesos.find(

@@ -1,8 +1,8 @@
-import masterAxios from '../api/masterAxiosInstance';
+import axiosInstance from '../api/axiosInstance';
 
 const conceptoNominaService = {
   getConceptosContrato: () =>
-    masterAxios.get('/api/master/conceptos-nomina/contrato'),
+    axiosInstance.get('/api/master/conceptos-nomina/contrato'),
 };
 
 export default conceptoNominaService;

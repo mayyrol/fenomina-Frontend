@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import payrollService from '../../../../../services/payrollService';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
 import { FileText, ChevronLeft, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useImagenAutenticada } from '../../..//hooks/useImagenAutenticada';
 
 const fmt = (v) =>
   v != null
@@ -51,7 +52,7 @@ export default function ResultadoLiquidacionPage() {
     'Intereses sobre las cesantías',
   ];
 
-
+  const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
 
   useEffect(() => {
     if (!nominaId || !id) return;
@@ -60,7 +61,7 @@ export default function ResultadoLiquidacionPage() {
     Promise.all([
       payrollService.getDesprendiblesNomina(nominaId),
       payrollService.getProcesos(id),
-      masterAxios.get(`/api/master/empresas/${id}`),
+      axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: desps }, { data: procesos }, { data: emp }]) => {
         setDesprendibles(desps);
@@ -86,8 +87,13 @@ export default function ResultadoLiquidacionPage() {
     let logoBase64 = null;
     if (empresa?.logoEmpresaUrl) {
       try {
-        const logoUrl = `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
-        const response = await fetch(logoUrl);
+        const logoUrl = `${import.meta.env.VITE_GATEWAY_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+        const token = useAuthStore.getState().accessToken;
+        const response = await fetch(logoUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         const blob = await response.blob();
  
         logoBase64 = await new Promise((resolve) => {
@@ -475,7 +481,7 @@ export default function ResultadoLiquidacionPage() {
                   {empresa?.logoEmpresaUrl
                     ? (
                       <img
-                        src={`${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`}
+                        src={logoSrc}
                         alt="logo"
                         style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '0' }}
                         onError={(e) => { e.target.style.display = 'none'; }}

@@ -7,8 +7,6 @@ import MensajeModal from '../../../../../components/MensajeModal';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
 import payrollService from '../../../../../services/payrollService';
 
-
-
 const TABS = ['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado', 'Anulado'];
 const PAGE_SIZE = 10;
 

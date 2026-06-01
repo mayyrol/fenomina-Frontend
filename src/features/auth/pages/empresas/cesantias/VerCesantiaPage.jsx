@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { Coins, UserRound } from 'lucide-react';
-import payrollAxios from '../../../../../api/payrollAxiosInstance';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
 import payrollService from '../../../../../services/payrollService';
 
 export default function VerCesantiaPage() {
@@ -33,7 +32,7 @@ export default function VerCesantiaPage() {
     setCargando(true);
 
     Promise.all([
-      masterAxios.get('/api/master/empleados', {
+      axiosInstance.get('/api/master/empleados', {
         params: { empresaId: id, estado: 'ACTIVO' },
       }),
       payrollService.getProcesos(id), // nóminas pagadas del año
@@ -52,7 +51,7 @@ export default function VerCesantiaPage() {
 
         return Promise.all(
           nominasDelAnio.map(p =>
-            payrollAxios
+            axiosInstance 
               .get(`/api/payroll/novedades/proceso/${p.procesoLiquiId}/empleado/${empleadoId}`)
               .then(({ data }) => ({ novedades: data, procesoLiquiId: p.procesoLiquiId }))
               .catch(() => ({ novedades: [], procesoLiquiId: p.procesoLiquiId }))
@@ -65,7 +64,7 @@ export default function VerCesantiaPage() {
           // desde los detalles de nómina
           return Promise.all(
             nominasDelAnio.map(p =>
-              payrollAxios
+              axiosInstance 
                 .get(`/api/payroll/desprendibles/nomina/${p.procesoLiquiId}`)
                 .then(({ data: desps }) => {
                   const despEmpleado = desps.find(

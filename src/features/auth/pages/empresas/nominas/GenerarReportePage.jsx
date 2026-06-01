@@ -4,7 +4,7 @@ import { useAuthStore } from '../../../../../store/authStore';
 import { FileText, ChevronLeft, ChevronRight, UserRound, Calendar, ChevronDown } from 'lucide-react';
 import MensajeModal from '../../../../../components/MensajeModal';
 import payrollService from '../../../../../services/payrollService';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
 import { useNominaStore } from '../../../../../store/useNominaStore';
 
 // ── Calendario ──────────────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ export default function GenerarReportePage() {
   useEffect(() => {
     if (!id) return;
     setCargandoEmp(true);
-    masterAxios.get('/api/master/empleados', {
+    axiosInstance.get('/api/master/empleados', {
       params: { empresaId: id, estado: 'ACTIVO' }
     })
       .then(({ data }) => setEmpleados(data))

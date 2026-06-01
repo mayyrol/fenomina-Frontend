@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import masterAxios from '../../../api/masterAxiosInstance';
+import axiosInstance from '../../../api/axiosInstance';   
 
 export function useEmpresasLista() {
   const [empresas,  setEmpresas]  = useState([]);
   const [cargando,  setCargando]  = useState(true);
 
   useEffect(() => {
-    masterAxios.get('/api/master/empresas')
+    axiosInstance.get('/api/master/empresas')
       .then(({ data }) => setEmpresas(data))
       .catch(() => setEmpresas([]))
       .finally(() => setCargando(false));

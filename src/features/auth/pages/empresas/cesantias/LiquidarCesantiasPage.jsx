@@ -5,7 +5,7 @@ import { Coins, UserRound } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
 import payrollService from '../../../../../services/payrollService';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
 import MensajeModal from '../../../../../components/MensajeModal';
 
 
@@ -38,7 +38,7 @@ export default function LiquidarCesantiasPage() {
 
     Promise.all([
       payrollService.getProcesosCesantias(id),
-      masterAxios.get(`/api/master/empresas/${id}`),
+      axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: procesos }, { data: emp }]) => {
         const encontrado = procesos.find(

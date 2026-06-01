@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
 import { Building2, UserRound } from 'lucide-react';
 import empresasService from '../../../../services/empresasService';
+import { useImagenAutenticada } from '../../hooks/useImagenAutenticada';
 
 export default function InfoEmpresaPage() {
   const navigate    = useNavigate();
@@ -13,6 +14,8 @@ export default function InfoEmpresaPage() {
   const [cargando, setCargando] = useState(true);
   const [hoverEditar,   setHoverEditar]   = useState(false);
   const [hoverRegresar, setHoverRegresar] = useState(false);
+
+  const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
 
   useEffect(() => {
     empresasService.getEmpresaById(id)
@@ -90,8 +93,8 @@ export default function InfoEmpresaPage() {
           <p style={styles.seccionTitulo}>Logo Empresa</p>
           <div style={styles.logoBox}>
             <div style={styles.fotoCirculo}>
-              {empresa.logoEmpresaUrl
-                ? <img src={`${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`} alt="logo" style={styles.fotoImg} />
+              {logoSrc
+                ? <img src={logoSrc} alt="logo" style={styles.fotoImg} />
                 : <Building2 size={32} color="#A3A3A3" />
               }
             </div>

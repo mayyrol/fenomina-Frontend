@@ -1,17 +1,17 @@
-import masterAxios from '../api/masterAxiosInstance';
+import axiosInstance from '../api/axiosInstance';
 
 const contratoConceptoService = {
   crearConcepto: (dto) =>
-    masterAxios.post('/api/master/contratos-concepto', dto),
+    axiosInstance.post('/api/master/contratos-concepto', dto),
 
   getConceptosByEmpleado: (empleadoId) =>
-    masterAxios.get(`/api/master/empleados/${empleadoId}/conceptos`),
+    axiosInstance.get(`/api/master/empleados/${empleadoId}/conceptos`),
 
   eliminarConcepto: (id) =>
-    masterAxios.delete(`/api/master/contratos-concepto/${id}`),
+    axiosInstance.delete(`/api/master/contratos-concepto/${id}`),
 
   actualizarConcepto: (id, dto) =>
-    masterAxios.patch(`/api/master/contratos-concepto/${id}`, dto),
+    axiosInstance.patch(`/api/master/contratos-concepto/${id}`, dto),
 };
 
 export default contratoConceptoService;

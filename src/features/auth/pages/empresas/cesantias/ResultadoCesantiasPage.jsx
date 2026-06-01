@@ -5,7 +5,8 @@ import { Coins, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import payrollService from '../../../../../services/payrollService';
-import masterAxios from '../../../../../api/masterAxiosInstance';
+import axiosInstance from '../../../../../api/axiosInstance'; 
+import { useImagenAutenticada } from '../../../hooks/useImagenAutenticada';
 
 const fmt = (v) => v != null ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
 
@@ -53,14 +54,21 @@ export default function ResultadoCesantiasPage() {
     (s, d) => s + (d.valorInteresesCesantias ?? 0), 0
   );
 
+  const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
+
   const handleDescargar = async () => {
     setDescargando(true);
 
     let logoBase64 = null;
     if (empresa?.logoEmpresaUrl) {
       try {
-        const logoUrl = `${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
-        const response = await fetch(logoUrl);
+        const logoUrl = `${import.meta.env.VITE_GATEWAY_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+        const token = useAuthStore.getState().accessToken;
+        const response = await fetch(logoUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         const blob = await response.blob();
         logoBase64 = await new Promise((resolve) => {
           const img = new Image();
@@ -213,7 +221,7 @@ export default function ResultadoCesantiasPage() {
     Promise.all([
       payrollService.getDesprendiblesCesantias(cesantiaId),
       payrollService.getProcesosCesantias(id),
-      masterAxios.get(`/api/master/empresas/${id}`),
+      axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: desps }, { data: procesos }, { data: emp }]) => {
         setDesprendibles(desps);
@@ -333,7 +341,7 @@ export default function ResultadoCesantiasPage() {
             {empresa?.logoEmpresaUrl && (
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
                 <img
-                  src={`${import.meta.env.VITE_MASTER_API_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`}
+                  src={logoSrc}
                   alt="logo"
                   style={{ width: '60px', objectFit: 'contain', borderRadius: '0' }}
                   onError={(e) => { e.target.style.display = 'none'; }}
