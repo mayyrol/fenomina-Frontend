@@ -4,9 +4,6 @@ import { useAuthStore } from '../store/authStore';
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_GATEWAY_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 let isRefreshing = false;

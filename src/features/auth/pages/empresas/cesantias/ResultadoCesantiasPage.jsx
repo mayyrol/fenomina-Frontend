@@ -5,7 +5,9 @@ import { Coins, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import payrollService from '../../../../../services/payrollService';
-import axiosInstance from '../../../../../api/axiosInstance'; 
+
+// Lógica restaurada de V1 para peticiones e imágenes
+import axiosInstance from '../../../../../api/axiosInstance';
 import { useImagenAutenticada } from '../../../hooks/useImagenAutenticada';
 
 const fmt = (v) => v != null ? '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
@@ -24,9 +26,12 @@ function numLetras(n) {
     n %= 1000000;
     r += n === 0 ? ' DE ' : ' ';
   }
-  if (n >= 1000) { r += (Math.floor(n/1000) === 1 ? 'MIL' : numLetras(Math.floor(n/1000)) + ' MIL') + ' '; n %= 1000; }
-  if (n >= 100)  { r += (n === 100 ? 'CIEN' : centenas[Math.floor(n/100)]) + ' '; n %= 100; }
-  if (n >= 20)   { r += decenas[Math.floor(n/10)] + (n%10 ? ' Y ' + unidades[n%10] : '') + ' '; }
+  if (n >= 1000) { r += (Math.floor(n/1000) === 1 ? 'MIL' : numLetras(Math.floor(n/1000)) + ' MIL') + ' ';
+    n %= 1000; }
+  if (n >= 100)  { r += (n === 100 ? 'CIEN' : centenas[Math.floor(n/100)]) + ' ';
+    n %= 100; }
+  if (n >= 20)   { r += decenas[Math.floor(n/10)] + (n%10 ? ' Y ' + unidades[n%10] : '') + ' ';
+  }
   else if (n > 0){ r += unidades[n] + ' '; }
   return r.trim();
 }
@@ -35,78 +40,85 @@ export default function ResultadoCesantiasPage() {
   const navigate             = useNavigate();
   const { id, cesantiaId }   = useParams();
   const { usuario }          = useAuthStore();
-
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
-
+  
   const [hoverDescargar, setHoverDescargar] = useState(false);
   const [descargando, setDescargando]       = useState(false);
-
   const [proceso,       setProceso]       = useState(null);
   const [empresa,       setEmpresa]       = useState(null);
   const [desprendibles, setDesprendibles] = useState([]);
   const [cargando,      setCargando]      = useState(false);
 
-  const totalCesantias = desprendibles.reduce(
-    (s, d) => s + (d.valorPrestacion ?? 0), 0
-  );
-  const totalIntereses = desprendibles.reduce(
-    (s, d) => s + (d.valorInteresesCesantias ?? 0), 0
-  );
+  const totalCesantias = desprendibles.reduce((s, d) => s + (d.valorPrestacion ?? 0), 0);
+  const totalIntereses = desprendibles.reduce((s, d) => s + (d.valorInteresesCesantias ?? 0), 0);
 
+  // Hook restaurado de V1
   const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
 
   const handleDescargar = async () => {
     setDescargando(true);
-
     let logoBase64 = null;
+    
+    // Lógica restaurada de V1 para obtener el logo con Bearer token
     if (empresa?.logoEmpresaUrl) {
       try {
         const logoUrl = `${import.meta.env.VITE_GATEWAY_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
         const token = useAuthStore.getState().accessToken;
         const response = await fetch(logoUrl, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
-        const blob = await response.blob();
-        logoBase64 = await new Promise((resolve) => {
-          const img = new Image();
-          const url = URL.createObjectURL(blob);
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxSize = 100;
-            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
-            canvas.width = img.width * ratio;
-            canvas.height = img.height * ratio;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
-            URL.revokeObjectURL(url);
-          };
-          img.src = url;
-        });
+        if (response.ok) {
+          const blob = await response.blob();
+          logoBase64 = await new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(blob);
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const maxSize = 100;
+              const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+              canvas.width = img.width * ratio;
+              canvas.height = img.height * ratio;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+              URL.revokeObjectURL(url);
+            };
+            img.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
+            img.src = url;
+          });
+        }
       } catch {
         logoBase64 = null;
       }
     }
 
-    const doc = new jsPDF('landscape');
-    let y = 14;
+    // Diseño vertical PDF nuevo
+    const doc = new jsPDF(); 
+    const M = 14;
+    const pageWidth  = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const mitad = pageHeight / 2;
+    let y = M;
 
-    if (logoBase64) doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
-    doc.setFontSize(11); doc.setFont(undefined, 'bold');
-    doc.text(empresa?.nombreEmpresa ?? '', 148, y + 4, { align: 'center' });
+    // ─── Página 1: planilla resumen ───
+    if (logoBase64) doc.addImage(logoBase64, 'JPEG', M, y, 20, 20);
+    doc.setFontSize(12); doc.setFont(undefined, 'bold');
+    doc.text(empresa?.nombreEmpresa ?? '', pageWidth / 2, y + 6, { align: 'center' });
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
-    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 148, y + 10, { align: 'center' });
-    doc.text(`CESANTIAS E INTERESES DE LAS CESANTIAS ${proceso?.anio ?? ''}`, 148, y + 16, { align: 'center' });
-    y += 26;
+    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, pageWidth / 2, y + 12, { align: 'center' });
+    doc.setFont(undefined, 'bold');
+    doc.text(`PLANILLA CESANTÍAS E INTERESES ${proceso?.anio ?? ''}`, pageWidth / 2, y + 18, { align: 'center' });
+    doc.setFont(undefined, 'normal');
+    y += 28;
 
     autoTable(doc, {
       startY: y,
-      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'DÍAS', 'FECHA INICIO', 'FECHA FIN', 'SALARIO BASE', 'BASE AUX TRANSP.', 'BASE LIQ.', 'CESANTÍAS', 'INTERESES DE CES.', 'FONDO DE CESANTÍAS']],
+      margin: { left: M, right: M, bottom: M },
+      tableWidth: pageWidth - M * 2,
+      head: [['No', 'CC', 'NOMBRE EMPLEADO', 'DÍAS', 'F. INICIO', 'F. FIN', 'SAL. BASE', 'AUX. TRANSP.', 'BASE LIQ.', 'CESANTÍAS', 'INT. CES.', 'FONDO CES.', 'FIRMA']],
       body: [
         ...desprendibles.map((desp, i) => [
           i + 1,
@@ -121,95 +133,115 @@ export default function ResultadoCesantiasPage() {
           fmt(desp.valorPrestacion),
           fmt(desp.valorInteresesCesantias),
           desp.fondoCesantias ?? '',
+          '',
         ]),
-        [{ content: 'TOTAL', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
-        { content: fmt(totalCesantias), styles: { fontStyle: 'bold' } },
-        { content: fmt(totalIntereses), styles: { fontStyle: 'bold' } },
-        ''],
+        [
+          { content: 'TOTAL', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: fmt(totalCesantias), styles: { fontStyle: 'bold', halign: 'right' } },
+          { content: fmt(totalIntereses), styles: { fontStyle: 'bold', halign: 'right' } },
+          '',
+          '',
+        ],
       ],
-      styles: { fontSize: 6 },
-      headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold', fontSize: 6 },
+      styles: { fontSize: 6, cellPadding: 1 },
+      headStyles: { fillColor: [11, 102, 42], textColor: 255, fontStyle: 'bold', fontSize: 6, halign: 'center', valign: 'middle' },
       alternateRowStyles: { fillColor: [245, 245, 245] },
+      bodyStyles: { minCellHeight: 12, valign: 'middle' },
+      columnStyles: {
+        0:  { cellWidth: 5,  halign: 'center' },
+        1:  { cellWidth: 11, halign: 'center' },
+        2:  { cellWidth: 19, halign: 'center' },
+        3:  { cellWidth: 8,  halign: 'center' },
+        4:  { cellWidth: 15, halign: 'center' },
+        5:  { cellWidth: 15, halign: 'center' },
+        6:  { cellWidth: 16, halign: 'right'  },
+        7:  { cellWidth: 18, halign: 'right'  },
+        8:  { cellWidth: 14, halign: 'right'  },
+        9:  { cellWidth: 16, halign: 'right'  },
+        10: { cellWidth: 15, halign: 'right'  },
+        11: { cellWidth: 14, halign: 'center' },
+        12: { cellWidth: 16, halign: 'center' },
+      },
     });
 
-    // Comprobantes individuales — original + copia por página
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const mitad = pageHeight / 2;
-
-    const renderComprobante = (desp, yInicio, mitadRef, pageHeightRef) => {
-      let cy = yInicio + 8;
-
-      const alturaComprobante = (yInicio === 0 ? mitadRef : pageHeightRef) - yInicio - 4;
+    // ─── Comprobantes: original + copia por página (portrait) ───
+    const renderComprobante = (desp, yInicio) => {
+      const margenSup  = yInicio === 0 ? M : yInicio + 2;
+      const rectBottom = yInicio === 0 ? mitad - 2 : pageHeight - M;
+      doc.setTextColor(0, 0, 0);
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
-      doc.rect(10, yInicio + 2, 190, alturaComprobante);
+      doc.rect(M, margenSup, pageWidth - M * 2, rectBottom - margenSup);
+      let cy = margenSup + 7;
 
+      // Cabecera: logo izq — empresa der
+      if (logoBase64) doc.addImage(logoBase64, 'JPEG', M + 4, cy - 1, 13, 13);
+      doc.setFontSize(9); doc.setFont(undefined, 'bold');
+      doc.text(empresa?.nombreEmpresa ?? '', pageWidth - M - 4, cy + 2, { align: 'right' });
       doc.setFontSize(8); doc.setFont(undefined, 'normal');
-      doc.text('Empleador:', 14, cy);
-      doc.setFont(undefined, 'bold');
-      doc.text(empresa?.nombreEmpresa ?? '', 55, cy); cy += 5;
+      doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, pageWidth - M - 4, cy + 8, { align: 'right' });
+      cy += 14;
+
+      doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.2);
+      doc.line(M + 4, cy, pageWidth - M - 4, cy);
+      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+      cy += 4;
+
+      // Datos del trabajador
+      doc.setFontSize(8); doc.setFont(undefined, 'bold');
+      doc.text('Datos del trabajador:', M + 4, cy); cy += 4;
       doc.setFont(undefined, 'normal');
-      doc.text('NIT:', 14, cy);
-      doc.text(empresa?.empresaNit ?? '', 55, cy); cy += 8;
+      doc.text('Nombre:', M + 4, cy);
+      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, M + 36, cy); cy += 4;
+      doc.text('Cédula:', M + 4, cy);
+      doc.text(String(desp.documentoEmpleado), M + 36, cy); cy += 6;
 
+      // Título centrado
       doc.setFont(undefined, 'bold');
-      doc.text('Datos del trabajador:', 14, cy); cy += 5;
+      doc.text(`Liquidación de cesantías e intereses ${proceso?.anio ?? ''}`, pageWidth / 2, cy, { align: 'center' });
+      cy += 6;
+
+      // Fechas
       doc.setFont(undefined, 'normal');
-      doc.text('Nombre:', 14, cy);
-      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 55, cy); cy += 5;
-      doc.text('Cédula:', 14, cy);
-      doc.text(desp.documentoEmpleado, 55, cy); cy += 8;
-
+      doc.text('Fecha inicial:', M + 4, cy); doc.text(desp.fechaInicioCorte ?? '', M + 52, cy); cy += 4;
+      doc.text('Fecha final:', M + 4, cy); doc.text(desp.fechaFinCorte ?? '', M + 52, cy); cy += 4;
+      doc.text('Días trabajados:', M + 4, cy); doc.text(String(desp.diasLiquidados ?? ''), M + 52, cy); cy += 6;
+      
+      const VC = M + 65;
+      doc.text('Salario Base:', M + 4, cy); doc.text(fmt(desp.salarioBase), VC, cy); cy += 4;
+      doc.text('Base Aux. de Transporte:', M + 4, cy); doc.text(fmt(desp.auxTransporte), VC, cy); cy += 4;
+      doc.text('Cesantías (informativo):', M + 4, cy); doc.text(fmt(desp.valorPrestacion), VC, cy); cy += 4;
+      doc.text('Intereses de cesantías:', M + 4, cy); doc.text(fmt(desp.valorInteresesCesantias), VC, cy); cy += 6;
+      
       doc.setFont(undefined, 'bold');
-      doc.text(`Liquidaciones de cesantías e intereses de cesantías ${proceso?.anio ?? ''}`, 105, cy, { align: 'center' });
-      cy += 8;
-
-      doc.setFont(undefined, 'normal');
-      doc.text('Fecha inicial:', 14, cy);
-      doc.text(desp.fechaInicioCorte ?? '', 70, cy); cy += 5;
-      doc.text('Fecha final:', 14, cy);
-      doc.text(desp.fechaFinCorte ?? '', 70, cy); cy += 5;
-      doc.text('Días trabajados:', 14, cy);
-      doc.text(String(desp.diasLiquidados ?? ''), 70, cy); cy += 8;
-
-      doc.text('Salario Base:', 14, cy);
-      doc.text(fmt(desp.salarioBase), 70, cy); cy += 5;
-      doc.text('Base Aux. de Transporte:', 14, cy);
-      doc.text(fmt(desp.auxTransporte), 70, cy); cy += 5;
-      doc.setFont(undefined, 'bold');
-      doc.text('Cesantías (informativo):', 14, cy);
-      doc.text(fmt(desp.valorPrestacion), 70, cy); cy += 5;
-      doc.text('Intereses de cesantías:', 14, cy);
-      doc.text(fmt(desp.valorInteresesCesantias), 70, cy); cy += 8;
-
-      doc.text('Valor a pagar intereses de cesantías:', 14, cy);
-      doc.text(fmt(desp.valorInteresesCesantias), 70, cy); 
-      const cyFirma = cy - 8;
-      cy += 5;
+      doc.text('Valor a pagar intereses de cesantías:', M + 4, cy);
+      doc.text(fmt(desp.valorInteresesCesantias), VC, cy); cy += 5;
+      doc.text('Valor en letras:', M + 4, cy);
       doc.setFont(undefined, 'normal');
       const letras = (() => {
         try { return numLetras(Math.round(desp.valorInteresesCesantias ?? 0)) + ' PESOS M/CTE'; }
         catch { return ''; }
       })();
-      const split = doc.splitTextToSize(`En letras: ${letras}`, 160);
-      doc.text(split, 14, cy); cy += split.length * 4 + 4;
+      const split = doc.splitTextToSize(letras, pageWidth - M * 2 - 69);
+      doc.text(split, VC, cy); cy += split.length * 4 + 6;
 
-      doc.text('_______________________', 130, cyFirma);
-      doc.text('Firma del trabajador', 138, cyFirma + 5);
+      // Recibí conforme
+      doc.text('Recibí conforme:', M + 4, cy); cy += 8;
+      doc.line(M + 4, cy, M + 80, cy); cy += 4;
+      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, M + 4, cy); cy += 4;
+      doc.text('Fecha de recibido:', M + 4, cy);
     };
-
+    
     desprendibles.forEach((desp) => {
-      doc.addPage('portrait');
-      const phPortrait = doc.internal.pageSize.getHeight();
-      const mitadPortrait = phPortrait / 2;
-      renderComprobante(desp, 0, mitadPortrait, phPortrait);
+      doc.addPage();
+      renderComprobante(desp, 0);
       doc.setDrawColor(180, 180, 180);
       doc.setLineDashPattern([3, 3], 0);
-      doc.line(14, mitadPortrait, 196, mitadPortrait);
+      doc.line(M, mitad, pageWidth - M, mitad);
       doc.setLineDashPattern([], 0);
-      renderComprobante(desp, mitadPortrait, mitadPortrait, phPortrait);
+      renderComprobante(desp, mitad);
     });
-
+    
     doc.save(`cesantias_${proceso?.anio ?? ''}.pdf`);
     setDescargando(false);
   };
@@ -218,26 +250,27 @@ export default function ResultadoCesantiasPage() {
     if (!cesantiaId || !id) return;
     setCargando(true);
 
-    Promise.all([
+    // Promise.allSettled implementado (nuevo ajuste), pero usando axiosInstance (restaurado de V1)
+    Promise.allSettled([
       payrollService.getDesprendiblesCesantias(cesantiaId),
       payrollService.getProcesosCesantias(id),
       axiosInstance.get(`/api/master/empresas/${id}`),
     ])
-      .then(([{ data: desps }, { data: procesos }, { data: emp }]) => {
-        setDesprendibles(desps);
-        setEmpresa(emp);
-        const encontrado = procesos.find(
-          p => String(p.procesoLiquiId) === String(cesantiaId)
-        );
-        setProceso(encontrado ?? null);
+      .then(([despsResult, procesosResult, empResult]) => {
+        if (despsResult.status === 'fulfilled') setDesprendibles(despsResult.value.data);
+        if (empResult.status === 'fulfilled') setEmpresa(empResult.value.data);
+        if (procesosResult.status === 'fulfilled') {
+          const encontrado = procesosResult.value.data.find(
+            p => String(p.procesoLiquiId) === String(cesantiaId)
+          );
+          setProceso(encontrado ?? null);
+        }
       })
-      .catch(() => {})
       .finally(() => setCargando(false));
   }, [cesantiaId, id]);
 
   return (
     <div style={styles.container}>
-
       {/* Header */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -267,18 +300,17 @@ export default function ResultadoCesantiasPage() {
         <hr style={styles.divider} />
       </div>
 
-      {/* Planilla resumen */}
+      {/* Planilla resumen con mejoras visuales pero logoSrc de V1 */}
       <div style={styles.card}>
-        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          <p style={{ fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 4px 0' }}>
-            {empresa?.nombreEmpresa ?? ''}
-          </p>
-          <p style={{ fontSize: '13px', color: '#272525', margin: '0 0 2px 0' }}>
-            NIT: {empresa?.empresaNit ?? ''}
-          </p>
-          <p style={{ fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 }}>
-            CESANTÍAS E INTERESES DE CESANTÍAS {proceso?.anio ?? ''}
-          </p>
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #E8E8E8', minHeight: '52px' }}>
+          {logoSrc && (
+            <img src={logoSrc} alt="Logo" style={{ position: 'absolute', left: 0, width: '52px', height: '52px', objectFit: 'contain' }} />
+          )}
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 2px 0' }}>{empresa?.nombreEmpresa ?? ''}</p>
+            <p style={{ fontSize: '13px', color: '#272525', margin: '0 0 2px 0' }}>NIT: {empresa?.empresaNit ?? ''}</p>
+            <p style={{ fontSize: '12px', fontWeight: '700', color: '#272525', margin: 0 }}>CESANTÍAS E INTERESES DE CESANTÍAS {proceso?.anio ?? ''}</p>
+          </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={styles.tabla}>
@@ -286,7 +318,7 @@ export default function ResultadoCesantiasPage() {
               <tr>
                 <th style={styles.th}>No</th>
                 <th style={styles.th}>CC</th>
-                <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
+                <th style={styles.th}>Nombre empleado</th>
                 <th style={styles.th}>Días</th>
                 <th style={styles.th}>Fecha inicio</th>
                 <th style={styles.th}>Fecha fin</th>
@@ -296,20 +328,17 @@ export default function ResultadoCesantiasPage() {
                 <th style={styles.th}>Cesantías</th>
                 <th style={styles.th}>Intereses Cesantías</th>
                 <th style={styles.th}>Fondo de Cesantías</th>
+                <th style={{ ...styles.th, minWidth: '120px' }}>Firma Empleado</th>
               </tr>
             </thead>
             <tbody>
               {cargando ? (
-                <tr>
-                  <td colSpan={12} style={{ textAlign: 'center', padding: '20px' }}>
-                    Cargando...
-                  </td>
-                </tr>
+                <tr><td colSpan={13} style={{ textAlign: 'center', padding: '20px' }}>Cargando...</td></tr>
               ) : desprendibles.map((desp, i) => (
                 <tr key={desp.empleadoId ?? i} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
                   <td style={styles.td}>{i + 1}</td>
                   <td style={styles.td}>{desp.documentoEmpleado}</td>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</td>
+                  <td style={styles.td}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</td>
                   <td style={styles.td}>{desp.diasLiquidados}</td>
                   <td style={styles.td}>{desp.fechaInicioCorte}</td>
                   <td style={styles.td}>{desp.fechaFinCorte}</td>
@@ -319,12 +348,14 @@ export default function ResultadoCesantiasPage() {
                   <td style={styles.td}>{fmt(desp.valorPrestacion)}</td>
                   <td style={styles.td}>{fmt(desp.valorInteresesCesantias)}</td>
                   <td style={styles.td}>{desp.fondoCesantias ?? ''}</td>
+                  <td style={{ ...styles.td, minWidth: '120px', height: '40px' }}></td>
                 </tr>
               ))}
               <tr style={{ backgroundColor: '#E8F5EE' }}>
                 <td colSpan={9} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>TOTAL</td>
                 <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalCesantias)}</td>
                 <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>{fmt(totalIntereses)}</td>
+                <td style={styles.td} />
                 <td style={styles.td} />
               </tr>
             </tbody>
@@ -336,34 +367,18 @@ export default function ResultadoCesantiasPage() {
       {desprendibles.map((desp) => (
         <div key={desp.empleadoId} style={{ display: 'flex', justifyContent: 'center' }}>
           <div style={styles.comprobante}>
-
-            {/* Logo */}
-            {empresa?.logoEmpresaUrl && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-                <img
-                  src={logoSrc}
-                  alt="logo"
-                  style={{ width: '60px', objectFit: 'contain', borderRadius: '0' }}
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              </div>
-            )}
-
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '2px' }}>
-                <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '80px' }}>Empleador:</span>
-                <span style={{ ...styles.comprobanteValor, fontWeight: '700' }}>{empresa?.nombreEmpresa ?? ''}</span>
-              </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <span style={{ ...styles.comprobanteLabel, minWidth: '80px' }}>NIT:</span>
-                <span style={styles.comprobanteValor}>{empresa?.empresaNit ?? ''}</span>
+            <div style={{ display: 'flex', justifyContent: logoSrc ? 'space-between' : 'flex-end', alignItems: 'center', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #E8E8E8' }}>
+              {logoSrc && (
+                <img src={logoSrc} alt="Logo" style={{ width: '52px', height: '52px', objectFit: 'contain' }} />
+              )}
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: '13px', fontWeight: '700', color: '#272525', margin: '0 0 2px 0' }}>{empresa?.nombreEmpresa ?? ''}</p>
+                <p style={{ fontSize: '11px', color: '#272525', margin: 0 }}>NIT: {empresa?.empresaNit ?? ''}</p>
               </div>
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <p style={{ ...styles.comprobanteLabel, fontWeight: '700', margin: '0 0 4px 0' }}>
-                Datos del trabajador:
-              </p>
+              <p style={{ ...styles.comprobanteLabel, fontWeight: '700', margin: '0 0 4px 0' }}>Datos del trabajador:</p>
               <div style={{ display: 'flex', gap: '12px', marginBottom: '2px' }}>
                 <span style={{ ...styles.comprobanteLabel, minWidth: '80px' }}>Nombre:</span>
                 <span style={styles.comprobanteValor}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</span>
@@ -374,7 +389,7 @@ export default function ResultadoCesantiasPage() {
               </div>
             </div>
 
-            <p style={{ fontSize: '11px', fontWeight: '700', textAlign: 'center', margin: '12px auto', color: '#272525', width: '100%' }}>
+            <p style={{ fontSize: '11px', fontWeight: '700', textAlign: 'center', margin: '12px auto', color: '#272525' }}>
               Liquidaciones de cesantías e intereses de cesantías {proceso?.anio ?? ''}
             </p>
 
@@ -413,33 +428,24 @@ export default function ResultadoCesantiasPage() {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '200px' }}>Valor a pagar intereses de cesantías:</span>
+                <span style={{ ...styles.comprobanteValor, fontWeight: '700' }}>{fmt(desp.valorInteresesCesantias)}</span>
+              </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '200px' }}>
-                  Valor a pagar intereses de cesantías:
-                </span>
-                <span style={{ ...styles.comprobanteValor, fontWeight: '700' }}>
-                  {fmt(desp.valorInteresesCesantias)}
+                <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '200px' }}>Valor en letras:</span>
+                <span style={{ ...styles.comprobanteValor, textTransform: 'uppercase' }}>
+                  {(() => {
+                    try { return numLetras(Math.round(desp.valorInteresesCesantias ?? 0)) + ' PESOS M/CTE'; }
+                    catch { return ''; }
+                  })()}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <span style={{ ...styles.comprobanteLabel, fontWeight: '700', minWidth: '200px' }}>
-                Valor en letras:
-              </span>
-              <span style={{ ...styles.comprobanteValor, textTransform: 'uppercase' }}>
-                {(() => {
-                  try { return numLetras(Math.round(desp.valorInteresesCesantias ?? 0)) + ' PESOS M/CTE'; }
-                  catch { return ''; }
-                })()}
-              </span>
-            </div>
-
             <p style={{ ...styles.comprobanteLabel, marginBottom: '20px' }}>Recibí conforme:</p>
             <div style={{ borderTop: '1px solid #272525', width: '220px', paddingTop: '6px', marginTop: '8px' }}>
-              <p style={{ fontSize: '11px', fontWeight: '700', color: '#272525', margin: '0 0 2px 0' }}>
-                {desp.nombresEmpleado} {desp.apellidosEmpleado}
-              </p>
+              <p style={{ fontSize: '11px', fontWeight: '700', color: '#272525', margin: '0 0 2px 0' }}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</p>
               <p style={{ fontSize: '11px', color: '#272525', margin: 0 }}>Fecha de recibido:</p>
             </div>
           </div>
@@ -451,18 +457,14 @@ export default function ResultadoCesantiasPage() {
         <button
           style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#272525' }}
           onClick={() => navigate(`/empresas/${id}/cesantias`)}
-        >
-          Cancelar
-        </button>
+        > Cancelar </button>
         <button
           style={{ background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverDescargar(true)}
           onMouseLeave={() => setHoverDescargar(false)}
           onClick={handleDescargar}
           disabled={cargando || desprendibles.length === 0}
-        >
-          Descargar Reportes en PDF
-        </button>
+        > Descargar Reportes en PDF </button>
       </div>
 
       {/* Modal descarga */}
@@ -477,36 +479,33 @@ export default function ResultadoCesantiasPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
 const styles = {
-  container:          { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '16px' },
-  header:             { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  titulo:             { fontSize: '18px', fontWeight: '800', color: '#272525', margin: 0 },
-  subtitulo:          { fontSize: '12px', color: '#A3A3A3', margin: 0 },
-  perfilBox:          { display: 'flex', alignItems: 'center', gap: '10px' },
-  avatar:             { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  perfilNombre:       { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
-  perfilCargo:        { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
-  btnDescargarSticky: { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  card:               { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
-  cardTitulo:         { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 12px 0' },
-  infoGrid:           { display: 'flex', flexDirection: 'column', gap: '10px' },
-  infoFila:           { display: 'flex', gap: '8px', alignItems: 'baseline' },
-  infoLabel:          { fontSize: '13px', fontWeight: '700', color: '#272525', whiteSpace: 'nowrap' },
-  infoValor:          { fontSize: '13px', color: '#272525' },
-  divider:            { border: 'none', borderTop: '1px solid #E8E8E8', margin: '24px 0 0 0' },
-  tableTitle:         { fontSize: '15px', fontWeight: '800', color: '#272525', margin: '0 0 16px 0' },
-  tabla:              { width: '100%', borderCollapse: 'collapse', minWidth: '1000px', fontSize: '11px' },
-  th:                 { backgroundColor: '#F0F0F0', fontWeight: '700', color: '#272525', padding: '7px 8px', textAlign: 'center', border: '1px solid #E0E0E0', whiteSpace: 'nowrap', fontSize: '11px' },
-  td:                 { padding: '6px 8px', textAlign: 'center', color: '#272525', border: '1px solid #E0E0E0', whiteSpace: 'nowrap', fontSize: '11px' },
-  trPar:              { backgroundColor: '#fff' },
-  trImpar:            { backgroundColor: '#FAFAFA' },
-  comprobante:        { border: '1px solid #D0D0D0', borderRadius: '4px', padding: '24px 28px', width: '100%', maxWidth: '680px', boxSizing: 'border-box', backgroundColor: '#fff', marginBottom: '8px' },
-  comprobanteLabel:   { fontSize: '11px', color: '#272525', margin: 0 },
-  comprobanteValor:   { fontSize: '11px', color: '#272525', margin: 0 },
-  exitoMsg: { fontSize: '14px', fontWeight: '700', color: '#0B662A', margin: '0 0 16px 0' },
+  container:        { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '16px' },
+  header:           { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  titulo:           { fontSize: '18px', fontWeight: '800', color: '#272525', margin: 0 },
+  subtitulo:        { fontSize: '12px', color: '#A3A3A3', margin: 0 },
+  perfilBox:        { display: 'flex', alignItems: 'center', gap: '10px' },
+  avatar:           { width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  perfilNombre:     { fontSize: '13px', fontWeight: '700', color: '#272525', margin: 0, lineHeight: 1.3 },
+  perfilCargo:      { fontSize: '11px', color: '#A3A3A3', fontWeight: '400', margin: 0 },
+  card:             { backgroundColor: '#fff', borderRadius: '16px', padding: '28px 32px' },
+  cardTitulo:       { fontSize: '16px', fontWeight: '800', color: '#272525', margin: '0 0 12px 0' },
+  exitoMsg:         { fontSize: '14px', fontWeight: '700', color: '#0B662A', margin: '0 0 16px 0' },
+  infoGrid:         { display: 'flex', flexDirection: 'column', gap: '10px' },
+  infoFila:         { display: 'flex', gap: '8px', alignItems: 'baseline' },
+  infoLabel:        { fontSize: '13px', fontWeight: '700', color: '#272525', whiteSpace: 'nowrap' },
+  infoValor:        { fontSize: '13px', color: '#272525' },
+  divider:          { border: 'none', borderTop: '1px solid #E8E8E8', margin: '24px 0 0 0' },
+  tabla:            { width: '100%', borderCollapse: 'collapse', minWidth: '1000px', fontSize: '11px' },
+  th:               { backgroundColor: '#F0F0F0', fontWeight: '700', color: '#272525', padding: '7px 8px', textAlign: 'center', border: '1px solid #E0E0E0', whiteSpace: 'nowrap', fontSize: '11px' },
+  td:               { padding: '6px 8px', textAlign: 'center', color: '#272525', border: '1px solid #E0E0E0', whiteSpace: 'nowrap', fontSize: '11px' },
+  trPar:            { backgroundColor: '#fff' },
+  trImpar:          { backgroundColor: '#FAFAFA' },
+  comprobante:      { border: '1px solid #D0D0D0', borderRadius: '4px', padding: '24px 28px', width: '100%', maxWidth: '680px', boxSizing: 'border-box', backgroundColor: '#fff', marginBottom: '8px' },
+  comprobanteLabel: { fontSize: '11px', color: '#272525', margin: 0 },
+  comprobanteValor: { fontSize: '11px', color: '#272525', margin: 0 },
 };
