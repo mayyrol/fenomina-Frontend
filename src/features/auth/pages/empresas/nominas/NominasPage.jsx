@@ -67,6 +67,7 @@ export default function NominasPage() {
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
+  const esAuditor = usuario?.rolUsuario === 'AUDITOR';
 
   const [tab, setTab]                           = useState('Borrador');
   const [busqueda, setBusqueda]                 = useState('');
@@ -206,22 +207,23 @@ export default function NominasPage() {
       </div>
 
       {/* Action bar */}
-      <div style={styles.addBar}>
-        <span style={styles.addLabel}>Generar reportes de nóminas empleados</span>
-        <button
-          style={{
-            ...styles.btnLiquidar,
-            background: hoverLiquidar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
-            transition: 'background 0.3s ease',
-          }}
-          onMouseEnter={() => setHoverLiquidar(true)}
-          onMouseLeave={() => setHoverLiquidar(false)}
-          onClick={() => navigate(`/empresas/${id}/nominas/generar-reporte`)}
-        >
-          Nuevo proceso de liquidación
-        </button>
-      </div>
-
+      {!esAuditor && (
+        <div style={styles.addBar}>
+          <span style={styles.addLabel}>Generar reportes de nóminas empleados</span>
+          <button
+            style={{
+              ...styles.btnLiquidar,
+              background: hoverLiquidar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+              transition: 'background 0.3s ease',
+            }}
+            onMouseEnter={() => setHoverLiquidar(true)}
+            onMouseLeave={() => setHoverLiquidar(false)}
+            onClick={() => navigate(`/empresas/${id}/nominas/generar-reporte`)}
+          >
+            Nuevo proceso de liquidación
+          </button>
+        </div>
+      )}
       {/* Tabs */}
       <div style={styles.tabsBox}>
         <div style={{ display: 'flex' }}>
@@ -286,7 +288,7 @@ export default function NominasPage() {
                     )}
                     <td style={styles.td}>{p.createdAt?.split('T')[0]}</td>
                     <td style={styles.td}>
-                      {p.estadoProcNomina === 'ANULADO'
+                      {p.estadoProcNomina === 'ANULADO' || esAuditor
                         ? <span style={styles.estadoTexto}>{ESTADO_LABEL[p.estadoProcNomina]}</span>
                         : <EstadoSelect
                             valor={ESTADO_LABEL[p.estadoProcNomina]}
@@ -297,7 +299,7 @@ export default function NominasPage() {
                     {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Finalizado'].includes(tab) && (
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                          {p.estadoProcNomina === 'BORRADOR' && (
+                          {!esAuditor && p.estadoProcNomina === 'BORRADOR' && (
                             <>
                               <button
                                 style={styles.iconBtn}
@@ -315,7 +317,7 @@ export default function NominasPage() {
                               </button>
                             </>
                           )}
-                          {p.estadoProcNomina === 'CERRADO' && (
+                          {!esAuditor && p.estadoProcNomina === 'CERRADO' && (
                             <button
                               style={styles.iconBtn}
                               title="Liquidar"

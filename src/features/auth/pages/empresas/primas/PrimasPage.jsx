@@ -68,6 +68,7 @@ export default function PrimasPage() {
   const { usuario } = useAuthStore();
 
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
+  const esAuditor = usuario?.rolUsuario === 'AUDITOR';
   const cargo  = usuario?.cargoUsuario ?? '';
 
   const [tab, setTab]                           = useState('Borrador');
@@ -211,17 +212,19 @@ export default function PrimasPage() {
       </div>
 
       {/* Action bar */}
-      <div style={styles.addBar}>
-        <span style={styles.addLabel}>Generar reportes de primas empleados</span>
-        <button
-          style={{ ...styles.btnLiquidar, background: hoverLiquidar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverLiquidar(true)}
-          onMouseLeave={() => setHoverLiquidar(false)}
-          onClick={() => navigate(`/empresas/${id}/primas/generar-reporte`)}
-        >
-          Nuevo proceso de liquidación
-        </button>
-      </div>
+      {!esAuditor && (
+        <div style={styles.addBar}>
+          <span style={styles.addLabel}>Generar reportes de primas empleados</span>
+          <button
+            style={{ ...styles.btnLiquidar, background: hoverLiquidar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
+            onMouseEnter={() => setHoverLiquidar(true)}
+            onMouseLeave={() => setHoverLiquidar(false)}
+            onClick={() => navigate(`/empresas/${id}/primas/generar-reporte`)}
+          >
+            Nuevo proceso de liquidación
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={styles.tabsBox}>
@@ -285,7 +288,7 @@ export default function PrimasPage() {
                     )}
                     <td style={styles.td}>{p.createdAt?.split('T')[0]}</td>
                     <td style={styles.td}>
-                      {p.estadoProcNomina === 'ANULADO'
+                      {p.estadoProcNomina === 'ANULADO' || esAuditor
                         ? <span style={styles.estadoTexto}>{ESTADO_LABEL[p.estadoProcNomina]}</span>
                         : <EstadoSelect
                             valor={ESTADO_LABEL[p.estadoProcNomina]}
@@ -296,7 +299,7 @@ export default function PrimasPage() {
                     {['Borrador', 'Cerrado', 'Pendiente por pagar', 'Pagado'].includes(tab) && (
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                          {p.estadoProcNomina === 'BORRADOR' && (
+                          {!esAuditor && p.estadoProcNomina === 'BORRADOR' && (
                             <>
                               <button style={styles.iconBtn}
                                 onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/desprendibles`)}
@@ -310,7 +313,7 @@ export default function PrimasPage() {
                               </button>
                             </>
                           )}
-                          {p.estadoProcNomina === 'CERRADO' && (
+                          {!esAuditor && p.estadoProcNomina === 'CERRADO' && (
                             <button style={styles.iconBtn}
                               onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/liquidar`)}
                               title="Liquidar">
