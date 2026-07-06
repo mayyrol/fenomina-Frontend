@@ -297,8 +297,12 @@ export default function NovedadesPage() {
 
         // Si viene con días pre-llenados desde el store
         const diasStore = useNominaStore.getState().diasLaborados[Number(empleadoId)];
+        const tipoProcesoActual = procesoEncontrado?.tipoProceso;
+        const diasDefault = tipoProcesoActual === 'NOMINA_QUINCENAL' ? 15 : 30;
         if (diasStore !== undefined && diasStore !== null) {
             setDiasLaborados(String(diasStore));
+        } else {
+            setDiasLaborados(String(diasDefault));
         }
 
         const procesoEncontrado = procesos.find(
@@ -730,7 +734,7 @@ export default function NovedadesPage() {
         <h3 style={styles.cardTitulo}>Novedades</h3>
         <p style={styles.seccionTitulo}>Base de Liquidación</p>
         <p style={styles.descripcion}>
-          Ingrese el número de días efectivamente trabajados en el periodo (máximo 30).
+          Ingrese el número de días efectivamente trabajados en el periodo (máximo {procesoPeriodo?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30}).
         </p>
         <div style={{ maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={styles.label}>Días laborados</label>
@@ -738,7 +742,8 @@ export default function NovedadesPage() {
             value={diasLaborados}
             onChange={(e) => {
               const val = Number(e.target.value);
-              if (val > 30 || val < 0) return;
+              const maxDias = procesoPeriodo?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30;
+              if (val > maxDias || val < 0) return;
               setDiasLaborados(e.target.value);
             }}
             onKeyDown={soloNumeros}

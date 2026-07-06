@@ -15,7 +15,7 @@ function BarraAcciones({ children, justificar = 'center' }) {
       display: 'flex',
       justifyContent: 'center',
       gap: '16px',
-      padding: '40px 32px 24px 32px',
+      padding: '60px 32px 24px 32px',
       background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
       zIndex: 100,
       flexWrap: 'wrap',

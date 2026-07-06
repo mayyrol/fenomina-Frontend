@@ -84,47 +84,61 @@ export default function DesprendiblesNominaPage() {
   const [mensajeError, setMensajeError] = useState('');
   const [pendienteNavegar, setPendienteNavegar] = useState(false);
 
+  const esQuincenal = proceso?.tipoProceso === 'NOMINA_QUINCENAL';
+  const diasPorDefecto = esQuincenal ? 15 : 30;
+
   useEffect(() => {
-    if (!nominaId || !id) return;
-    setCargando(true);
+      if (!nominaId || !id) return;
+      setCargando(true);
 
-    Promise.all([
-      payrollService.getProcesos(id),
-      payrollService.getEmpleadosActivos(id),
-      axiosInstance.get(`/api/master/empresas/${id}`),
-    ])
-      .then(([{ data: procesos }, { data: emps }, { data: emp }]) => {
-        const encontrado = procesos.find(
-          p => String(p.procesoLiquiId) === String(nominaId)
-        );
-        setProceso(encontrado ?? null);
-        setEmpresa(emp);
+      let procesoEncontrado = null;  
+      let empleadosMostrar = [];     
 
-        const seleccionados = useNominaStore.getState().empleadosSeleccionados;
-        const empsAMostrar  = emps.filter(e =>
-          seleccionados.includes(e.empleadoId)
-        );
-        setEmpleados(empsAMostrar);
+      Promise.all([
+        payrollService.getProcesos(id),
+        payrollService.getEmpleadosActivos(id),
+        axiosInstance.get(`/api/master/empresas/${id}`),
+      ])
+        .then(([{ data: procesos }, { data: emps }, { data: emp }]) => {
+          procesoEncontrado = procesos.find(    
+            p => String(p.procesoLiquiId) === String(nominaId)
+          );
+          setProceso(procesoEncontrado ?? null);
+          setEmpresa(emp);
 
-        return Promise.all(
-          empsAMostrar.map(e =>
-            axiosInstance
-              .get(`/api/payroll/novedades/proceso/${nominaId}/empleado/${e.empleadoId}`)
-              .then(({ data }) => ({ empleadoId: e.empleadoId, data }))
-              .catch(() => ({ empleadoId: e.empleadoId, data: [] }))
-          )
-        );
-      })
-      .then((resultados) => {
-        const mapa = {};
-        resultados.forEach(({ empleadoId, data }) => {
-          mapa[empleadoId] = data;
-        });
-        setNovedades(mapa);
-      })
-      .catch(() => {})
-      .finally(() => setCargando(false));
-  }, [nominaId, id]);
+          const seleccionados = useNominaStore.getState().empleadosSeleccionados;
+          empleadosMostrar = emps.filter(e =>   
+            seleccionados.includes(e.empleadoId)
+          );
+          setEmpleados(empleadosMostrar);
+
+          return Promise.all(
+            empleadosMostrar.map(e =>
+              axiosInstance
+                .get(`/api/payroll/novedades/proceso/${nominaId}/empleado/${e.empleadoId}`)
+                .then(({ data }) => ({ empleadoId: e.empleadoId, data }))
+                .catch(() => ({ empleadoId: e.empleadoId, data: [] }))
+            )
+          );
+        })
+        .then((resultados) => {
+          const mapa = {};
+          resultados.forEach(({ empleadoId, data }) => {
+            mapa[empleadoId] = data;
+          });
+          setNovedades(mapa);
+
+          const diasDefault = procesoEncontrado?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30;
+          empleadosMostrar.forEach(e => {
+            const diasActual = useNominaStore.getState().diasLaborados[e.empleadoId];
+            if (diasActual === undefined || diasActual === null) {
+              useNominaStore.getState().setDiasEmpleado(e.empleadoId, diasDefault);
+            }
+          });
+        })
+        .catch(() => {})
+        .finally(() => setCargando(false));
+    }, [nominaId, id]);
 
   const toggleExpandido = (empId) =>
     setExpandidos(prev => ({ ...prev, [empId]: !prev[empId] }));
@@ -169,7 +183,7 @@ export default function DesprendiblesNominaPage() {
 
     const filas = empleados.flatMap(emp => {
       const novsEmp = novedades[emp.empleadoId] ?? [];
-      const dias = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? 30;
+      const dias = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? diasPorDefecto;
 
       if (novsEmp.length === 0) {
         return [{
@@ -282,7 +296,7 @@ export default function DesprendiblesNominaPage() {
         ) : empleadosFiltrados.map((emp) => {
           const expandido = expandidos[emp.empleadoId] ?? true;
           const novsEmp   = novedades[emp.empleadoId] ?? [];
-          const dias      = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? 30;
+          const dias = useNominaStore.getState().diasLaborados[emp.empleadoId] ?? diasPorDefecto;
 
           return (
             <div key={emp.empleadoId} style={styles.empCard}>
@@ -470,8 +484,8 @@ export default function DesprendiblesNominaPage() {
           console.log('ultimoDiaMesFin:', new Date(fechaFinPeriodo.getFullYear(), fechaFinPeriodo.getMonth() + 1, 0).getDate());
           console.log('diasDelPeriodo calculado:', diasDelPeriodo);
           for (const emp of empleados) {
-            // Si no hay valor en el store, asumir 30 (valor por defecto)
-            const diasIngresados = diasStore[emp.empleadoId] ?? 30;
+            // Si no hay valor en el store, asumir valor por defecto (15 o 30)
+            const diasIngresados = diasStore[emp.empleadoId] ?? diasPorDefecto;
 
             // Validar máximo según tipo de proceso
             if (Number(diasIngresados) > maxDias) {
