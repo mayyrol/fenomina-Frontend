@@ -4,6 +4,43 @@ import { useAuthStore } from '../../../../../../store/authStore';
 import { FileText, ChevronLeft, UserRound, Search } from 'lucide-react';
 import { useHistoricos } from "../../../../hooks/useHistoricos";
 import historicosService from '../../../../../../services/historicosService';
+import { exportarExcel } from '../../../../../../utils/exportExcel';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
@@ -35,6 +72,7 @@ export default function ReportesNominasPage() {
   const [fecha,        setFecha]         = useState('');
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
+  const [hoverDescargar, setHoverDescargar] = useState(false);
 
   const handleTabPrincipal = (t) => {
     setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
@@ -80,6 +118,23 @@ export default function ReportesNominasPage() {
       ? 'Histórico Detalles de Nómina por Empleado'
       : 'Histórico Total de Nóminas por Periodo';
 
+  const EXCEL_HEADERS = {
+    nominas: ['#','Nombre(s)','Apellidos','Año','Periodo','Número de documento','Salario básico mensual','Total devengado','Total deducciones','Total neto a pagar','Estado proceso'],
+    periodo: ['Año','Periodo','Fecha inicio','Fecha fin','Total devengado','Total deducciones','Total neto','Total empleados','Estado proceso'],
+  };
+
+  const filaExcel = (r, index) => {
+    if (tabPrincipal === 'nominas') {
+      return [index + 1, r.nombresEmp, r.apellidosEmp, r.anio, r.periodo, r.documentoEmp, r.salarioBascMensual ?? 0, r.totalDevengado ?? 0, r.totalDeducciones ?? 0, r.netoNomina ?? 0, fmtEstado(r.estadoProceso)];
+    }
+    return [r.anio, r.periodo, r.fechaInicioPeriodo ?? '-', r.fechaFinPeriodo ?? '-', r.totalDevengado ?? 0, r.totalDeducciones ?? 0, r.totalNeto ?? 0, r.totalEmpleados, fmtEstado(r.estadoProceso)];
+  };
+
+  const handleDescargarExcel = () => {
+    const filas = datosActivos.map((r, i) => filaExcel(r, i));
+    exportarExcel(EXCEL_HEADERS[tabPrincipal], filas, tituloTabla);
+  };
+
   return (
     <div style={styles.container}>
 
@@ -99,11 +154,6 @@ export default function ReportesNominasPage() {
           </div>
         </div>
       </div>
-
-      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       <div style={styles.toolbarCard}>
         <div>
@@ -147,7 +197,24 @@ export default function ReportesNominasPage() {
               />
             </div>
           )}
+
+          <button
+          style={{
+            background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+            border: 'none', borderRadius: '8px', padding: '10px 24px',
+            fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+            cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease', flexShrink: 0,
+          }}
+          onMouseEnter={() => setHoverDescargar(true)}
+          onMouseLeave={() => setHoverDescargar(false)}
+          onClick={handleDescargarExcel}
+          disabled={cargando || datosActivos.length === 0}
+        >
+          Descargar en Excel
+        </button>
+        
         </div>
+        
       </div>
 
       <div style={styles.tabsRow}>
@@ -201,7 +268,6 @@ export default function ReportesNominasPage() {
                   <th style={styles.th}>Total devengado</th>
                   <th style={styles.th}>Total deducciones</th>
                   <th style={styles.th}>Total neto</th>
-                  <th style={styles.th}>Costo total empresa</th>
                   <th style={styles.th}>Total empleados</th>
                   <th style={styles.th}>Estado proceso</th>
                 </tr>
@@ -235,7 +301,6 @@ export default function ReportesNominasPage() {
                     <td style={styles.td}>{fmt(r.totalDevengado)}</td>
                     <td style={styles.td}>{fmt(r.totalDeducciones)}</td>
                     <td style={styles.td}>{fmt(r.totalNeto)}</td>
-                    <td style={styles.td}>{fmt(r.totalCostoEmpresa)}</td>
                     <td style={styles.td}>{r.totalEmpleados}</td>
                     <td style={styles.td}>{fmtEstado(r.estadoProceso)}</td>
                   </>}
@@ -256,6 +321,17 @@ export default function ReportesNominasPage() {
             disabled={pagina === totalPaginas - 1}>{'>>'}</button>
         </div>
       </div>
+
+      {/* Volver */}
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
+      
     </div>
   );
 }

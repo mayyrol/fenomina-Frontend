@@ -8,6 +8,41 @@ import EstadoDropdown from '../../../../../components/EstadoDropdown';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '40px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 export default function EmpleadosEmpresaPage() {
   const navigate = useNavigate();
@@ -127,12 +162,6 @@ export default function EmpleadosEmpresaPage() {
           </div>
         </div>
       </div>
-
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       {/* Toolbar */}
       <div style={styles.toolbarCard}>
@@ -277,6 +306,15 @@ export default function EmpleadosEmpresaPage() {
           >{'>>'}</button>
         </div>
       </div>
+
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(-1)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
 
       <ConfirmarCambiosModal
         visible={modalEstado}

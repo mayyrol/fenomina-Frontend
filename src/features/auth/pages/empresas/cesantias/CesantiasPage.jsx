@@ -6,6 +6,42 @@ import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosMod
 import MensajeModal from '../../../../../components/MensajeModal';
 import payrollService from '../../../../../services/payrollService';
 
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '40px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 const PAGE_SIZE = 10;
 
 const OPCIONES_POR_ESTADO = {
@@ -164,10 +200,6 @@ export default function CesantiasPage() {
           <div><p style={styles.perfilNombre}>{nombre}</p><p style={styles.perfilCargo}>{cargo}</p></div>
         </div>
       </div>
-
-      <button style={{ ...styles.volverBtn, width: 'fit-content' }} onClick={() => navigate(`/empresas/${id}`)}>
-        <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-      </button>
 
       <div style={styles.toolbarCard}>
         <div>
@@ -332,6 +364,15 @@ export default function CesantiasPage() {
             style={{ ...styles.pageBtn, opacity: pagina >= totalPaginas - 1 ? 0.4 : 1 }}>{'>>'}</button>
         </div>
       </div>
+
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
 
       <ConfirmarCambiosModal visible={confirmarEstado} onCancelar={() => setConfirmarEstado(false)} onConfirmar={handleConfirmarEstado} titulo="¿Deseas cambiar el estado del proceso?" descripcion="Una vez confirmes, el estado del proceso será actualizado." />
       <ConfirmarCambiosModal visible={confirmarAnulado} onCancelar={() => setConfirmarAnulado(false)}

@@ -4,6 +4,43 @@ import { useAuthStore } from '../../../../../../store/authStore';
 import { CreditCard, ChevronLeft, UserRound, Search } from 'lucide-react';
 import { useHistoricos } from "../../../../hooks/useHistoricos";
 import historicosService from '../../../../../../services/historicosService';
+import { exportarExcel } from '../../../../../../utils/exportExcel';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
@@ -35,6 +72,7 @@ export default function ReportesPrimasPage() {
   const [fecha,        setFecha]         = useState('');
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
+  const [hoverDescargar, setHoverDescargar] = useState(false);
 
   const handleTabPrincipal = (t) => {
     setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
@@ -80,6 +118,23 @@ export default function ReportesPrimasPage() {
       ? 'Histórico Detalles de Primas por Empleado'
       : 'Histórico Total de Primas por Periodo';
 
+  const EXCEL_HEADERS = {
+    primas:  ['#','Nombre(s)','Apellidos','Año','Semestre','Número de identificación','Fecha inicio periodo','Fecha fin periodo','Fecha inicio corte prima','Fecha fin corte prima','Días laborados','Salario base','Base Aux. transp.','Base liquidación','Total prima','Estado proceso'],
+    periodo: ['Año','Semestre','Total neto primas','Total empleados','Estado proceso'],
+  };
+
+  const filaExcel = (r, index) => {
+    if (tabPrincipal === 'primas') {
+      return [index + 1, r.nombresEmp, r.apellidosEmp, r.anioLiqui, r.periodoLiqui, r.documentoEmp, r.finicioGeneral ?? '-', r.ffinalGeneral ?? '-', r.fechaInicioCorte ?? '-', r.fechaFinCorte ?? '-', r.diasLiquidados, r.salarioBase ?? 0, r.promedioAuxTransporte ?? 0, r.baseLiquiTotal ?? 0, r.valorNetoPrima ?? 0, fmtEstado(r.estadoProceso)];
+    }
+    return [r.anio, r.periodo, r.totalNetoPrimas ?? 0, r.totalEmpleados, fmtEstado(r.estadoProceso)];
+  };
+
+  const handleDescargarExcel = () => {
+    const filas = datosActivos.map((r, i) => filaExcel(r, i));
+    exportarExcel(EXCEL_HEADERS[tabPrincipal], filas, tituloTabla);
+  };
+
   return (
     <div style={styles.container}>
 
@@ -99,11 +154,6 @@ export default function ReportesPrimasPage() {
           </div>
         </div>
       </div>
-
-      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       <div style={styles.toolbarCard}>
         <div>
@@ -147,7 +197,24 @@ export default function ReportesPrimasPage() {
               </div>
             </div>
           )}
+
+          <button
+          style={{
+            background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+            border: 'none', borderRadius: '8px', padding: '10px 24px',
+            fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+            cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease', flexShrink: 0,
+          }}
+          onMouseEnter={() => setHoverDescargar(true)}
+          onMouseLeave={() => setHoverDescargar(false)}
+          onClick={handleDescargarExcel}
+          disabled={cargando || datosActivos.length === 0}
+        >
+          Descargar en Excel
+        </button>
+        
         </div>
+        
       </div>
 
       <div style={styles.tabsRow}>
@@ -251,6 +318,17 @@ export default function ReportesPrimasPage() {
             disabled={pagina === totalPaginas - 1}>{'>>'}</button>
         </div>
       </div>
+
+      {/* Volver */}
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
+      
     </div>
   );
 }

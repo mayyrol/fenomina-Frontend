@@ -7,6 +7,43 @@ import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal'
 import parametrosService from '../../../../services/parametrosService';
 import { formatearMiles, limpiarMiles } from '../../../../utils/formatters';
 
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '40px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 const MAPA_PARAMETRO_NOMBRE = {
   'SMMLV (SALARIO MÍNIMO)':                    'SMMLV',
   'AUXILIO DE TRANSPORTE':                     'AUXILIO_TRANSPORTE',
@@ -450,32 +487,15 @@ export default function ParametrosGeneralesPage() {
       </div>
 
       {/* Botones */}
-      <div style={styles.botonesRow}>
+      <BarraAcciones>
+        <button style={btnSecundario} onClick={() => navigate(-1)}>Regresar</button>
         <button
-          style={{
-            ...styles.btnGuardar,
-            background: hoverGuardar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
-            transition: 'background 0.3s ease',
-          }}
+          style={{ color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 40px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', background: hoverGuardar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverGuardar(true)}
           onMouseLeave={() => setHoverGuardar(false)}
           onClick={handleGuardar}
-        >
-          Guardar
-        </button>
-        <button
-          style={{
-            ...styles.btnRegresar,
-            background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff',
-            transition: 'background 0.3s ease',
-          }}
-          onMouseEnter={() => setHoverRegresar(true)}
-          onMouseLeave={() => setHoverRegresar(false)}
-          onClick={() => navigate(-1)}
-        >
-          Regresar
-        </button>
-      </div>
+        >Guardar cambios</button>
+      </BarraAcciones>
 
       {/* Modales */}
       <MensajeModal
@@ -505,7 +525,7 @@ export default function ParametrosGeneralesPage() {
 }
 
 const styles = {
-  container:        { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '100%' },
+  container: { padding: '0', fontFamily: 'Nunito, sans-serif', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '100%' },
   header:           { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   titulo:           { fontSize: '18px', fontWeight: '800', color: '#272525', margin: 0 },
   subtitulo:        { fontSize: '12px', color: '#A3A3A3', margin: 0, maxWidth: '620px' },

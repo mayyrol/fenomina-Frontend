@@ -4,6 +4,43 @@ import { useAuthStore } from '../../../../../../store/authStore';
 import { Coins, ChevronLeft, UserRound, Search } from 'lucide-react';
 import { useHistoricos } from "../../../../hooks/useHistoricos";
 import historicosService from '../../../../../../services/historicosService';
+import { exportarExcel } from '../../../../../../utils/exportExcel';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
@@ -35,6 +72,8 @@ export default function ReportesCesantiasPage() {
   const [fecha,        setFecha]         = useState('');
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
+
+  const [hoverDescargar, setHoverDescargar] = useState(false);
 
   const handleTabPrincipal = (t) => {
     setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
@@ -80,6 +119,23 @@ export default function ReportesCesantiasPage() {
       ? 'Histórico Detalles de Cesantías e Intereses por Empleado'
       : 'Histórico Total de Cesantías e Intereses por Periodo';
 
+  const EXCEL_HEADERS = {
+    cesantias: ['#','Nombre(s)','Apellidos','Año','Periodo','Número de identificación','Fecha inicio corte','Fecha fin corte','Días laborados','Salario','Salario base liqui.','Base Aux. transp.','Cesantías','Intereses cesantías','Fondo de cesantías','Estado proceso'],
+    periodo:   ['Año','Periodo','Total cesantías','Total intereses cesantías','Total empleados','Estado proceso'],
+  };
+
+  const filaExcel = (r, index) => {
+    if (tabPrincipal === 'cesantias') {
+      return [index + 1, r.nombresEmp, r.apellidosEmp, r.anioLiqui, r.periodoLiqui, r.documentoEmp, r.fechaInicioCorte ?? '-', r.fechaFinCorte ?? '-', r.diasLiquidados, r.salarioBase ?? 0, r.baseLiquiTotal ?? 0, r.promedioAuxTransporte ?? 0, r.cesantias ?? 0, r.interesesCesantias ?? 0, r.fondoCesantiasEmp ?? '-', fmtEstado(r.estadoProceso)];
+    }
+    return [r.anio, r.periodo, r.totalCesantias ?? 0, r.totalInteresesCesantias ?? 0, r.totalEmpleados, fmtEstado(r.estadoProceso)];
+  };
+
+  const handleDescargarExcel = () => {
+    const filas = datosActivos.map((r, i) => filaExcel(r, i));
+    exportarExcel(EXCEL_HEADERS[tabPrincipal], filas, tituloTabla);
+  };
+
   return (
     <div style={styles.container}>
 
@@ -99,11 +155,6 @@ export default function ReportesCesantiasPage() {
           </div>
         </div>
       </div>
-
-      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       <div style={styles.toolbarCard}>
         <div>
@@ -147,6 +198,20 @@ export default function ReportesCesantiasPage() {
               </div>
             </div>
           )}
+          <button
+          style={{
+            background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+            border: 'none', borderRadius: '8px', padding: '10px 24px',
+            fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+            cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease', flexShrink: 0,
+          }}
+          onMouseEnter={() => setHoverDescargar(true)}
+          onMouseLeave={() => setHoverDescargar(false)}
+          onClick={handleDescargarExcel}
+          disabled={cargando || datosActivos.length === 0}
+        >
+          Descargar en Excel
+        </button>
         </div>
       </div>
 
@@ -253,6 +318,17 @@ export default function ReportesCesantiasPage() {
             disabled={pagina === totalPaginas - 1}>{'>>'}</button>
         </div>
       </div>
+
+      {/* Volver */}
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
+      
     </div>
   );
 }

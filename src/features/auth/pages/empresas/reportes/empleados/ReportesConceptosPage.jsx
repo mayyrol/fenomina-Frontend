@@ -4,6 +4,43 @@ import { useAuthStore } from '../../../../../../store/authStore';
 import { Layers, ChevronLeft, UserRound, Search } from 'lucide-react';
 import { useHistoricos } from "../../../../hooks/useHistoricos";
 import historicosService from '../../../../../../services/historicosService';
+import { exportarExcel } from '../../../../../../utils/exportExcel';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const fmt2 = (v) => v == null ? '-' : '' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -34,6 +71,17 @@ const TITULOS = {
   totalVacaciones: 'Histórico Total de Vacaciones por Periodo',
 };
 
+const EXCEL_HEADERS = {
+  horasExtra: ['#','Nombre(s)','Apellidos','Año','Periodo','Doc.','Rec. noc. lun-sáb','Val. rec. noc. lun-sáb','Rec. diur. dom/fest','Val. rec. diur. dom/fest','Rec. noct. dom/fest','Val. rec. noct. dom/fest','Hrs ex. diur. lun-sáb','Val. hrs ex. diur. lun-sáb','Hrs ex. noct. lun-sáb','Val. hrs ex. noct. lun-sáb','Hrs ex. diur. dom/fest','Val. hrs ex. diur. dom/fest','Hrs ex. noct. dom/fest','Val. hrs ex. noct. dom/fest','Total'],
+  totalHoras: ['Año','Periodo','Total horas extra y recargos empresa'],
+  incapacidades: ['#','Nombre(s)','Apellidos','Doc.','Año','Periodo','Días incap. común','Días incap. laboral','Total incap. común','Total incap. laboral'],
+  totalIncap: ['Año','Periodo','Total incap. común','Total incap. laboral'],
+  licencias: ['#','Nombre(s)','Apellidos','Doc.','Año','Periodo','Días mat/pat','Val. mat/pat','Días calamidad','Val. calamidad','Días matrimonio','Val. matrimonio','Días Isaac','Val. Isaac','Días sufragio','Val. sufragio','Días cargos trans.','Val. cargos trans.','Días cit. jud.','Val. cit. jud.','Días otros remun.','Val. otros remun.','Días no remun.','Val. no remun.'],
+  totalLicencias: ['Año','Periodo','Total licencias remuneradas','Total licencias no remuneradas'],
+  vacaciones: ['#','Nombre(s)','Apellidos','Doc.','Año','Periodo','Fecha inicio','Fecha fin','Tipo','Días','Valor'],
+  totalVacaciones: ['Año','Periodo','Total vacaciones compensadas en dinero','Total vacaciones disfrutadas'],
+};
+
 export default function ReportesConceptosPage() {
   const navigate    = useNavigate();
   const { id }      = useParams();
@@ -48,6 +96,8 @@ export default function ReportesConceptosPage() {
   const [fecha,        setFecha]         = useState('');
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
+
+  const [hoverDescargar, setHoverDescargar] = useState(false);
 
   const handleTabPrincipal = (t) => {
     setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
@@ -305,6 +355,51 @@ export default function ReportesConceptosPage() {
     }
   };
 
+  const filaExcel = (r, index) => {
+    switch (tabPrincipal) {
+      case 'horasExtra':
+        return [index + 1, r.nombresEmp, r.apellidosEmp, r.anio, r.periodo, r.documentoEmp,
+          r.horasRecargoNocturnoLunSab ?? 0, r.valorRecargoNocturnoLunSab ?? 0,
+          r.horasRecargoDiurnoDomFest ?? 0, r.valorRecargoDiurnoDomFest ?? 0,
+          r.horasRecargoNocturnoDomFest ?? 0, r.valorRecargoNocturnoDomFest ?? 0,
+          r.horasExtraDiurnaLunSab ?? 0, r.valorExtraDiurnaLunSab ?? 0,
+          r.horasExtraNocturnaLunSab ?? 0, r.valorExtraNocturnaLunSab ?? 0,
+          r.horasExtraDiurnaDomFest ?? 0, r.valorExtraDiurnaDomFest ?? 0,
+          r.horasExtraNocturnaDomFest ?? 0, r.valorExtraNocturnaDomFest ?? 0,
+          r.totalHorasExtraYRecargos ?? 0];
+      case 'totalHoras':
+        return [r.anio, r.periodo, r.totalHorasExtraYRecargosEmpresa ?? 0];
+      case 'incapacidades':
+        return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo, r.diasIncapacidadComun, r.diasIncapacidadLaboral, r.totalIncapacidadComun ?? 0, r.totalIncapacidadLaboral ?? 0];
+      case 'totalIncap':
+        return [r.anio, r.periodo, r.totalIncapacidadComun ?? 0, r.totalIncapacidadLaboral ?? 0];
+      case 'licencias':
+        return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo,
+          r.diasLicenciaMaternidadPaternidad, r.valorLicenciaMaternidadPaternidad ?? 0,
+          r.diasLicenciaCalamidad, r.valorLicenciaCalamidad ?? 0,
+          r.diasLicenciaMatrimonio, r.valorLicenciaMatrimonio ?? 0,
+          r.diasLicenciaIsaac, r.valorLicenciaIsaac ?? 0,
+          r.diasLicenciaSufragio, r.valorLicenciaSufragio ?? 0,
+          r.diasCargosTransitorios, r.valorCargosTransitorios ?? 0,
+          r.diasCitacionesJudiciales, r.valorCitacionesJudiciales ?? 0,
+          r.diasOtrosPermisosRemunerados, r.valorOtrosPermisosRemunerados ?? 0,
+          r.diasLicenciasNoRemuneradas, r.valorLicenciasNoRemuneradas ?? 0];
+      case 'totalLicencias':
+        return [r.anio, r.periodo, r.totalOtrosPermisosRemunerados ?? 0, r.totalLicenciasNoRemuneradas ?? 0];
+      case 'vacaciones':
+        return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo, r.fechaInicioVac ?? '-', r.fechaFinVac ?? '-', r.tipoVacaciones ?? '-', r.diasTomados ?? '-', r.valorPagoVac ?? 0];
+      case 'totalVacaciones':
+        return [r.anio, r.periodo, r.totalVacacionesCompensadas ?? 0, r.totalVacacionesDisfrutadas ?? 0];
+      default:
+        return [];
+    }
+  };
+
+  const handleDescargarExcel = () => {
+    const filas = datosActivos.map((r, i) => filaExcel(r, i));
+    exportarExcel(EXCEL_HEADERS[tabPrincipal], filas, TITULOS[tabPrincipal]);
+  };
+
   return (
     <div style={styles.container}>
 
@@ -324,11 +419,6 @@ export default function ReportesConceptosPage() {
           </div>
         </div>
       </div>
-
-      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       <div style={styles.toolbarCard}>
         <div>
@@ -384,7 +474,24 @@ export default function ReportesConceptosPage() {
               </div>
             </>
           )}
+
+          <button
+            style={{
+              background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+              border: 'none', borderRadius: '8px', padding: '10px 24px',
+              fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+              cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease', flexShrink: 0,
+            }}
+            onMouseEnter={() => setHoverDescargar(true)}
+            onMouseLeave={() => setHoverDescargar(false)}
+            onClick={handleDescargarExcel}
+            disabled={cargando || datosActivos.length === 0}
+          >
+            Descargar en Excel
+          </button>
+          
         </div>
+        
       </div>
 
       <div style={styles.tabsRow}>
@@ -430,6 +537,17 @@ export default function ReportesConceptosPage() {
             disabled={pagina === totalPaginas - 1}>{'>>'}</button>
         </div>
       </div>
+
+      {/* Volver */}
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
+
     </div>
   );
 }

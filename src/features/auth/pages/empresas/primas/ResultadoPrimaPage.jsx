@@ -5,10 +5,47 @@ import { CreditCard, ChevronLeft, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import payrollService from '../../../../../services/payrollService';
+import { exportarExcel } from '../../../../../utils/exportExcel';
 
-// Lógica restaurada de V1 para peticiones e imágenes
 import axiosInstance from '../../../../../api/axiosInstance';
 import { useImagenAutenticada } from '../../../hooks/useImagenAutenticada';
+
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const calcularNeto = (desp) => desp.valorPrestacion ?? 0;
 const fmt = (v) => '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -36,6 +73,18 @@ function numLetras(n) {
   else if (n > 0){ r += unidades[n] + ' '; }
   return r.trim();
 }
+
+const nombreCompleto = (desp) =>
+  `${desp.apellidosEmpleado ?? ''} ${desp.nombresEmpleado ?? ''}`.trim();
+
+const CARGOS_OCULTABLES = ['POR DEFINIR', 'SIN DEFINIR', 'N/A'];
+
+const tieneCargoValido = (desp) => {
+  const cargo = desp.cargoEmpleado;
+  if (cargo == null) return false;
+  const cargoNormalizado = cargo.trim().toUpperCase();
+  return cargoNormalizado !== '' && !CARGOS_OCULTABLES.includes(cargoNormalizado);
+};
 
 export default function ResultadoPrimaPage() {
   const navigate        = useNavigate();
@@ -129,13 +178,13 @@ export default function ResultadoPrimaPage() {
       startY: y,
       margin: { left: M, right: M, bottom: M },
       tableWidth: pageWidth - M * 2,
-      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'CARGO', 'F. INICIO', 'F. FIN', 'DÍAS', 'SAL. BASE', 'AUX. TRANSP.', 'NETO', 'FIRMA']],
+      head: [['No', 'CC', 'APELLIDOS Y NOMBRES', 'CARGO', 'F. INICIO', 'F. FIN', 'DÍAS', 'SAL. BASE', 'AUX. TRANSP.', 'NETO', 'FIRMA']],
       body: [
         ...desprendibles.map((desp, i) => [
           i + 1,
           desp.documentoEmpleado,
-          `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
-          desp.cargoEmpleado ?? '',
+          `${nombreCompleto(desp)}`,
+          tieneCargoValido(desp) ? desp.cargoEmpleado : '',
           desp.fechaInicioCorte,
           desp.fechaFinCorte,
           desp.diasLiquidados,
@@ -196,9 +245,13 @@ export default function ResultadoPrimaPage() {
       doc.setFontSize(8); doc.setFont(undefined, 'bold');
       doc.text('Datos del trabajador:', M + 4, cy); cy += 5;
       doc.setFont(undefined, 'normal');
-      doc.text('Nombre:', M + 4, cy); doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, M + 36, cy); cy += 5;
+      doc.text('Nombre:', M + 4, cy); doc.text(`${nombreCompleto(desp)}`, M + 36, cy); cy += 5;
       doc.text('Cédula:', M + 4, cy); doc.text(desp.documentoEmpleado, M + 36, cy); cy += 5;
-      doc.text('Cargo:', M + 4, cy); doc.text(desp.cargoEmpleado ?? '', M + 36, cy); cy += 6;
+      if (tieneCargoValido(desp)) {
+        doc.text('Cargo:', M + 4, cy); doc.text(desp.cargoEmpleado, M + 36, cy); cy += 6;
+      } else {
+        cy += 1; 
+      }
 
       doc.setFont(undefined, 'bold');
       doc.text(`Comprobante del pago de la prima de servicios correspondiente al ${semestre}`, pageWidth / 2, cy, { align: 'center' });
@@ -222,7 +275,7 @@ export default function ResultadoPrimaPage() {
 
       doc.text('Recibí conforme:', M + 4, cy); cy += 10;
       doc.line(M + 4, cy, M + 80, cy); cy += 4;
-      doc.text(`${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, M + 4, cy); cy += 5;
+      doc.text(`${nombreCompleto(desp)}`, M + 4, cy); cy += 5;
       doc.text('Fecha de recibido:', M + 4, cy);
     };
 
@@ -236,8 +289,29 @@ export default function ResultadoPrimaPage() {
       renderComprobante(desp, mitad, mitad, pageHeight);
     });
 
-    doc.save(`prima_${semestre.replace(/ /g, '_')}_${proceso?.anio ?? ''}.pdf`);
+    const nombreArchivo = `${empresa?.nombreEmpresa ?? 'PRIMA'} ${semestre} ${proceso?.anio ?? ''}`.trim();
+    doc.save(`${nombreArchivo}.pdf`);
     setDescargando(false);
+  };
+
+  const EXCEL_HEADERS_PRIMA = ['#','CC','Apellidos y Nombres','Cargo','Fecha inicio','Fecha fin','Días','Salario base','Aux. transporte','Neto'];
+
+  const handleDescargarExcel = () => {
+    const filas = desprendibles.map((desp, i) => [
+      i + 1,
+      desp.documentoEmpleado,
+      nombreCompleto(desp),
+      tieneCargoValido(desp) ? desp.cargoEmpleado : '-',
+      desp.fechaInicioCorte ?? '-',
+      desp.fechaFinCorte ?? '-',
+      desp.diasLiquidados,
+      desp.salarioBase ?? 0,
+      desp.auxTransporte ?? 0,
+      desp.valorPrestacion ?? 0,
+    ]);
+    const semestre = proceso?.periodo === 1 ? 'Primer semestre' : 'Segundo semestre';
+    const nombreArchivo = `${empresa?.nombreEmpresa ?? 'PRIMA'} ${semestre} ${proceso?.anio ?? ''}`.trim();
+    exportarExcel(EXCEL_HEADERS_PRIMA, filas, nombreArchivo, 'Prima');
   };
 
   useEffect(() => {
@@ -251,7 +325,12 @@ export default function ResultadoPrimaPage() {
       axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([despsResult, procesosResult, empResult]) => {
-        if (despsResult.status === 'fulfilled') setDesprendibles(despsResult.value.data);
+        if (despsResult.status === 'fulfilled') {
+          const ordenados = [...despsResult.value.data].sort((a, b) =>
+            (a.apellidosEmpleado ?? '').localeCompare(b.apellidosEmpleado ?? '', 'es')
+          );
+          setDesprendibles(ordenados);
+        }
         else setErrorDesp(true); // Lógica de control de errores conservada
 
         if (empResult.status === 'fulfilled') setEmpresa(empResult.value.data);
@@ -343,8 +422,10 @@ export default function ResultadoPrimaPage() {
                   <tr key={desp.cabeLiquiPrestacionId ?? i} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
                     <td style={styles.td}>{i + 1}</td>
                     <td style={styles.td}>{desp.documentoEmpleado}</td>
-                    <td style={{ ...styles.td, textAlign: 'left' }}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</td>
-                    <td style={{ ...styles.td, textAlign: 'left' }}>{desp.cargoEmpleado ?? ''}</td>
+                    <td style={{ ...styles.td, textAlign: 'left' }}>{nombreCompleto(desp)}</td>
+                    <td style={{ ...styles.td, textAlign: 'left' }}>
+                      {tieneCargoValido(desp) ? desp.cargoEmpleado : ''}
+                    </td>
                     <td style={styles.td}>{calcularFechaInicio(desp)}</td>
                     <td style={styles.td}>{desp.fechaFinCorte}</td>
                     <td style={styles.td}>{desp.diasLiquidados}</td>
@@ -386,16 +467,18 @@ export default function ResultadoPrimaPage() {
                 <p style={{ ...styles.comprobanteLabel, fontWeight: '700', margin: '0 0 4px 0' }}>Datos del trabajador:</p>
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '2px' }}>
                   <span style={styles.comprobanteLabel}>Nombre:</span>
-                  <span style={styles.comprobanteValor}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</span>
+                  <span style={styles.comprobanteValor}>{nombreCompleto(desp)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <span style={styles.comprobanteLabel}>Cédula:</span>
                   <span style={styles.comprobanteValor}>{desp.documentoEmpleado}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <span style={styles.comprobanteLabel}>Cargo:</span>
-                  <span style={styles.comprobanteValor}>{desp.cargoEmpleado ?? ''}</span>
-                </div>
+                {tieneCargoValido(desp) && (
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    <span style={styles.comprobanteLabel}>Cargo:</span>
+                    <span style={styles.comprobanteValor}>{desp.cargoEmpleado}</span>
+                  </div>
+                )}
               </div>
 
               <p style={{ fontSize: '11px', fontWeight: '700', textAlign: 'center', margin: '12px auto', color: '#272525', width: '100%' }}>
@@ -446,7 +529,7 @@ export default function ResultadoPrimaPage() {
 
               <p style={{ ...styles.comprobanteLabel, marginBottom: '24px' }}>Recibí conforme:</p>
               <div style={{ borderTop: '1px solid #272525', width: '220px', paddingTop: '6px', marginTop: '8px' }}>
-                <p style={{ fontSize: '11px', color: '#272525', margin: '0 0 2px 0', fontWeight: '600' }}>{desp.nombresEmpleado} {desp.apellidosEmpleado}</p>
+                <p style={{ fontSize: '11px', color: '#272525', margin: '0 0 2px 0', fontWeight: '600' }}>{nombreCompleto(desp)}</p>
                 <p style={{ fontSize: '11px', color: '#272525', margin: 0 }}>Fecha de recibido:</p>
               </div>
             </div>
@@ -454,32 +537,33 @@ export default function ResultadoPrimaPage() {
         );
       })}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+      <BarraAcciones justificar="space-between">
         <button
-          style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#272525' }}
-          onClick={() => navigate(`/empresas/${id}/primas`)}
-        > Cancelar </button>
-        <button
-          style={{ background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverDescargar(true)}
-          onMouseLeave={() => setHoverDescargar(false)}
-          onClick={handleDescargar}
-          disabled={cargando || desprendibles.length === 0}
-        > Descargar Reportes en PDF </button>
-      </div>
-
-      {/* Modal descarga */}
-      {descargando && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '40px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#E8F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CreditCard size={28} color="#0B662A" />
-            </div>
-            <p style={{ fontSize: '16px', fontWeight: '800', color: '#272525', margin: 0 }}>Descarga en curso</p>
-            <p style={{ fontSize: '13px', color: '#A3A3A3', margin: 0 }}>La descarga de los desprendibles tomará unos segundos.</p>
-          </div>
+          style={btnSecundario}
+          onClick={() => navigate(`/empresas/${id}/primas`)} 
+        >
+          Volver al inicio
+        </button>
+        <div style={{ display: 'flex', gap: '12px', pointerEvents: 'all' }}>
+          <button
+            style={{ background: '#fff', border: '1px solid #0B662A', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#0B662A' }}
+            onClick={handleDescargarExcel}
+            disabled={cargando || desprendibles.length === 0}
+          >
+            Descargar en Excel
+          </button>
+          <button
+            style={{ background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease' }}
+            onMouseEnter={() => setHoverDescargar(true)}
+            onMouseLeave={() => setHoverDescargar(false)}
+            onClick={handleDescargar}
+            disabled={cargando || desprendibles.length === 0}
+          >
+            Descargar Reportes en PDF
+          </button>
         </div>
-      )}
+      </BarraAcciones>
+
     </div>
   );
 }

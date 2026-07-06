@@ -11,6 +11,41 @@ import {
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 
+function BarraAcciones({ children, justificar = 'center' }) {
+  return (
+    <div style={{
+      position: 'sticky',
+      bottom: '-24px',
+      display: 'flex',
+      justifyContent: justificar,
+      gap: '16px',
+      padding: '60px 32px 24px 32px',
+      background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+      zIndex: 100,
+      flexWrap: 'wrap',
+      marginTop: '-40px',
+      boxSizing: 'border-box',
+      pointerEvents: 'none',
+    }}>
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error }) {
   const [abierto, setAbierto] = useState(false);
   const hoy = new Date();
@@ -136,7 +171,7 @@ const soloNumeros = (e) => {
 
 const filaVaciaLicencia  = () => ({ concepNominaId: '', fechaInicio: '', fechaFin: '' });
 const filaVaciaHoras     = () => ({ concepNominaId: '', fecha: '', cantidad: '' });
-const filaVaciaPagos     = () => ({ concepNominaId: '', fecha: '', monto: '' });
+const filaVaciaPagos = () => ({ concepNominaId: '', fecha: '', monto: '', descripcion: '' });
 const filaVaciaVacacion = () => ({ concepNominaId: '', diasVacaciones: '', fechaInicio: '', fechaFin: '' });
 const filaVaciaOtros     = () => ({ descripcion: '', monto: '', fecha: '', constituyeSalario: 'si' });
 const filaVaciaReten     = () => ({ descripcion: '', monto: '', fecha: '' });
@@ -360,6 +395,7 @@ export default function NovedadesPage() {
               concepNominaId: String(novedadEdit.fkConcepNominaId ?? ''),
               fecha: isoToDisplay(novedadEdit.fechaNovedad),
               monto: String(novedadEdit.valorRefNovedad ?? ''),
+              descripcion: novedadEdit.observaciones ?? '',
           }]);
       } else if (esOtroDevengSalarial || esOtroDevengNoSalarial) {
           setOtrosDeveng([{
@@ -500,6 +536,7 @@ export default function NovedadesPage() {
             periodo:              procesoActual?.periodo,
             fechaNovedad:         fechaToISO(f.fecha),
             valorRefNovedad:      Number(f.monto),
+            observaciones:        f.descripcion || null,
             cantidadDiasNovedad:  null,
             cantidadHorasNovedad: null,
           });
@@ -795,6 +832,13 @@ export default function NovedadesPage() {
                 onChange={(v) => updateFila(setPagosExtra, pagosExtra, i, 'concepNominaId', v)}
                 options={opcionesPagos}
               />, i)}
+            {campo('Descripción',
+              <input
+                value={f.descripcion}
+                onChange={(e) => updateFila(setPagosExtra, pagosExtra, i, 'descripcion', e.target.value)}
+                placeholder="Nombre de la bonificación o compensación"
+                style={styles.input}
+              />, i)}
             {campo('Fecha de novedad',
               <CalendarioInput
                 value={f.fecha}
@@ -1003,13 +1047,19 @@ export default function NovedadesPage() {
       </div>
 
       {/* Botones */}
-      <div style={styles.botonesRow}>
+      <BarraAcciones>
+        <button
+          style={btnSecundario}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+          onClick={() => navigate(-1)}
+        >
+          Regresar
+        </button>
         <button
           style={{
             ...styles.btnGuardarCerrar,
-            background: hoverGuardar
-              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
-              : '#0B662A',
+            background: hoverGuardar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
             transition: 'background 0.3s ease',
           }}
           onMouseEnter={() => setHoverGuardar(true)}
@@ -1018,21 +1068,7 @@ export default function NovedadesPage() {
         >
           Guardar
         </button>
-        <button
-          style={{
-            ...styles.btnRegresar,
-            background: hoverRegresar
-              ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'
-              : '#fff',
-            transition: 'background 0.3s ease',
-          }}
-          onMouseEnter={() => setHoverRegresar(true)}
-          onMouseLeave={() => setHoverRegresar(false)}
-          onClick={() => navigate(-1)}
-        >
-          Regresar
-        </button>
-      </div>
+      </BarraAcciones>
 
       <ConfirmarCambiosModal
         visible={confirmarGuardar}

@@ -4,6 +4,43 @@ import { useAuthStore } from '../../../../../store/authStore';
 import { Banknote, ChevronLeft, UserRound, Search, X } from 'lucide-react';
 import { useHistoricos } from "../../../hooks/useHistoricos";
 import historicosService from '../../../../../services/historicosService';
+import { exportarExcel } from '../../../../../utils/exportExcel';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
@@ -25,6 +62,14 @@ const TITULOS = {
   cargas:        'Histórico Cargas Prestacionales por Empleado (Reporte del Empleador)',
 };
 
+const EXCEL_HEADERS = {
+  segSocEmpl:  ['#','Nombre(s)','Apellidos','Número de documento','Año','Periodo','Fecha de ingreso','Salud empleador','Pensión empleador','ARL empleador','Total seg. social empleador'],
+  totalSegSoc: ['Año','Periodo','Seg. social salud','Seg. social pensión','Seg. social ARL','Total seguridad social'],
+  parafEmpl:   ['#','Nombre(s)','Apellidos','Número de documento','Año','Periodo','Fecha de ingreso','SENA','ICBF','Caja de compensación','Total aportes parafiscales'],
+  totalParaf:  ['Año','Periodo','Ap. paraf. SENA','Ap. paraf. ICBF','Ap. paraf. caja compensación','Total aportes parafiscales'],
+  cargas:      ['Año','Semestre','Cesantías (informativo)','Primas','Intereses de cesantías'],
+};
+
 export default function ProvisionesPage() {
   const navigate    = useNavigate();
   const { id }      = useParams();
@@ -39,6 +84,8 @@ export default function ProvisionesPage() {
   const [fechaFiltro, setFechaFiltro] = useState('');
   const [pagina,      setPagina]      = useState(0);
   const [porPagina,   setPorPagina]   = useState(10);
+
+  const [hoverDescargar, setHoverDescargar] = useState(false);
 
   const handleTab       = (t) => { setTabActual(t); setBusqueda(''); setAnioFiltro(''); setFechaFiltro(''); setPagina(0); };
   const handlePorPagina = (v) => { setPorPagina(v); setPagina(0); };
@@ -190,6 +237,28 @@ export default function ProvisionesPage() {
     }
   };
 
+  const filaExcel = (r, index) => {
+    switch (tabActual) {
+      case 'segSocEmpl':
+        return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo, r.fechaIngresoEmp ?? '-', r.empleadorSalud ?? 0, r.empleadorPension ?? 0, r.empleadorArl ?? 0, r.totalSocialEmpleador ?? 0];
+      case 'totalSegSoc':
+        return [r.anio, r.periodo, r.segSocialSalud ?? 0, r.segSocialPension ?? 0, r.segSocialArl ?? 0, r.totalSegSocialEmpr ?? 0];
+      case 'parafEmpl':
+        return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo, r.fechaIngresoEmp ?? '-', r.apFiscaSena ?? 0, r.apFiscaIcbf ?? 0, r.apFiscaCajaComp ?? 0, r.totalAportesParafEmpleador ?? 0];
+      case 'totalParaf':
+        return [r.anio, r.periodo, r.apFiscaSena ?? 0, r.apFiscaIcbf ?? 0, r.apFiscaCajaComp ?? 0, r.totalAportesParafEmpr ?? 0];
+      case 'cargas':
+        return [r.anio, r.periodo, r.cargPresCesantiasInformativo ?? 0, r.cargPresPrimas ?? 0, r.cargPresIntCesantias ?? 0];
+      default:
+        return [];
+    }
+  };
+
+  const handleDescargarExcel = () => {
+    const filas = datosActivos.map((r, i) => filaExcel(r, i));
+    exportarExcel(EXCEL_HEADERS[tabActual], filas, TITULOS[tabActual]);
+  };
+
   return (
     <div style={styles.container}>
 
@@ -210,71 +279,83 @@ export default function ProvisionesPage() {
         </div>
       </div>
 
-      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}/reportes`)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
-
       <div style={styles.toolbarCard}>
         <div style={{ flexShrink: 0 }}>
           <p style={styles.totalNum}>{totalFiltrado}</p>
           <p style={styles.totalLabel}>Total registros</p>
         </div>
 
-        <div style={styles.filtrosBox}>
-          {/* Búsqueda nombre/documento — solo tabs de detalle */}
-          {esDetalle && (
-            <div style={styles.searchBox}>
-              <Search size={14} color="#A3A3A3" />
-              <input
-                style={styles.searchInput}
-                placeholder="Buscar por nombre o n° de documento"
-                value={busqueda}
-                onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
-              />
-              {busqueda && (
-                <button style={styles.clearBtn} onClick={() => { setBusqueda(''); setPagina(0); }}>
-                  <X size={12} color="#A3A3A3" />
-                </button>
-              )}
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={styles.filtrosBox}>
+            {/* Búsqueda nombre/documento — solo tabs de detalle */}
+            {esDetalle && (
+              <div style={styles.searchBox}>
+                <Search size={14} color="#A3A3A3" />
+                <input
+                  style={styles.searchInput}
+                  placeholder="Buscar por nombre o n° de documento"
+                  value={busqueda}
+                  onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+                />
+                {busqueda && (
+                  <button style={styles.clearBtn} onClick={() => { setBusqueda(''); setPagina(0); }}>
+                    <X size={12} color="#A3A3A3" />
+                  </button>
+                )}
+              </div>
+            )}
 
-          {/* Filtro por año — todos los tabs */}
-          <div style={styles.filtroItem}>
-            <label style={styles.filtroLabel}>Año</label>
-            <div style={styles.filtroInputBox}>
-              <input
-                style={styles.filtroInput}
-                type="number"
-                min="2000"
-                max="2100"
-                placeholder="Ej: 2026"
-                value={anioFiltro}
-                onChange={(e) => { setAnioFiltro(e.target.value); setPagina(0); }}
-              />
-              {anioFiltro && (
-                <button style={styles.clearBtn} onClick={() => { setAnioFiltro(''); setPagina(0); }}>
-                  <X size={12} color="#A3A3A3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Filtro por fecha de ingreso — solo tabs de detalle */}
-          {esDetalle && (
+            {/* Filtro por año — todos los tabs */}
             <div style={styles.filtroItem}>
-              <label style={styles.filtroLabel}>Fecha ingreso</label>
+              <label style={styles.filtroLabel}>Año</label>
               <div style={styles.filtroInputBox}>
                 <input
-                  style={{ ...styles.filtroInput, minWidth: '130px', colorScheme: 'light' }}
-                  type="date"
-                  value={fechaFiltro}
-                  onChange={(e) => { setFechaFiltro(e.target.value); setPagina(0); }}
+                  style={styles.filtroInput}
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  placeholder="Ej: 2026"
+                  value={anioFiltro}
+                  onChange={(e) => { setAnioFiltro(e.target.value); setPagina(0); }}
                 />
+                {anioFiltro && (
+                  <button style={styles.clearBtn} onClick={() => { setAnioFiltro(''); setPagina(0); }}>
+                    <X size={12} color="#A3A3A3" />
+                  </button>
+                )}
               </div>
             </div>
-          )}
+
+            {/* Filtro por fecha de ingreso — solo tabs de detalle */}
+            {esDetalle && (
+              <div style={styles.filtroItem}>
+                <label style={styles.filtroLabel}>Fecha ingreso</label>
+                <div style={styles.filtroInputBox}>
+                  <input
+                    style={{ ...styles.filtroInput, minWidth: '130px', colorScheme: 'light' }}
+                    type="date"
+                    value={fechaFiltro}
+                    onChange={(e) => { setFechaFiltro(e.target.value); setPagina(0); }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            style={{
+              background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+              border: 'none', borderRadius: '8px', padding: '10px 24px',
+              fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+              cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease', flexShrink: 0,
+            }}
+            onMouseEnter={() => setHoverDescargar(true)}
+            onMouseLeave={() => setHoverDescargar(false)}
+            onClick={handleDescargarExcel}
+            disabled={cargando || datosActivos.length === 0}
+          >
+            Descargar en Excel
+          </button>
         </div>
       </div>
 
@@ -321,6 +402,16 @@ export default function ProvisionesPage() {
             disabled={pagina === totalPaginas - 1}>{'>>'}</button>
         </div>
       </div>
+
+      {/* Volver */}
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
     </div>
   );
 }

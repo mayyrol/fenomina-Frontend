@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from "../../../../../store/authStore";
 import { Users, UserRound, ChevronDown, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, AlertTriangle } from 'lucide-react';
@@ -9,6 +9,42 @@ import contratoConceptoService from '../../../../../services/contratoConceptoSer
 import parametrosService from '../../../../../services/parametrosService';
 import conceptoNominaService from '../../../../../services/conceptoNominaService';
 import { formatearMiles, limpiarMiles } from '../../../../../utils/formatters';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '40px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY', error }) {
   const [abierto, setAbierto] = useState(false);
@@ -94,17 +130,142 @@ const CAMPOS_REQUERIDOS = {
   subtipoCotizante: 'select',
   salario:          'input',
   auxTransporte:    'select',
-  eps:              'input',
-  fondoPensiones:   'input',
-  arl:              'input',
+  eps:              'select',  
+  fondoPensiones:   'select',   
+  arl:              'select',   
   claseRiesgo:      'select',
-  fondoCesantias:   'input',
-  cajaCompensacion: 'input',
+  fondoCesantias:   'select',   
+  cajaCompensacion: 'select',
 };
 
 const MSG_SELECT = 'Debes seleccionar una opción';
 const MSG_INPUT  = 'Este campo es obligatorio';
 const MSG_FECHA  = 'Debes seleccionar una fecha';
+
+
+const LISTA_EPS = [
+  'ALIANSALUD EPS','ANAS WAYUU EPSI','ASMET SALUD','ASOCIACION INDIGENA DEL CAUCA EPSI',
+  'CAJACOPI ATLANTICO','CAPITAL SALUD','COMFACHOCO','COMFAORIENTE','COMFENALCO VALLE',
+  'COMPENSAR EPS','COOSALUD EPS-S','DUSAKAWI EPSI','EMSSANAR','EPM - EMPRESAS PÚBLICAS DE MEDELLIN',
+  'EPS FAMILIAR DE COLOMBIA','EPS SANITAS','EPS SURA','FAMISANAR',
+  'FONDO DE PASIVO SOCIAL DE FERROCARRILES NACIONALES DE COLOMBIA',
+  'MALLAMAS EPSI','MUTUAL SER','NUEVA EPS','PIJAOS SALUD EPSI','SALUD BÓLIVAR EPS SAS',
+  'SALUD MIA','SALUD TOTAL EPS S.A.','SAVIA SALUD EPS','SERVICIO OCCIDENTAL DE SALUD EPS SOS','OTRO',
+].sort((a, b) => a === 'OTRO' ? 1 : b === 'OTRO' ? -1 : a.localeCompare(b, 'es'));
+
+const LISTA_FONDOS_PENSION = [
+  'COLFONDOS','COLPENSIONES','PORVENIR','PROTECCIÓN','SKANDIA (OLD MUTUAL)','OTRO',
+];
+
+const LISTA_ARL = [
+  'ARL SURA','AXA COLPATRIA SEGUROS S.A.','COLMENA SEGUROS S.A.','COLSANITAS SEGUROS',
+  'COMPAÑÍA DE SEGUROS DE VIDA AURORA S.A.','LA EQUIDAD SEGUROS GENERALES ORGANISMO COOPERATIVO',
+  'MAPFRE SEGUROS GENERALES DE COLOMBIA S.A','POSITIVA COMPAÑÍA DE SEGUROS S.A.',
+  'SEGUROS ALFA','SEGUROS BOLÍVAR S.A.','OTRO',
+];
+
+const LISTA_FONDOS_CESANTIAS = [
+  'COLFONDOS','FNA - FONDO NACIONAL DEL AHORRO','PORVENIR','PROTECCIÓN','SKANDIA (OLD MUTUAL)','OTRO',
+];
+
+const LISTA_CAJAS_COMPENSACION = [
+  'CAFABA','CAFAMAZ','CAFAM','CAFASUR','CAJACOPI','CAJAMAG','CAJASAN','CAJASAI',
+  'CAMACOL','COFREM','COLSUBSIDIO','COMBARRANQUILLA','COMCAJA','COMFACA','COMFACAUCA',
+  'COMFACASANARE','COMFACESAR','COMFACHOCO','COMFACOR','COMFACUNDI','COMFAFAMILIAR PUTUMAYO',
+  'COMFAGUAJIRA','COMFABOY','COMFAMA','COMFAMILIAR ATLANTICO','COMFAMILIAR CARTAGENA',
+  'COMFAMILIAR HUILA','COMFAMILIAR NARIÑO','COMFAMILIAR RISARALDA','COMFAMILIARES CALDAS',
+  'COMFANORTE','COMFAORIENTE','COMFASUCRE','COMFATOLIMA','COMFAR ARAUCA','COMFANDI',
+  'COMFENALCO ANTIOQUIA','COMFENALCO CARTAGENA','COMFENALCO SANTANDER','COMFENALCO TOLIMA',
+  'COMFENALCO VALLE','COMPENSAR','CONFACALDAS','FENALCO QUINDIO','OTRO',
+].sort((a, b) => a === 'OTRO' ? 1 : b === 'OTRO' ? -1 : a.localeCompare(b, 'es'));
+
+function SelectConBusqueda({ opciones, value, onChange, placeholder = 'Buscar...', error }) {
+  const [busqueda, setBusqueda] = useState('');
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setAbierto(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtradas = opciones.filter(o =>
+    o.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  const seleccionar = (opcion) => {
+    onChange(opcion);
+    setBusqueda('');
+    setAbierto(false);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        style={{
+          ...styles.input,
+          border: error ? '1px solid #E53E3E' : '1px solid #D0D0D0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'pointer', userSelect: 'none'
+        }}
+        onClick={() => setAbierto(!abierto)}
+      >
+        <span style={{ color: value ? '#272525' : '#A3A3A3', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {value || 'Seleccionar opción'}
+        </span>
+        <ChevronDown size={16} color="#A3A3A3" style={{ flexShrink: 0 }} />
+      </div>
+      {abierto && (
+        <div style={{
+          position: 'absolute', top: '110%', left: 0, right: 0,
+          backgroundColor: '#fff', border: '1px solid #D0D0D0',
+          borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+          zIndex: 200, maxHeight: '260px', display: 'flex', flexDirection: 'column'
+        }}>
+          <div style={{ padding: '8px', borderBottom: '1px solid #F0F0F0' }}>
+            <input
+              autoFocus
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder={placeholder}
+              style={{
+                width: '100%', border: '1px solid #D0D0D0', borderRadius: '6px',
+                padding: '6px 10px', fontSize: '13px', fontFamily: 'Nunito, sans-serif',
+                outline: 'none', boxSizing: 'border-box'
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div style={{ overflowY: 'auto', maxHeight: '200px' }}>
+            {filtradas.length === 0 ? (
+              <div style={{ padding: '12px', fontSize: '13px', color: '#A3A3A3', textAlign: 'center' }}>
+                Sin resultados
+              </div>
+            ) : filtradas.map((o, i) => (
+              <div
+                key={i}
+                onClick={() => seleccionar(o)}
+                style={{
+                  padding: '10px 14px', fontSize: '13px', cursor: 'pointer',
+                  color: value === o ? '#0B662A' : '#272525',
+                  backgroundColor: value === o ? '#F0FAF4' : 'transparent',
+                  fontWeight: value === o ? '700' : '400',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = value === o ? '#F0FAF4' : '#FAFAFA'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = value === o ? '#F0FAF4' : 'transparent'}
+              >
+                {o}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CrearEmpleadoPage() {
   const navigate    = useNavigate();
@@ -520,17 +681,35 @@ export default function CrearEmpleadoPage() {
         <div style={styles.fila3}>
           <div style={styles.campo}>
             <label style={styles.label}>EPS (Entidad Promotora de Salud)<span style={styles.req}>*</span></label>
-            <input name="eps" value={form.eps} onChange={handleChange} placeholder="Ingresar dato" style={inputStyle('eps')} />
+            <SelectConBusqueda
+              opciones={LISTA_EPS}
+              value={form.eps}
+              onChange={(v) => { setForm({ ...form, eps: v }); setErrores({ ...errores, eps: '' }); }}
+              placeholder="Buscar EPS"
+              error={errores.eps}
+            />
             {errores.eps && <span style={styles.errorMsg}>{errores.eps}</span>}
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Fondo de pensiones<span style={styles.req}>*</span></label>
-            <input name="fondoPensiones" value={form.fondoPensiones} onChange={handleChange} placeholder="Ingresar dato" style={inputStyle('fondoPensiones')} />
+            <SelectConBusqueda
+              opciones={LISTA_FONDOS_PENSION}
+              value={form.fondoPensiones}
+              onChange={(v) => { setForm({ ...form, fondoPensiones: v }); setErrores({ ...errores, fondoPensiones: '' }); }}
+              placeholder="Buscar fondo de pensiones"
+              error={errores.fondoPensiones}
+            />
             {errores.fondoPensiones && <span style={styles.errorMsg}>{errores.fondoPensiones}</span>}
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>ARL (Administradora de Riesgos Laborales)<span style={styles.req}>*</span></label>
-            <input name="arl" value={form.arl} onChange={handleChange} placeholder="Ingresar dato" style={inputStyle('arl')} />
+            <SelectConBusqueda
+              opciones={LISTA_ARL}
+              value={form.arl}
+              onChange={(v) => { setForm({ ...form, arl: v }); setErrores({ ...errores, arl: '' }); }}
+              placeholder="Buscar ARL"
+              error={errores.arl}
+            />
             {errores.arl && <span style={styles.errorMsg}>{errores.arl}</span>}
           </div>
         </div>
@@ -552,12 +731,24 @@ export default function CrearEmpleadoPage() {
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Fondo de cesantías<span style={styles.req}>*</span></label>
-            <input name="fondoCesantias" value={form.fondoCesantias} onChange={handleChange} placeholder="Ingresar dato" style={inputStyle('fondoCesantias')} />
+            <SelectConBusqueda
+              opciones={LISTA_FONDOS_CESANTIAS}
+              value={form.fondoCesantias}
+              onChange={(v) => { setForm({ ...form, fondoCesantias: v }); setErrores({ ...errores, fondoCesantias: '' }); }}
+              placeholder="Buscar fondo de cesantías"
+              error={errores.fondoCesantias}
+            />
             {errores.fondoCesantias && <span style={styles.errorMsg}>{errores.fondoCesantias}</span>}
           </div>
           <div style={styles.campo}>
             <label style={styles.label}>Caja de compensación<span style={styles.req}>*</span></label>
-            <input name="cajaCompensacion" value={form.cajaCompensacion} onChange={handleChange} placeholder="Ingresar dato" style={inputStyle('cajaCompensacion')} />
+            <SelectConBusqueda
+              opciones={LISTA_CAJAS_COMPENSACION}
+              value={form.cajaCompensacion}
+              onChange={(v) => { setForm({ ...form, cajaCompensacion: v }); setErrores({ ...errores, cajaCompensacion: '' }); }}
+              placeholder="Buscar caja de compensación"
+              error={errores.cajaCompensacion}
+            />
             {errores.cajaCompensacion && <span style={styles.errorMsg}>{errores.cajaCompensacion}</span>}
           </div>
         </div>
@@ -609,24 +800,15 @@ export default function CrearEmpleadoPage() {
       </div>
 
       {/* ── Botones ── */}
-      <div style={styles.botonesRow}>
+      <BarraAcciones>
+        <button style={btnSecundario} onClick={() => navigate(-1)}>Regresar</button>
         <button
-          style={{ ...styles.btnCrear, background: hoverCrear ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
+          style={{ color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 40px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', background: hoverCrear ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverCrear(true)}
           onMouseLeave={() => setHoverCrear(false)}
           onClick={handleSubmit}
-        >
-          Crear Empleado
-        </button>
-        <button
-          style={{ ...styles.btnRegresar, background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverRegresar(true)}
-          onMouseLeave={() => setHoverRegresar(false)}
-          onClick={() => navigate(-1)}
-        >
-          Regresar
-        </button>
-      </div>
+        >Crear Empleado</button>
+      </BarraAcciones>
 
       {/* ── Modal advertencia auxilio de transporte (SMMLV dinámico) ── */}
       {advertenciaAux && (

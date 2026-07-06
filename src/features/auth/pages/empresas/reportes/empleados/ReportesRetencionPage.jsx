@@ -4,6 +4,43 @@ import { useAuthStore } from '../../../../../../store/authStore';
 import { Percent, ChevronLeft, UserRound, Search } from 'lucide-react';
 import { useHistoricos } from "../../../../hooks/useHistoricos";
 import historicosService from '../../../../../../services/historicosService';
+import { exportarExcel } from '../../../../../../utils/exportExcel';
+
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) => v == null ? '-' : '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
@@ -21,6 +58,8 @@ export default function ReportesRetencionPage() {
   const [anioFiltro, setAnioFiltro] = useState('');
   const [pagina,    setPagina]    = useState(0);
   const [porPagina, setPorPagina] = useState(10);
+
+  const [hoverDescargar, setHoverDescargar] = useState(false);
 
   const handlePorPagina = (v) => { setPorPagina(v); setPagina(0); };
 
@@ -46,6 +85,13 @@ export default function ReportesRetencionPage() {
   const totalPaginas  = Math.max(1, Math.ceil(totalFiltrado / porPagina));
   const datosPagina   = datosActivos.slice(pagina * porPagina, (pagina + 1) * porPagina);
 
+  const EXCEL_HEADERS_RETENCION = ['#','Nombre(s)','Apellidos','Número de documento','Año','Periodo','Total retenido'];
+
+  const handleDescargarExcel = () => {
+    const filas = datosActivos.map((r, i) => [i + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo, r.totalRetefuente ?? 0]);
+    exportarExcel(EXCEL_HEADERS_RETENCION, filas, 'Retencion en la fuente');
+  };
+
   return (
     <div style={styles.container}>
 
@@ -65,11 +111,6 @@ export default function ReportesRetencionPage() {
           </div>
         </div>
       </div>
-
-      <button style={styles.volverBtn} onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       <div style={styles.toolbarCard}>
         <div>
@@ -98,7 +139,24 @@ export default function ReportesRetencionPage() {
               />
             </div>
           </div>
+
+          <button
+            style={{
+              background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
+              border: 'none', borderRadius: '8px', padding: '10px 24px',
+              fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+              cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease', flexShrink: 0,
+            }}
+            onMouseEnter={() => setHoverDescargar(true)}
+            onMouseLeave={() => setHoverDescargar(false)}
+            onClick={handleDescargarExcel}
+            disabled={cargando || datosActivos.length === 0}
+          >
+            Descargar en Excel
+          </button>
+
         </div>
+
       </div>
 
       <div style={styles.tabsRow}>
@@ -157,6 +215,17 @@ export default function ReportesRetencionPage() {
             disabled={pagina === totalPaginas - 1}>{'>>'}</button>
         </div>
       </div>
+
+      {/* Volver */}
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
+
     </div>
   );
 }

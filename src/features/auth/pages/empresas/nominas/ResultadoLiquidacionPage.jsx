@@ -7,6 +7,42 @@ import { FileText, ChevronLeft, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useImagenAutenticada } from '../../..//hooks/useImagenAutenticada';
+import { exportarExcel } from '../../../../../utils/exportExcel';
+
+function BarraAcciones({ children, justificar = 'center' }) {
+  return (
+    <div style={{
+      position: 'sticky',
+      bottom: '-24px',
+      display: 'flex',
+      justifyContent: justificar,
+      gap: '16px',
+      padding: '60px 32px 24px 32px',
+      background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+      zIndex: 100,
+      flexWrap: 'wrap',
+      marginTop: '-40px',
+      boxSizing: 'border-box',
+      pointerEvents: 'none',
+    }}>
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', width: justificar === 'space-between' ? '100%' : 'auto', justifyContent: justificar, pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
 
 const fmt = (v) =>
   v != null
@@ -23,7 +59,52 @@ const CONCEPTOS_CON_DESCRIPCION = [
     'Otro concepto a devenir no salarial',
     'Otros conceptos a deducir salariales',
     'Otros conceptos a deducir no salariales',
+    'Comisiones',                                       
+    'Bonificaciones ocasionales o por mera liberalidad', 
+    'Beneficios o extralegales no salariales',
 ];
+
+const nombreCompleto = (desp) =>
+  `${desp.apellidosEmpleado ?? ''} ${desp.nombresEmpleado ?? ''}`.trim();
+
+const NOMBRES_NO_SALARIALES_DEVENGO = [
+  'Beneficios o extralegales no salariales',
+  'Otro concepto a devenir no salarial',
+  'Otros pagos que no constituyen salario permanente',
+  'Bonificaciones ocasionales o por mera liberalidad',
+];
+
+const calcularResumenFila = (desp) => {
+  const conceptos = desp.conceptos ?? [];
+
+  const auxTransporte = conceptos.find(c => c.nombreConcepto === 'Auxilio de transporte');
+
+  const devengadoSalarial = conceptos
+    .filter(c => c.categoria === 'DEVENGO')
+    .filter(c => c.nombreConcepto !== 'Auxilio de transporte')
+    .filter(c => !NOMBRES_NO_SALARIALES_DEVENGO.includes(c.nombreConcepto))
+    .reduce((s, c) => s + (Number(c.valorResultado) || 0), 0);
+
+  const devengadoNoSalarial = conceptos
+    .filter(c => c.categoria === 'DEVENGO')
+    .filter(c => NOMBRES_NO_SALARIALES_DEVENGO.includes(c.nombreConcepto))
+    .reduce((s, c) => s + (Number(c.valorResultado) || 0), 0);
+
+  const totalDeducciones = conceptos
+    .filter(c => c.categoria === 'DEDUCCION')
+    .reduce((s, c) => s + (Number(c.valorResultado) || 0), 0);
+
+  return {
+    auxTransporteValor: auxTransporte?.valorResultado ?? null,
+    devengadoSalarial,
+    devengadoNoSalarial,
+    totalDeducciones,
+  };
+};
+
+const hayDevengoNoSalarial = (desprendibles) =>
+  desprendibles.some(d => calcularResumenFila(d).devengadoNoSalarial > 0);
+
 
 export default function ResultadoLiquidacionPage() {
   const navigate         = useNavigate();
@@ -64,7 +145,10 @@ export default function ResultadoLiquidacionPage() {
       axiosInstance.get(`/api/master/empresas/${id}`),
     ])
       .then(([{ data: desps }, { data: procesos }, { data: emp }]) => {
-        setDesprendibles(desps);
+        const ordenados = [...desps].sort((a, b) =>
+          (a.apellidosEmpleado ?? '').localeCompare(b.apellidosEmpleado ?? '', 'es')
+        );
+        setDesprendibles(ordenados);
         setEmpresa(emp);
         const encontrado = procesos.find(
           p => String(p.procesoLiquiId) === String(nominaId)
@@ -80,6 +164,8 @@ export default function ResultadoLiquidacionPage() {
     totalDeducciones: desp.totalDeducciones ?? 0,
     neto:             desp.netoAPagar       ?? 0,
   });
+
+  const mostrarColumnaNoSalarial = hayDevengoNoSalarial(desprendibles);
 
   const handleDescargar = async () => {
     setDescargando(true);
@@ -153,7 +239,7 @@ export default function ResultadoLiquidacionPage() {
       y += 5;
       const fechaFinMostrar = (proceso?.fechaFinPeriodo ?? '').replace(/-31$/, '-30');
       doc.text(`Periodo: ${desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo ?? ''} - ${fechaFinMostrar}`, 14, y); y += 5;
-      doc.text(`Nombre: ${desp.nombresEmpleado} ${desp.apellidosEmpleado}`, 14, y); y += 5;
+      doc.text(`Apellidos y Nombres: ${nombreCompleto(desp)}`, 14, y); y += 5;
       doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
       doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
       doc.text(`Salario base  ${fmt(desp.salarioBasico)}`, 196, y - 15, { align: 'right' });
@@ -233,10 +319,19 @@ export default function ResultadoLiquidacionPage() {
           doc.setTextColor(0, 0, 0);
           doc.setDrawColor(0, 0, 0);
       }
+      
+      const firmaY = doc.lastAutoTable.finalY + (desp.advertenciaNoSalarial ? 28 : 18);
+      doc.setDrawColor(100, 100, 100);
+      doc.setLineWidth(0.3);
+      doc.line(116, firmaY, 196, firmaY);
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Firma del trabajador', 196, firmaY + 4, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      doc.setDrawColor(0, 0, 0);
     
       const limiteInferior = yInicio === 0 ? mitad - 12 : pageHeight - 8;
       doc.setTextColor(163, 163, 163);
-      doc.text('Firma del trabajador', 196, y - 5, { align: 'right' });
       doc.setTextColor(0, 0, 0);
     };
 
@@ -254,44 +349,56 @@ export default function ResultadoLiquidacionPage() {
 
     const totalNeto = desprendibles.reduce((s, d) => s + (d.netoAPagar ?? 0), 0);
 
+    const columnasResumen = ['No', 'CC', 'APELLIDOS Y NOMBRES', 'SALARIO BÁSICO MENSUAL', 'TOTAL DEVENGADO'];
+    if (mostrarColumnaNoSalarial) columnasResumen.push('TOTAL DEVENGADO NO SALARIAL');
+    columnasResumen.push('AUX. TRANSPORTE', 'TOTAL DEDUCCIONES', 'NETO A PAGAR');
+
     autoTable(doc, {
       startY: y + 28,
-      head: [['No', 'CC', 'NOMBRES Y APELLIDOS', 'SALARIO BASE', 'AUX. TRANSPORTE', 'NETO A PAGAR']],
+      head: [columnasResumen],
       body: [
         ...desprendibles.map((desp, i) => {
-          const auxTransporte = (desp.conceptos ?? [])
-            .find(c => c.nombreConcepto === 'Auxilio de transporte');
-          return [
+          const r = calcularResumenFila(desp);
+          const fila = [
             i + 1,
             desp.documentoEmpleado,
-            `${desp.nombresEmpleado} ${desp.apellidosEmpleado}`,
+            nombreCompleto(desp),
             fmt(desp.salarioBasico),
-            auxTransporte?.valorResultado ? fmt(auxTransporte.valorResultado) : '-',
-            fmt(desp.netoAPagar),
+            fmt(r.devengadoSalarial),
           ];
+          if (mostrarColumnaNoSalarial) {
+            fila.push(r.devengadoNoSalarial > 0 ? fmt(r.devengadoNoSalarial) : '-');
+          }
+          fila.push(
+            r.auxTransporteValor ? fmt(r.auxTransporteValor) : '-',
+            fmt(r.totalDeducciones),
+            fmt(desp.netoAPagar),
+          );
+          return fila;
         }),
         [
-          { content: 'TOTAL', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+          {
+            content: 'TOTAL',
+            colSpan: mostrarColumnaNoSalarial ? 7 : 6,
+            styles: { halign: 'right', fontStyle: 'bold' }
+          },
           { content: fmt(totalNeto), styles: { fontStyle: 'bold' } },
         ],
       ],
-      styles: { fontSize: 7 },
+      styles: { fontSize: 6 },
       headStyles: {
         fillColor: [11, 102, 42],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 7,
+        fontSize: 6,
       },
       alternateRowStyles: { fillColor: [245, 245, 245] },
       columnStyles: {
         0: { halign: 'center' },
         1: { halign: 'center' },
         2: { halign: 'left' },
-        3: { halign: 'right' },
-        4: { halign: 'right' },
-        5: { halign: 'right' },
       },
-      margin: { left: 14, right: 14 },
+      margin: { left: 10, right: 10 },
       didParseCell: (data) => {
         const lastRow = data.table.body.length - 1;
         if (data.row.index === lastRow) {
@@ -300,7 +407,6 @@ export default function ResultadoLiquidacionPage() {
           data.cell.styles.textColor = [11, 102, 42];
         }
       },
-      
     });
 
     doc.addPage();
@@ -331,8 +437,23 @@ export default function ResultadoLiquidacionPage() {
       renderDesprendible(desp, mitad, mitad, pageHeight, conceptosFiltrados);
     });
 
-    doc.save(`desprendibles_nomina_${nominaId}.pdf`);
+    const nombreArchivo = `${empresa?.nombreEmpresa ?? 'NOMINA'} ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`.trim();
+    doc.save(`${nombreArchivo}.pdf`)
     setDescargando(false);
+  };
+
+  const EXCEL_HEADERS_NOMINA = ['#','CC','Apellidos y Nombres','Salario básico mensual','Total devengado', ...(mostrarColumnaNoSalarial ? ['Total devengado no salarial'] : []), 'Aux. transporte','Total deducciones','Neto a pagar'];
+
+  const handleDescargarExcel = () => {
+    const filas = desprendibles.map((desp, i) => {
+      const r = calcularResumenFila(desp);
+      const fila = [i + 1, desp.documentoEmpleado, nombreCompleto(desp), desp.salarioBasico ?? 0, r.devengadoSalarial ?? 0];
+      if (mostrarColumnaNoSalarial) fila.push(r.devengadoNoSalarial ?? 0);
+      fila.push(r.auxTransporteValor ?? 0, r.totalDeducciones ?? 0, desp.netoAPagar ?? 0);
+      return fila;
+    });
+    const nombreArchivo = `${empresa?.nombreEmpresa ?? 'NOMINA'} ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`.trim();
+    exportarExcel(EXCEL_HEADERS_NOMINA, filas, nombreArchivo, 'Nómina');
   };
 
   return (
@@ -412,42 +533,41 @@ export default function ResultadoLiquidacionPage() {
             </p>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={styles.tabla}>
+            <table style={{ ...styles.tabla, fontSize: '12px' }}>
               <thead>
                 <tr>
                   <th style={styles.th}>No</th>
                   <th style={styles.th}>CC</th>
-                  <th style={{ ...styles.th, textAlign: 'left' }}>Nombres y Apellidos</th>
-                  <th style={styles.th}>Salario base</th>
+                  <th style={{ ...styles.th, textAlign: 'left' }}>Apellidos y Nombres</th>
+                  <th style={styles.th}>Salario básico mensual</th>
+                  <th style={styles.th}>Total devengado</th>
+                  {mostrarColumnaNoSalarial && <th style={styles.th}>Total devengado no salarial</th>}
                   <th style={styles.th}>Auxilio de transporte</th>
+                  <th style={styles.th}>Total deducciones</th>
                   <th style={styles.th}>Neto a pagar</th>
                 </tr>
               </thead>
               <tbody>
                 {desprendibles.map((desp, i) => {
-                  const auxTransporte = (desp.conceptos ?? [])
-                    .find(c => c.nombreConcepto === 'Auxilio de transporte');
+                  const r = calcularResumenFila(desp);
                   return (
                     <tr key={desp.cabecNominaId} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
                       <td style={styles.td}>{i + 1}</td>
                       <td style={styles.td}>{desp.documentoEmpleado}</td>
-                      <td style={{ ...styles.td, textAlign: 'left' }}>
-                        {desp.nombresEmpleado} {desp.apellidosEmpleado}
-                      </td>
+                      <td style={{ ...styles.td, textAlign: 'left' }}>{nombreCompleto(desp)}</td>
                       <td style={styles.td}>{fmt(desp.salarioBasico)}</td>
-                      <td style={styles.td}>
-                        {auxTransporte?.valorResultado
-                          ? fmt(auxTransporte.valorResultado)
-                          : '-'}
-                      </td>
-                      <td style={{ ...styles.td, fontWeight: '700', color: '#0B662A' }}>
-                        {fmt(desp.netoAPagar)}
-                      </td>
+                      <td style={styles.td}>{fmt(r.devengadoSalarial)}</td>
+                      {mostrarColumnaNoSalarial && (
+                        <td style={styles.td}>{r.devengadoNoSalarial > 0 ? fmt(r.devengadoNoSalarial) : '-'}</td>
+                      )}
+                      <td style={styles.td}>{r.auxTransporteValor ? fmt(r.auxTransporteValor) : '-'}</td>
+                      <td style={styles.td}>{fmt(r.totalDeducciones)}</td>
+                      <td style={{ ...styles.td, fontWeight: '700', color: '#0B662A' }}>{fmt(desp.netoAPagar)}</td>
                     </tr>
                   );
                 })}
                 <tr style={{ backgroundColor: '#E8F5EE' }}>
-                  <td colSpan={5} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>
+                  <td colSpan={mostrarColumnaNoSalarial ? 7 : 6} style={{ ...styles.td, fontWeight: '800', textAlign: 'right', color: '#0B662A' }}>
                     TOTAL
                   </td>
                   <td style={{ ...styles.td, fontWeight: '800', color: '#0B662A' }}>
@@ -514,8 +634,8 @@ export default function ResultadoLiquidacionPage() {
                     {desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo} - {proceso?.fechaFinPeriodo?.replace(/-31$/, '-30')}
                   </p>
                   <p style={styles.empInfoFila}>
-                    <strong>Nombre</strong> &nbsp;
-                    {desp.nombresEmpleado} {desp.apellidosEmpleado}
+                    <strong>Apellidos y Nombres</strong> &nbsp;
+                    {nombreCompleto(desp)}
                   </p>
                   <p style={styles.empInfoFila}>
                     <strong>Doc. Identidad</strong> &nbsp; {desp.documentoEmpleado}
@@ -534,7 +654,6 @@ export default function ResultadoLiquidacionPage() {
                     color: '#A3A3A3',
                     fontSize: '11px',
                   }}>
-                    Firma del trabajador
                   </p>
                 </div>
               </div>
@@ -640,50 +759,42 @@ export default function ResultadoLiquidacionPage() {
                   <span>{desp.advertenciaNoSalarial}</span>
                 </div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderTop: '1px solid #272525', width: '180px', marginBottom: '4px' }} />
+                  <p style={{ fontSize: '11px', color: '#A3A3A3', margin: 0 }}>Firma del trabajador</p>
+                </div>
+              </div>
             </div>
           );
         })
       )}
 
       {/* Botones inferiores */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-        <button
-          style={{
-            background: '#fff',
-            border: '1px solid #D0D0D0',
-            borderRadius: '8px',
-            padding: '10px 28px',
-            fontSize: '14px',
-            fontWeight: '700',
-            fontFamily: 'Nunito, sans-serif',
-            cursor: 'pointer',
-            color: '#272525',
-          }}
-          onClick={() => navigate(`/empresas/${id}/nominas`)}
-        >
-          Cancelar
+      
+      <BarraAcciones justificar="space-between">
+        <button style={btnSecundario} onClick={() => navigate(`/empresas/${id}/nominas`)}>
+          Volver al inicio
         </button>
-        <button
-          style={{
-            background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '10px 28px',
-            fontSize: '14px',
-            fontWeight: '700',
-            fontFamily: 'Nunito, sans-serif',
-            cursor: 'pointer',
-            color: '#fff',
-            transition: 'background 0.3s ease',
-          }}
-          onMouseEnter={() => setHoverDescargar(true)}
-          onMouseLeave={() => setHoverDescargar(false)}
-          onClick={handleDescargar}
-          disabled={cargando || desprendibles.length === 0}
-        >
-          Descargar Reportes en PDF
-        </button>
-      </div>
+        <div style={{ display: 'flex', gap: '12px', pointerEvents: 'all' }}>
+          <button
+            style={{ background: '#fff', border: '1px solid #0B662A', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#0B662A' }}
+            onClick={handleDescargarExcel}
+            disabled={cargando || desprendibles.length === 0}
+          >
+            Descargar en Excel
+          </button>
+          <button
+            style={{ background: hoverDescargar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#fff', transition: 'background 0.3s ease' }}
+            onMouseEnter={() => setHoverDescargar(true)}
+            onMouseLeave={() => setHoverDescargar(false)}
+            onClick={handleDescargar}
+            disabled={cargando || desprendibles.length === 0}
+          >
+            Descargar Reportes en PDF
+          </button>
+        </div>
+      </BarraAcciones>
 
 
       {/* Modal descarga */}

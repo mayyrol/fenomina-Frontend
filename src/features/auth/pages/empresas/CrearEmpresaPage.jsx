@@ -7,13 +7,6 @@ import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal'
 import empresasService from '../../../../services/empresasService';
 
 
-// ── CAMBIO 1: solo números en NIT ──
-const soloNumeros = (e) => {
-  if (!/[0-9]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) {
-    e.preventDefault();
-  }
-};
-
 export default function CrearEmpresaPage() {
   const navigate    = useNavigate();
   const { usuario } = useAuthStore();
@@ -158,7 +151,6 @@ export default function CrearEmpresaPage() {
               name="nitEmpresa"
               value={form.nitEmpresa}
               onChange={handleChange}
-              onKeyDown={soloNumeros}
               placeholder="Ingresar número"
               style={{ ...styles.input, ...(errores.nitEmpresa ? styles.inputError : {}) }}
             />

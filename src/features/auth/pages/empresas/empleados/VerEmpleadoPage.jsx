@@ -4,6 +4,42 @@ import { useAuthStore } from "../../../../../store/authStore";
 import { Users, UserRound } from 'lucide-react';
 import empleadosService from '../../../../../services/empleadosService';
 
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '40px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 export default function VerEmpleadoPage() {
   const navigate    = useNavigate();
   const { id, empleadoId } = useParams();
@@ -256,27 +292,17 @@ export default function VerEmpleadoPage() {
       )}
 
       {/* ── Botones ── */}
-      <div style={styles.botonesRow}>
-        <button
-          style={{ ...styles.btnRegresar, background: hoverRegresar ? 'linear-gradient(135deg, #f0f0f0, #e0e0e0)' : '#fff', transition: 'background 0.3s ease' }}
-          onMouseEnter={() => setHoverRegresar(true)}
-          onMouseLeave={() => setHoverRegresar(false)}
-          onClick={() => navigate(-1)}
-        >
-          Regresar
-        </button>
-
+      <BarraAcciones>
+        <button style={btnSecundario} onClick={() => navigate(-1)}>Volver</button>
         {usuario?.rolUsuario !== 'CLIENTE_EMPRESA' && usuario?.rolUsuario !== 'AUDITOR' && (
           <button
-            style={{ ...styles.btnEditar, background: hoverEditar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
+            style={{ color: '#fff', border: 'none', borderRadius: '8px', padding: '14px 40px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', background: hoverEditar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
             onMouseEnter={() => setHoverEditar(true)}
             onMouseLeave={() => setHoverEditar(false)}
             onClick={() => navigate(`/empresas/${id}/empleados/${empleadoId}/editar`)}
-          >
-            Editar Información
-          </button>
+          >Editar Información</button>
         )}
-      </div>
+      </BarraAcciones>
 
     </div>
   );

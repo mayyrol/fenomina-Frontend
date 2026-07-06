@@ -72,7 +72,7 @@ const payrollService = {
     axiosInstance.get(`${BASE}/desprendibles/intereses-cesantias/${procesoId}`),
 
   getConceptosNovedades: () =>
-    axiosInstance.get('/api/master/internal/conceptos-nomina'),
+    axiosInstance.get('/api/master/conceptos-nomina/novedades'),
 
   getPreviewPrimaEmpleado: (empresaId, empleadoId, semestre, anio) =>
     axiosInstance.get(`${BASE}/desprendibles/prima/preview/${empresaId}/empleado/${empleadoId}`, {

@@ -14,6 +14,42 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 const formatMiles = (valor) => {
   const str = String(Math.round(valor));
   return '$' + str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -365,15 +401,10 @@ export default function DesprendiblesNominaPage() {
       </div>
 
       {/* Acciones */}
-      <div style={styles.accionesBar}>
+
+      <BarraAcciones>
         <button
-          style={{
-            ...styles.btnCerrar,
-            background: hoverCerrar
-              ? 'linear-gradient(135deg, #0B662A, #1a9e45)'
-              : '#0B662A',
-            transition: 'background 0.3s ease',
-          }}
+          style={{ ...styles.btnCerrar, background: hoverCerrar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease' }}
           onMouseEnter={() => setHoverCerrar(true)}
           onMouseLeave={() => setHoverCerrar(false)}
           onClick={() => setConfirmarCerrar(true)}
@@ -381,11 +412,7 @@ export default function DesprendiblesNominaPage() {
           Cerrar proceso
         </button>
         <button
-          style={{
-            ...styles.btnAnular,
-            transition: 'background 0.3s ease',
-            ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}),
-          }}
+          style={{ ...styles.btnAnular, transition: 'background 0.3s ease', ...(hoverAnular ? { backgroundColor: '#f5f5f5' } : {}) }}
           onMouseEnter={() => setHoverAnular(true)}
           onMouseLeave={() => setHoverAnular(false)}
           onClick={() => setConfirmarAnular(true)}
@@ -393,24 +420,17 @@ export default function DesprendiblesNominaPage() {
           Anular
         </button>
         <button
-          style={{
-            ...styles.btnEliminar,
-            transition: 'background 0.3s ease',
-            ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}),
-          }}
+          style={{ ...styles.btnEliminar, transition: 'background 0.3s ease', ...(hoverEliminar ? { backgroundColor: '#FFF5F5' } : {}) }}
           onMouseEnter={() => setHoverEliminar(true)}
           onMouseLeave={() => setHoverEliminar(false)}
           onClick={() => setConfirmarEliminar(true)}
         >
           Eliminar
         </button>
-        <button
-          style={styles.btnAnular}
-          onClick={() => navigate(`/empresas/${id}/nominas`)}
-        >
+        <button style={styles.btnAnular} onClick={() => navigate(`/empresas/${id}/nominas`)}>
           Cancelar
         </button>
-      </div>
+      </BarraAcciones>
 
       {/* Modales */}
       <ConfirmarCambiosModal
@@ -477,9 +497,7 @@ export default function DesprendiblesNominaPage() {
             if (emp.fechaIngresoEmp) {
               const fechaIngreso = new Date(emp.fechaIngresoEmp + 'T00:00:00');
               if (fechaIngreso > fechaInicioPeriodo && fechaIngreso <= fechaFinPeriodo) {
-                const diasValidos = Math.round(
-                  (fechaFinPeriodo - fechaIngreso) / (1000 * 60 * 60 * 24)
-                ) + 1;
+                const diasValidos = calcularDiasComerciales(fechaIngreso, fechaFinPeriodo);
                 if (Number(diasIngresados) > diasValidos) {
                   setMensajeError(
                     `${emp.nombresEmp} ${emp.apellidosEmp} ingresó el ${emp.fechaIngresoEmp}. Los días laborados no pueden superar ${diasValidos} días válidos del periodo.`
@@ -638,7 +656,7 @@ const styles = {
   iconBtn:            { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' },
   btnPDF:             { color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 28px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
   accionesBar:        { display: 'flex', gap: '12px', justifyContent: 'center', paddingBottom: '16px', flexWrap: 'wrap' },
-  btnCerrar:          { flex: 1, maxWidth: '220px', backgroundColor: '#0B662A', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  btnAnular:          { flex: 1, maxWidth: '220px', backgroundColor: '#fff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
-  btnEliminar:        { flex: 1, maxWidth: '220px', backgroundColor: '#fff', color: '#E53E3E', border: '1px solid #E53E3E', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnCerrar:   { width: '160px', backgroundColor: '#0B662A', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnAnular:   { width: '160px', backgroundColor: '#fff', color: '#272525', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
+  btnEliminar: { width: '160px', backgroundColor: '#fff', color: '#E53E3E', border: '1px solid #E53E3E', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer' },
 };

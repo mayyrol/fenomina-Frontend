@@ -7,6 +7,42 @@ import payrollService from '../../../../../services/payrollService';
 import axiosInstance from '../../../../../api/axiosInstance'; 
 import { useNominaStore } from '../../../../../store/useNominaStore';
 
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 // ── Calendario ──────────────────────────────────────────────────────────────
 function CalendarioInput({ value, onChange, placeholder = 'DD/MM/YYYY' }) {
   const [abierto, setAbierto] = useState(false);
@@ -141,24 +177,7 @@ export default function GenerarReportePage() {
       const diasPeriodo     = Math.round(
         (fechaFinDate - fechaInicioDate) / (1000 * 60 * 60 * 24)
       ) + 1;
-/* 
-      if (diasPeriodo < 12) {
-        setMensajeError(
-          `El periodo tiene ${diasPeriodo} día(s). El mínimo permitido es 12 días.`
-        );
-        setModal('error');
-        return;
-      }
 
-      if (diasPeriodo > 31) {
-        setMensajeError(
-          `El periodo tiene ${diasPeriodo} día(s). El máximo permitido es 31 días.`
-        );
-        setModal('error');
-        return;
-      }
-
-*/
       const MESES_NUM = {
         'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
         'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12
@@ -166,9 +185,14 @@ export default function GenerarReportePage() {
 
       const mesNum = MESES_NUM[mesLiquidar];
 
+      // calcular tipoProceso y periodo correctamente
+      const esQuincenal = diasPeriodo <= 15;
+      const tipoProceso = esQuincenal ? 'NOMINA_QUINCENAL' : 'NOMINA_MENSUAL';
+
+
       const payload = {
         empresaId:   Number(id),
-        tipoProceso: 'NOMINA_MENSUAL',
+        tipoProceso,
         anio:        Number(anioInicio),
         periodo:     mesNum,
         fechaInicio: `${anioInicio}-${mesInicio}-${diaInicio}`,
@@ -225,12 +249,6 @@ export default function GenerarReportePage() {
           </div>
         </div>
       </div>
-
-      {/* Volver */}
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" />
-        <span>Volver</span>
-      </button>
 
       {/* Card 1 — Cabecera */}
       <div style={styles.card}>
@@ -312,7 +330,10 @@ export default function GenerarReportePage() {
       </div>
 
       {/* Botones */}
-      <div style={styles.botonesRow}>
+      <BarraAcciones>
+        <button style={btnSecundario} onClick={() => navigate(-1)}>
+          Cancelar
+        </button>
         <button
           style={{
             ...styles.btnSeguir,
@@ -326,10 +347,7 @@ export default function GenerarReportePage() {
         >
           Seguir proceso de liquidación
         </button>
-        <button style={styles.btnCancelar} onClick={() => navigate(-1)}>
-          Cancelar
-        </button>
-      </div>
+      </BarraAcciones>
 
       <MensajeModal
         tipo={modal}

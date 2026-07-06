@@ -6,6 +6,42 @@ import MensajeModal from '../../../../../components/MensajeModal';
 import { useCesantiaStore } from '../../../../../store/useCesantiaStore';
 import payrollService from '../../../../../services/payrollService';
 
+function BarraAcciones({ children }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 const AÑOS = ['2023', '2024', '2025', '2026', '2027'];
 
 function SelectAño({ value, onChange }) {
@@ -132,10 +168,6 @@ export default function GenerarReporteCesantiasPage() {
         </div>
       </div>
 
-      <button style={styles.volverBtn} onClick={() => navigate(-1)}>
-        <ChevronLeft size={16} color="#272525" /><span>Volver</span>
-      </button>
-
       {/* Card 1 — Cabecera */}
       <div style={styles.card}>
         <h3 style={styles.cardTitulo}>Generar Cabecera de Reporte Cesantías e Intereses</h3>
@@ -214,21 +246,22 @@ export default function GenerarReporteCesantiasPage() {
       </div>
 
       {/* Botones */}
-      <div style={styles.botonesRow}>
+      <BarraAcciones>
+        <button
+          style={styles.btnCancelar}
+          onClick={() => { useCesantiaStore.getState().limpiarProceso(); navigate(`/empresas/${id}/cesantias`); }}
+        >
+          Regresar
+        </button>
         <button
           style={{ ...styles.btnGenerar, background: hoverGenerar ? 'linear-gradient(135deg, #0B662A, #1a9e45)' : '#0B662A', transition: 'background 0.3s ease', opacity: camposCompletos ? 1 : 0.7 }}
-          onMouseEnter={() => setHoverGenerar(true)} onMouseLeave={() => setHoverGenerar(false)}
+          onMouseEnter={() => setHoverGenerar(true)}
+          onMouseLeave={() => setHoverGenerar(false)}
           onClick={handleGenerar}
         >
           Generar Desprendibles
         </button>
-        <button style={styles.btnCancelar} onClick={() => { 
-          useCesantiaStore.getState().limpiarProceso(); 
-          navigate(`/empresas/${id}/cesantias`); 
-        }}>
-          Regresar
-        </button>
-      </div>
+      </BarraAcciones>
 
       <MensajeModal
         tipo={modal}

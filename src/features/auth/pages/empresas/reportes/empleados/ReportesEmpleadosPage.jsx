@@ -3,6 +3,42 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../../store/authStore';
 import { Users, ChevronLeft, UserRound, FileText, CreditCard, Coins, Layers, Percent } from 'lucide-react';
 
+function BarraAcciones({ children, justificar = 'center' }) {
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: '-24px', 
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        padding: '60px 32px 24px 32px',
+        background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+        zIndex: 100,
+        flexWrap: 'wrap',
+        marginTop: '-40px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '16px', pointerEvents: 'all' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+const btnSecundario = {
+  color: '#272525',
+  border: '1px solid #D0D0D0',
+  borderRadius: '8px',
+  padding: '14px 40px',
+  fontSize: '14px',
+  fontWeight: '700',
+  fontFamily: 'Nunito, sans-serif',
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+};
+
 function Carpeta({ children }) {
   return (
     <svg viewBox="0 0 160 130" width="100%" xmlns="http://www.w3.org/2000/svg">
@@ -56,16 +92,6 @@ export default function ReportesEmpleadosPage() {
         </div>
       </div>
 
-      <button
-        style={{ ...styles.volverBtn, color: hoverVolver ? '#0B662A' : '#272525' }}
-        onClick={() => navigate(`/empresas/${id}/reportes`)}
-        onMouseEnter={() => setHoverVolver(true)}
-        onMouseLeave={() => setHoverVolver(false)}
-      >
-        <ChevronLeft size={16} color={hoverVolver ? '#0B662A' : '#272525'} />
-        <span>Volver</span>
-      </button>
-
       <div style={styles.areaContenido}>
         <div style={styles.card}>
           <div style={styles.grid}>
@@ -82,6 +108,18 @@ export default function ReportesEmpleadosPage() {
           </div>
         </div>
       </div>
+
+      <BarraAcciones justificar="flex-start">
+        <button
+          style={{ ...btnSecundario, padding: '10px 24px' }}
+          onClick={() => navigate(`/empresas/${id}/reportes`)}
+          onMouseEnter={() => setHoverVolver(true)}
+          onMouseLeave={() => setHoverVolver(false)}
+        >
+          Volver
+        </button>
+      </BarraAcciones>
+
     </div>
   );
 }
