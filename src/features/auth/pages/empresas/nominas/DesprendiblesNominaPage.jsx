@@ -122,19 +122,44 @@ export default function DesprendiblesNominaPage() {
           );
         })
         .then((resultados) => {
-          const mapa = {};
-          resultados.forEach(({ empleadoId, data }) => {
-            mapa[empleadoId] = data;
-          });
-          setNovedades(mapa);
+            const mapa = {};
+            resultados.forEach(({ empleadoId, data }) => {
+                mapa[empleadoId] = data;
+            });
+            setNovedades(mapa);
 
-          const diasDefault = procesoEncontrado?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30;
-          empleadosMostrar.forEach(e => {
-            const diasActual = useNominaStore.getState().diasLaborados[e.empleadoId];
-            if (diasActual === undefined || diasActual === null) {
-              useNominaStore.getState().setDiasEmpleado(e.empleadoId, diasDefault);
-            }
-          });
+            const diasDefault = procesoEncontrado?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30;
+            const fechaInicioPeriodo = procesoEncontrado?.fechaInicioPeriodo
+                ? new Date(procesoEncontrado.fechaInicioPeriodo + 'T00:00:00') : null;
+            const fechaFinPeriodo = procesoEncontrado?.fechaFinPeriodo
+                ? new Date(procesoEncontrado.fechaFinPeriodo + 'T00:00:00') : null;
+
+            empleadosMostrar.forEach(e => {
+                const diasActual = useNominaStore.getState().diasLaborados[e.empleadoId];
+                if (diasActual === undefined || diasActual === null) {
+                    let diasCalculados = diasDefault;
+
+                    if (e.fechaIngresoEmp && fechaInicioPeriodo && fechaFinPeriodo) {
+                        const fechaIngreso = new Date(e.fechaIngresoEmp + 'T00:00:00');
+                        if (fechaIngreso > fechaInicioPeriodo) {
+                            // Calcular días comerciales (base 30)
+                            const inicio = fechaIngreso;
+                            const fin = fechaFinPeriodo;
+                            const meses = (fin.getFullYear() - inicio.getFullYear()) * 12
+                                + (fin.getMonth() - inicio.getMonth());
+                            const ultimoDiaMesFin = new Date(fin.getFullYear(), fin.getMonth() + 1, 0).getDate();
+                            const diaFin = fin.getDate() === ultimoDiaMesFin ? 30 : Math.min(fin.getDate(), 30);
+                            const diaInicio = Math.min(inicio.getDate(), 30);
+                            diasCalculados = Math.min(
+                                meses * 30 + (diaFin - diaInicio) + 1,
+                                diasDefault
+                            );
+                        }
+                    }
+
+                    useNominaStore.getState().setDiasEmpleado(e.empleadoId, diasCalculados);
+                }
+            });
         })
         .catch(() => {})
         .finally(() => setCargando(false));

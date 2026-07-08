@@ -295,6 +295,11 @@ export default function NovedadesPage() {
           c.nombreConcepNomina.toLowerCase().includes('no constituyen salario')
         ).map(toOpcion));
 
+        const procesoEncontrado = procesos.find(
+            p => String(p.procesoLiquiId) === String(nominaId)
+        );
+        setProcesoPeriodo(procesoEncontrado ?? null);
+
         // Si viene con días pre-llenados desde el store
         const diasStore = useNominaStore.getState().diasLaborados[Number(empleadoId)];
         const tipoProcesoActual = procesoEncontrado?.tipoProceso;
@@ -305,10 +310,6 @@ export default function NovedadesPage() {
             setDiasLaborados(String(diasDefault));
         }
 
-        const procesoEncontrado = procesos.find(
-          p => String(p.procesoLiquiId) === String(nominaId)
-        );
-        setProcesoPeriodo(procesoEncontrado ?? null);
       })
       .catch(() => {})
       .finally(() => setCargando(false));
@@ -469,6 +470,45 @@ export default function NovedadesPage() {
     const inicio = new Date(procesoPeriodo.fechaInicioPeriodo);
     const fin = new Date(procesoPeriodo.fechaFinPeriodo);
     return fecha >= inicio && fecha <= fin;
+  };
+
+  const calcularDiasComerciales = (inicio, fin) => {
+      const meses = (fin.getFullYear() - inicio.getFullYear()) * 12
+          + (fin.getMonth() - inicio.getMonth());
+      const ultimoDiaMesFin = new Date(fin.getFullYear(), fin.getMonth() + 1, 0).getDate();
+      const diaFin = fin.getDate() === ultimoDiaMesFin ? 30 : Math.min(fin.getDate(), 30);
+      const diaInicio = Math.min(inicio.getDate(), 30);
+      return meses * 30 + (diaFin - diaInicio) + 1;
+  };
+
+  const calcularDiasAusencia = () => {
+      let dias = 0;
+
+      // IDs 4-15: licencias e incapacidades — días desde fechaInicio a fechaFin
+      for (const f of tiempoLic) {
+          if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
+              const idConcepto = Number(f.concepNominaId);
+              if ([4,5,6,7,8,9,10,11,12,13,14,15].includes(idConcepto)) {
+                  const [dI, mI, aI] = f.fechaInicio.split('/');
+                  const [dF, mF, aF] = f.fechaFin.split('/');
+                  const inicio = new Date(`${aI}-${mI}-${dI}`);
+                  const fin    = new Date(`${aF}-${mF}-${dF}`);
+                  dias += calcularDiasComerciales(inicio, fin);
+              }
+          }
+      }
+
+      // IDs 2-3: vacaciones — días del campo diasVacaciones
+      for (const f of vacaciones) {
+          if (f.concepNominaId && f.diasVacaciones) {
+              const idConcepto = Number(f.concepNominaId);
+              if ([2, 3].includes(idConcepto)) {
+                  dias += parseInt(f.diasVacaciones, 10) || 0;
+              }
+          }
+      }
+
+      return dias;
   };
 
   const handleGuardar = async () => {
@@ -675,16 +715,52 @@ export default function NovedadesPage() {
 
       // Si es edición, hacer PUT; si es creación, hacer POST
       if (novedadId && novedadesAGuardar.length === 1) {
-        await axiosInstance.put(
-          `/api/payroll/novedades/${novedadId}`,
-          novedadesAGuardar[0]
-        );
+          await axiosInstance.put(
+              `/api/payroll/novedades/${novedadId}`,
+              novedadesAGuardar[0]
+          );
+
+          if (novedadEdit) {
+              const idOriginal = novedadEdit.fkConcepNominaId;
+              let diasOriginales = 0;
+
+              if ([4,5,6,7,8,9,10,11,12,13,14,15].includes(idOriginal)) {
+                  if (novedadEdit.fechaInicioAusen && novedadEdit.fechaFinAusen) {
+                      const inicio = new Date(novedadEdit.fechaInicioAusen);
+                      const fin    = new Date(novedadEdit.fechaFinAusen);
+                      diasOriginales = calcularDiasComerciales(inicio, fin);
+                  }
+              } else if ([2, 3].includes(idOriginal)) {
+                  diasOriginales = novedadEdit.cantidadDiasNovedad ?? 0;
+              }
+
+              const diasNuevos = calcularDiasAusencia();
+              const diasActuales = useNominaStore.getState().diasLaborados[Number(empleadoId)]
+                  ?? (procesoPeriodo?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30);
+
+              // Reconstruir base sumando los días originales, luego restar los nuevos
+              const base = diasActuales + diasOriginales;
+              const nuevosDias = Math.max(0, base - diasNuevos);
+              useNominaStore.getState().setDiasEmpleado(Number(empleadoId), nuevosDias);
+              setDiasLaborados(String(nuevosDias));
+          }
+
       } else {
-        await Promise.all(
-          novedadesAGuardar.map(n =>
-            axiosInstance.post('/api/payroll/novedades', n)
-          )
-        );
+          await Promise.all(
+              novedadesAGuardar.map(n =>
+                  axiosInstance.post('/api/payroll/novedades', n)
+              )
+          );
+
+          // Creación: solo descontar días nuevos
+          const diasADescontar = calcularDiasAusencia();
+          if (diasADescontar > 0) {
+              const diasActuales = useNominaStore.getState().diasLaborados[Number(empleadoId)]
+                  ?? (procesoPeriodo?.tipoProceso === 'NOMINA_QUINCENAL' ? 15 : 30);
+              const nuevosDias = Math.max(0, diasActuales - diasADescontar);
+              useNominaStore.getState().setDiasEmpleado(Number(empleadoId), nuevosDias);
+              setDiasLaborados(String(nuevosDias));
+          }
       }
 
       setModal('exito');
