@@ -80,6 +80,9 @@ const historicosService = {
 
   getVacacionesConsolidado: (params) =>
     axiosInstance.get(`${BASE}/conceptos/vacaciones/consolidado`, { params }),
+
+  getProximasVacaciones: (params) =>
+    axiosInstance.get(`${BASE}/conceptos/proximas-vacaciones`, { params }),
 };
 
 export default historicosService;

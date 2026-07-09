@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../../store/authStore';
 import { Layers, ChevronLeft, UserRound, Search } from 'lucide-react';
@@ -54,9 +54,10 @@ const TABS_PRINCIPAL = [
   { id: 'totalLicencias',  label: 'Total licencias'              },
   { id: 'vacaciones',      label: 'Vacaciones'                   },
   { id: 'totalVacaciones', label: 'Total vacaciones'             },
+  { id: 'proximasVac', label: 'Próximas vacaciones' },
 ];
 
-const TABS_EMPLEADO = new Set(['horasExtra', 'incapacidades', 'licencias', 'vacaciones']);
+const TABS_EMPLEADO = new Set(['horasExtra', 'incapacidades', 'licencias', 'vacaciones', 'proximasVac']);
 
 const OPCIONES_PAGINA = [10, 25, 50];
 
@@ -69,6 +70,7 @@ const TITULOS = {
   totalLicencias:  'Histórico Total de Licencias por Periodo',
   vacaciones:      'Histórico Detalles Vacaciones por Empleado',
   totalVacaciones: 'Histórico Total de Vacaciones por Periodo',
+  proximasVac: 'Próximas Vacaciones por Empleado',
 };
 
 const EXCEL_HEADERS = {
@@ -80,6 +82,9 @@ const EXCEL_HEADERS = {
   totalLicencias: ['Año','Periodo','Total licencias remuneradas','Total licencias no remuneradas'],
   vacaciones: ['#','Nombre(s)','Apellidos','Doc.','Año','Periodo','Fecha inicio','Fecha fin','Tipo','Días','Valor'],
   totalVacaciones: ['Año','Periodo','Total vacaciones compensadas en dinero','Total vacaciones disfrutadas'],
+  proximasVac: ['#','Nombre(s)','Apellidos','Documento','Fecha de ingreso',
+                'Año últ. vac.','Fecha inicio últ. vac.','Fecha fin últ. vac.',
+                'Próxima fecha de vacaciones','Fuente'],
 };
 
 export default function ReportesConceptosPage() {
@@ -96,8 +101,19 @@ export default function ReportesConceptosPage() {
   const [fecha,        setFecha]         = useState('');
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
+  const [datosProxVac,  setDatosProxVac]  = useState([]);
+  const [cProxVac,      setCProxVac]      = useState(false);
 
   const [hoverDescargar, setHoverDescargar] = useState(false);
+
+  useEffect(() => {
+      if (!id) return;
+      setCProxVac(true);
+      historicosService.getProximasVacaciones({ empresaId: id })
+          .then(res => setDatosProxVac(res.data))
+          .catch(() => setDatosProxVac([]))
+          .finally(() => setCProxVac(false));
+  }, [id]);
 
   const handleTabPrincipal = (t) => {
     setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
@@ -119,6 +135,18 @@ export default function ReportesConceptosPage() {
   const esTabEmpleado = TABS_EMPLEADO.has(tabPrincipal);
 
   const filtrarDatos = (datos) => datos.filter(r => {
+    if (tabPrincipal === 'proximasVac') {
+        if (busqueda) {
+            if (/^\d+$/.test(busqueda.trim())) {
+                if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
+            } else {
+                const nm = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
+                if (!nm.includes(busqueda.toLowerCase())) return false;
+            }
+        }
+        if (fecha && r.proximaFechaVac > fecha) return false;
+        return true;
+    }
     if (tabPrincipal === 'vacaciones') {
       if (fecha && (r.fechaInicioVac ?? '') !== fecha && (r.fechaFinVac ?? '') !== fecha) return false;
       if (busqueda) {
@@ -152,6 +180,7 @@ export default function ReportesConceptosPage() {
     totalLicencias:  { rawDatos: datosTotLic,   cargando: cTotLic   },
     vacaciones:      { rawDatos: datosVac,      cargando: cVac      },
     totalVacaciones: { rawDatos: datosTotVac,   cargando: cTotVac   },
+    proximasVac: { rawDatos: datosProxVac, cargando: cProxVac },
   };
 
   const { rawDatos, cargando } = mapaData[tabPrincipal];
@@ -229,6 +258,14 @@ export default function ReportesConceptosPage() {
           <th style={styles.th}>Total vacaciones compensadas en dinero</th>
           <th style={styles.th}>Total vacaciones disfrutadas</th>
         </tr>
+      );
+      case 'proximasVac': return (
+          <tr>
+              {['#','Nombre(s)','Apellidos','Documento','Fecha de ingreso',
+                'Año últ. vac.','Fecha inicio últ. vac.','Fecha fin últ. vac.',
+                'Próxima fecha de vacaciones','Fuente']
+                .map(h => <th key={h} style={styles.th}>{h}</th>)}
+          </tr>
       );
       default: return null;
     }
@@ -351,6 +388,22 @@ export default function ReportesConceptosPage() {
           <td style={styles.td}>{fmt(r.totalVacacionesDisfrutadas)}</td>
         </tr>
       );
+      case 'proximasVac': return (
+          <tr key={index} style={bg}>
+              <td style={styles.td}>{num}</td>
+              <td style={styles.td}>{r.nombresEmp}</td>
+              <td style={styles.td}>{r.apellidosEmp}</td>
+              <td style={styles.td}>{r.documentoEmp}</td>
+              <td style={styles.td}>{r.fechaIngresoEmp ?? '-'}</td>
+              <td style={styles.td}>{r.anioUltimasVac ?? '-'}</td>
+              <td style={styles.td}>{r.fechaInicioUltimasVac ?? '-'}</td>
+              <td style={styles.td}>{r.fechaFinUltimasVac ?? '-'}</td>
+              <td style={{ ...styles.td, fontWeight: '700', color: '#0B662A' }}>
+                  {r.proximaFechaVac ?? '-'}
+              </td>
+              <td style={styles.td}>{r.fuente ?? '-'}</td>
+          </tr>
+      );
       default: return null;
     }
   };
@@ -390,6 +443,11 @@ export default function ReportesConceptosPage() {
         return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp, r.anio, r.periodo, r.fechaInicioVac ?? '-', r.fechaFinVac ?? '-', r.tipoVacaciones ?? '-', r.diasTomados ?? '-', r.valorPagoVac ?? 0];
       case 'totalVacaciones':
         return [r.anio, r.periodo, r.totalVacacionesCompensadas ?? 0, r.totalVacacionesDisfrutadas ?? 0];
+      case 'proximasVac':
+          return [index + 1, r.nombresEmp, r.apellidosEmp, r.documentoEmp,
+                  r.fechaIngresoEmp ?? '-', r.anioUltimasVac ?? '-',
+                  r.fechaInicioUltimasVac ?? '-', r.fechaFinUltimasVac ?? '-',
+                  r.proximaFechaVac ?? '-', r.fuente ?? '-'];
       default:
         return [];
     }
@@ -447,6 +505,27 @@ export default function ReportesConceptosPage() {
                 />
               </div>
             </>
+          ) : tabPrincipal === 'proximasVac' ? (
+              <>
+                  <div style={styles.searchBox}>
+                      <Search size={14} color="#A3A3A3" />
+                      <input
+                          style={styles.searchInput}
+                          placeholder="Buscar por nombre o n° de documento"
+                          value={busqueda}
+                          onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+                      />
+                  </div>
+                  <div style={styles.fechaBox}>
+                      <span style={styles.fechaLabel}>Vacaciones antes de</span>
+                      <input
+                          type="date"
+                          style={styles.fechaInput}
+                          value={fecha}
+                          onChange={(e) => { setFecha(e.target.value); setPagina(0); }}
+                      />
+                  </div>
+              </>
           ) : (
             <>
               {esTabEmpleado && (
@@ -573,7 +652,7 @@ const styles = {
   fechaLabel:      { fontSize: '11px', color: '#A3A3A3', fontWeight: '600' },
   fechaInput:      { border: '1px solid #0B662A', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', boxShadow: 'none', backgroundColor: '#fff', cursor: 'pointer', color: '#272525' },
   tabsRow:         { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E8' },
-  tabsBox:         { display: 'flex', flexWrap: 'wrap' },
+  tabsBox:         { display: 'flex', flexWrap: 'nowrap', overflowX: 'auto', },
   tab:             { background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px 16px', fontSize: '13px', fontWeight: '600', color: '#A3A3A3', cursor: 'pointer', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap' },
   tabActivo:       { color: '#0B662A', borderBottom: '2px solid #0B662A' },
   porPaginaBox:    { display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '4px', flexShrink: 0 },
