@@ -146,7 +146,12 @@ export default function GenerarReporteCesantiasPage() {
     if (!id) return;
     setCargandoEmp(true);
     payrollService.getEmpleadosActivos(id)
-      .then(({ data }) => setEmpleados(data))
+      .then(({ data }) => {
+        const ordenados = [...data].sort((a, b) =>
+          (a.apellidosEmp ?? '').localeCompare(b.apellidosEmp ?? '', 'es')
+        );
+        setEmpleados(ordenados);
+      })
       .catch(() => {})
       .finally(() => setCargandoEmp(false));
   }, [id]);
@@ -217,8 +222,8 @@ export default function GenerarReporteCesantiasPage() {
               ) : empleados.map((emp, i) => (
                 <tr key={emp.empleadoId}
                   style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombresEmp}</td>
                   <td style={styles.td}>{emp.apellidosEmp}</td>
+                  <td style={styles.td}>{emp.nombresEmp}</td>
                   <td style={styles.td}>{emp.fechaIngresoEmp}</td>
                   <td style={styles.td}>{emp.documentoEmp}</td>
                   <td style={styles.td}>

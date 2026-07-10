@@ -84,7 +84,7 @@ const EXCEL_HEADERS = {
   totalVacaciones: ['Año','Periodo','Total vacaciones compensadas en dinero','Total vacaciones disfrutadas'],
   proximasVac: ['#','Nombre(s)','Apellidos','Documento','Fecha de ingreso',
                 'Año últ. vac.','Fecha inicio últ. vac.','Fecha fin últ. vac.',
-                'Próxima fecha de vacaciones','Fuente'],
+                'Próximas vacaciones disp. desde','Fuente'],
 };
 
 export default function ReportesConceptosPage() {
@@ -263,7 +263,7 @@ export default function ReportesConceptosPage() {
           <tr>
               {['#','Nombre(s)','Apellidos','Documento','Fecha de ingreso',
                 'Año últ. vac.','Fecha inicio últ. vac.','Fecha fin últ. vac.',
-                'Próxima fecha de vacaciones','Fuente']
+                'Próximas vacaciones disp. desde','Fuente']
                 .map(h => <th key={h} style={styles.th}>{h}</th>)}
           </tr>
       );

@@ -73,10 +73,11 @@ export default function ReportesNominasPage() {
   const [pagina,       setPagina]       = useState(0);
   const [porPagina,    setPorPagina]    = useState(10);
   const [hoverDescargar, setHoverDescargar] = useState(false);
+  const [periodoFiltro, setPeriodoFiltro] = useState('');
 
   const handleTabPrincipal = (t) => {
-    setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
-    setFecha(''); setPagina(0);
+      setTabPrincipal(t); setBusqueda(''); setAnioFiltro('');
+      setFecha(''); setPagina(0); setPeriodoFiltro('');
   };
   const handlePorPagina = (v) => { setPorPagina(v); setPagina(0); };
 
@@ -90,15 +91,16 @@ export default function ReportesNominasPage() {
 
   const filtrarDatos = (datos) => datos.filter(r => {
     if (tabPrincipal === 'nominas') {
-      if (anioFiltro && !String(r.anio ?? '').startsWith(anioFiltro)) return false;
-      if (busqueda) {
-        if (/^\d+$/.test(busqueda.trim())) {
-          if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
-        } else {
-          const nm = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
-          if (!nm.includes(busqueda.toLowerCase())) return false;
+        if (anioFiltro && !String(r.anio ?? '').startsWith(anioFiltro)) return false;
+        if (periodoFiltro && String(r.periodo ?? '') !== periodoFiltro) return false;
+        if (busqueda) {
+            if (/^\d+$/.test(busqueda.trim())) {
+                if (!String(r.documentoEmp ?? '').startsWith(busqueda)) return false;
+            } else {
+                const nm = `${r.nombresEmp ?? ''} ${r.apellidosEmp ?? ''}`.toLowerCase();
+                if (!nm.includes(busqueda.toLowerCase())) return false;
+            }
         }
-      }
     } else {
       if (fecha && (r.fechaInicioPeriodo ?? '') !== fecha && (r.fechaFinPeriodo ?? '') !== fecha) return false;
     }
@@ -119,13 +121,13 @@ export default function ReportesNominasPage() {
       : 'Histórico Total de Nóminas por Periodo';
 
   const EXCEL_HEADERS = {
-    nominas: ['#','Nombre(s)','Apellidos','Año','Periodo','Número de documento','Salario básico mensual','Total devengado','Total deducciones','Total neto a pagar','Estado proceso'],
+    nominas: ['#','Nombre(s)','Apellidos','Año','Periodo','Número de documento','Salario básico mensual','Días laborados', 'Total devengado','Total deducciones','Total neto a pagar','Estado proceso'],
     periodo: ['Año','Periodo','Fecha inicio','Fecha fin','Total devengado','Total deducciones','Total neto','Total empleados','Estado proceso'],
   };
 
   const filaExcel = (r, index) => {
     if (tabPrincipal === 'nominas') {
-      return [index + 1, r.nombresEmp, r.apellidosEmp, r.anio, r.periodo, r.documentoEmp, r.salarioBascMensual ?? 0, r.totalDevengado ?? 0, r.totalDeducciones ?? 0, r.netoNomina ?? 0, fmtEstado(r.estadoProceso)];
+      return [index + 1, r.nombresEmp, r.apellidosEmp, r.anio, r.periodo, r.documentoEmp, r.salarioBascMensual ?? 0, r.diasLaborados ?? 0, r.totalDevengado ?? 0, r.totalDeducciones ?? 0, r.netoNomina ?? 0, fmtEstado(r.estadoProceso)];
     }
     return [r.anio, r.periodo, r.fechaInicioPeriodo ?? '-', r.fechaFinPeriodo ?? '-', r.totalDevengado ?? 0, r.totalDeducciones ?? 0, r.totalNeto ?? 0, r.totalEmpleados, fmtEstado(r.estadoProceso)];
   };
@@ -183,6 +185,18 @@ export default function ReportesNominasPage() {
                     onChange={(e) => { setAnioFiltro(e.target.value); setPagina(0); }}
                   />
                 </div>
+              </div>
+              <div style={styles.fechaBox}>
+                  <span style={styles.fechaLabel}>Periodo</span>
+                  <div style={styles.filtroInputBox}>
+                      <input
+                          type="text"
+                          style={styles.filtroInput}
+                          placeholder="Ej: 3"
+                          value={periodoFiltro}
+                          onChange={(e) => { setPeriodoFiltro(e.target.value); setPagina(0); }}
+                      />
+                  </div>
               </div>
             </>
           )}
@@ -253,6 +267,7 @@ export default function ReportesNominasPage() {
                   <th style={styles.th}>Periodo</th>
                   <th style={styles.th}>Número de documento</th>
                   <th style={styles.th}>Salario básico mensual</th>
+                  <th style={styles.th}>Días laborados</th>
                   <th style={styles.th}>Total devengado</th>
                   <th style={styles.th}>Total deducciones</th>
                   <th style={styles.th}>Total neto a pagar</th>
@@ -288,6 +303,7 @@ export default function ReportesNominasPage() {
                     <td style={styles.td}>{r.periodo}</td>
                     <td style={styles.td}>{r.documentoEmp}</td>
                     <td style={styles.td}>{fmt(r.salarioBascMensual)}</td>
+                    <td style={styles.td}>{r.diasLaborados ?? '-'}</td>
                     <td style={styles.td}>{fmt(r.totalDevengado)}</td>
                     <td style={styles.td}>{fmt(r.totalDeducciones)}</td>
                     <td style={{ ...styles.td, fontWeight: '700' }}>{fmt(r.netoNomina)}</td>

@@ -216,15 +216,18 @@ export default function GenerarReportePage() {
     }
   };
 
-
-
   useEffect(() => {
     if (!id) return;
     setCargandoEmp(true);
     axiosInstance.get('/api/master/empleados', {
       params: { empresaId: id, estado: 'ACTIVO' }
     })
-      .then(({ data }) => setEmpleados(data))
+      .then(({ data }) => {
+        const ordenados = [...data].sort((a, b) =>
+          (a.apellidosEmp ?? '').localeCompare(b.apellidosEmp ?? '', 'es')
+        );
+        setEmpleados(ordenados);
+      })
       .catch((err) => setErrorEmp(err))
       .finally(() => setCargandoEmp(false));
   }, [id]);
@@ -285,8 +288,8 @@ export default function GenerarReportePage() {
           <table style={styles.tabla}>
             <thead>
               <tr>
-                <th style={{ ...styles.th, textAlign: 'left' }}>Nombre(s)</th>
                 <th style={styles.th}>Apellidos</th>
+                <th style={styles.th}>Nombres</th>
                 <th style={styles.th}>Fecha de ingreso</th>
                 <th style={styles.th}>Número de documento</th>
                 <th style={styles.th}>
@@ -310,8 +313,8 @@ export default function GenerarReportePage() {
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>Cargando empleados...</td></tr>
               ) : empleados.map((emp, i) => (
                 <tr key={emp.empleadoId} style={i % 2 === 0 ? styles.trPar : styles.trImpar}>
-                  <td style={{ ...styles.td, textAlign: 'left' }}>{emp.nombresEmp}</td>
                   <td style={styles.td}>{emp.apellidosEmp}</td>
+                  <td style={styles.td}>{emp.nombresEmp}</td>
                   <td style={styles.td}>{emp.fechaIngresoEmp}</td>
                   <td style={styles.td}>{emp.documentoEmp}</td>
                   <td style={styles.td}>

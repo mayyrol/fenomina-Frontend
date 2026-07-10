@@ -74,6 +74,18 @@ const NOMBRES_NO_SALARIALES_DEVENGO = [
   'Bonificaciones ocasionales o por mera liberalidad',
 ];
 
+const CONCEPTOS_EXCLUIDOS = [
+  'Pensión empleador',
+  'Aporte salud empleador',
+  'ARL empleador',
+  'Caja de compensación empleador',
+  'SENA empleador',
+  'ICBF empleador',
+  'Prima de servicios',
+  'Cesantías',
+  'Intereses sobre las cesantías',
+];
+
 const calcularResumenFila = (desp) => {
   const conceptos = desp.conceptos ?? [];
 
@@ -102,6 +114,79 @@ const calcularResumenFila = (desp) => {
   };
 };
 
+const normalizar = (s) =>
+  (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+const esConceptoBase          = (n) => n === 'Salario días trabajados' || n === 'Auxilio de transporte';
+const esConceptoHorasExtra    = (n) => { const x = normalizar(n); return x.includes('hora extra') || x.includes('recargo'); };
+const esConceptoVacaciones    = (n) => normalizar(n).includes('vacacion');
+const esConceptoLicenciaGeneral = (n) => normalizar(n).includes('licencia'); // incluye remuneradas y no remuneradas
+const esConceptoLicenciaNoRem = (n) => n === 'Licencias no remuneradas';
+const esConceptoLicenciaRem   = (n) => esConceptoLicenciaGeneral(n) && !esConceptoLicenciaNoRem(n);
+const esConceptoIncapacidad   = (n) => normalizar(n).includes('incapacidad');
+const esConceptoRetefuente    = (n) => normalizar(n).includes('retencion en la fuente');
+const esConceptoSaludPension  = (n) => { const x = normalizar(n); return x.includes('salud') || x.includes('pension'); };
+
+const obtenerEtiquetaConcepto = (c) =>
+  CONCEPTOS_CON_DESCRIPCION.includes(c.nombreConcepto) && c.observacion ? c.observacion : c.nombreConcepto;
+
+const calcularNovedades = (desp) => {
+  const conceptos = (desp.conceptos ?? []).filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto));
+
+  const sumaCantidad = (arr) => arr.reduce((s, c) => s + (Number(c.cantidad) || 0), 0);
+  const sumaValor     = (arr) => arr.reduce((s, c) => s + (Number(c.valorResultado) || 0), 0);
+
+  const diasLaboradosConcepto = conceptos.find(c => c.nombreConcepto === 'Salario días trabajados');
+  const diasLaborados = diasLaboradosConcepto?.cantidad ?? '-';
+
+  const horas               = conceptos.filter(c => esConceptoHorasExtra(c.nombreConcepto));
+  const vacaciones           = conceptos.filter(c => esConceptoVacaciones(c.nombreConcepto));
+  const licenciasRem         = conceptos.filter(c => esConceptoLicenciaRem(c.nombreConcepto));
+  const licenciasNoRem       = conceptos.filter(c => esConceptoLicenciaNoRem(c.nombreConcepto));
+  const incapacidades        = conceptos.filter(c => esConceptoIncapacidad(c.nombreConcepto));
+  const retefuente           = conceptos.filter(c => esConceptoRetefuente(c.nombreConcepto));
+
+  const otros = conceptos.filter(c =>
+    !esConceptoBase(c.nombreConcepto) &&
+    !esConceptoHorasExtra(c.nombreConcepto) &&
+    !esConceptoVacaciones(c.nombreConcepto) &&
+    !esConceptoLicenciaGeneral(c.nombreConcepto) &&
+    !esConceptoIncapacidad(c.nombreConcepto) &&
+    !esConceptoRetefuente(c.nombreConcepto) &&
+    !esConceptoSaludPension(c.nombreConcepto)
+  );
+
+  return {
+    diasLaborados,
+    horasValor: sumaValor(horas),
+    horasCantidad: sumaCantidad(horas),
+    hayHoras: horas.length > 0,
+    vacacionesDias: sumaCantidad(vacaciones),
+    vacacionesValor: sumaValor(vacaciones),
+    hayVacaciones: vacaciones.length > 0,
+    licenciasDias: sumaCantidad(licenciasRem),
+    licenciasValor: sumaValor(licenciasRem),
+    hayLicencias: licenciasRem.length > 0,
+    licenciasNoRemDias: sumaCantidad(licenciasNoRem),
+    licenciasNoRemValor: sumaValor(licenciasNoRem),
+    hayLicenciasNoRem: licenciasNoRem.length > 0,
+    incapacidadesDias: sumaCantidad(incapacidades),
+    incapacidadesValor: sumaValor(incapacidades),
+    hayIncapacidades: incapacidades.length > 0,
+    retefuenteValor: sumaValor(retefuente),
+    hayRetefuente: retefuente.length > 0,
+    otros,
+  };
+};
+
+const obtenerConceptosOtrosUnicos = (desprendibles) => {
+  const etiquetas = new Set();
+  desprendibles.forEach(d => {
+    calcularNovedades(d).otros.forEach(c => etiquetas.add(obtenerEtiquetaConcepto(c)));
+  });
+  return Array.from(etiquetas).sort((a, b) => a.localeCompare(b, 'es'));
+};
+
 const hayDevengoNoSalarial = (desprendibles) =>
   desprendibles.some(d => calcularResumenFila(d).devengadoNoSalarial > 0);
 
@@ -120,18 +205,6 @@ export default function ResultadoLiquidacionPage() {
   const [cargando,      setCargando]      = useState(false);
   const [hoverDescargar,setHoverDescargar] = useState(false);
   const [descargando,   setDescargando]   = useState(false);
-
-  const CONCEPTOS_EXCLUIDOS = [
-    'Pensión empleador',
-    'Aporte salud empleador',
-    'ARL empleador',
-    'Caja de compensación empleador',
-    'SENA empleador',
-    'ICBF empleador',
-    'Prima de servicios',
-    'Cesantías',
-    'Intereses sobre las cesantías',
-  ];
 
   const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
 
@@ -442,16 +515,52 @@ export default function ResultadoLiquidacionPage() {
     setDescargando(false);
   };
 
-  const EXCEL_HEADERS_NOMINA = ['#','CC','Apellidos y Nombres','Salario básico mensual','Total devengado', ...(mostrarColumnaNoSalarial ? ['Total devengado no salarial'] : []), 'Aux. transporte','Total deducciones','Neto a pagar'];
+  const hayHorasExtra       = desprendibles.some(d => calcularNovedades(d).hayHoras);
+  const hayVacaciones       = desprendibles.some(d => calcularNovedades(d).hayVacaciones);
+  const hayLicencias        = desprendibles.some(d => calcularNovedades(d).hayLicencias);
+  const hayLicenciasNoRem   = desprendibles.some(d => calcularNovedades(d).hayLicenciasNoRem);
+  const hayIncapacidades    = desprendibles.some(d => calcularNovedades(d).hayIncapacidades);
+  const hayRetefuente       = desprendibles.some(d => calcularNovedades(d).hayRetefuente);
+  const conceptosOtros      = obtenerConceptosOtrosUnicos(desprendibles);
+
+  const EXCEL_HEADERS_NOMINA = [
+    '#', 'CC', 'Apellidos y Nombres', 'Días laborados', 'Salario básico mensual', 'Total devengado',
+    ...(mostrarColumnaNoSalarial ? ['Total devengado no salarial'] : []),
+    ...(hayHorasExtra     ? ['Horas extra/recargos', '# Horas/recargos'] : []),
+    ...(hayVacaciones     ? ['Días vacaciones', 'Valor vacaciones'] : []),
+    ...(hayLicencias      ? ['Días licencias', 'Valor licencias'] : []),
+    ...(hayLicenciasNoRem ? ['Días licencia no remunerada', 'Valor descontado licencia no remunerada'] : []),
+    ...(hayIncapacidades  ? ['Días incapacidades', 'Valor incapacidades'] : []),
+    'Aux. transporte', 'Total deducciones',
+    ...(hayRetefuente ? ['Retención en la fuente'] : []),
+    ...conceptosOtros,
+    'Neto a pagar',
+  ];
 
   const handleDescargarExcel = () => {
     const filas = desprendibles.map((desp, i) => {
-      const r = calcularResumenFila(desp);
-      const fila = [i + 1, desp.documentoEmpleado, nombreCompleto(desp), desp.salarioBasico ?? 0, r.devengadoSalarial ?? 0];
+      const r   = calcularResumenFila(desp);
+      const nov = calcularNovedades(desp);
+
+      const fila = [i + 1, desp.documentoEmpleado, nombreCompleto(desp), nov.diasLaborados, desp.salarioBasico ?? 0, r.devengadoSalarial ?? 0];
       if (mostrarColumnaNoSalarial) fila.push(r.devengadoNoSalarial ?? 0);
-      fila.push(r.auxTransporteValor ?? 0, r.totalDeducciones ?? 0, desp.netoAPagar ?? 0);
+      if (hayHorasExtra)     fila.push(nov.horasValor, nov.horasCantidad);
+      if (hayVacaciones)     fila.push(nov.vacacionesDias, nov.vacacionesValor);
+      if (hayLicencias)      fila.push(nov.licenciasDias, nov.licenciasValor);
+      if (hayLicenciasNoRem) fila.push(nov.licenciasNoRemDias, nov.licenciasNoRemValor);
+      if (hayIncapacidades)  fila.push(nov.incapacidadesDias, nov.incapacidadesValor);
+      fila.push(r.auxTransporteValor ?? 0, r.totalDeducciones ?? 0);
+      if (hayRetefuente) fila.push(nov.retefuenteValor);
+
+      conceptosOtros.forEach((nombreCol) => {
+        const encontrado = nov.otros.find(c => obtenerEtiquetaConcepto(c) === nombreCol);
+        fila.push(encontrado ? (encontrado.valorResultado ?? 0) : '-');
+      });
+
+      fila.push(desp.netoAPagar ?? 0);
       return fila;
     });
+
     const nombreArchivo = `${empresa?.nombreEmpresa ?? 'NOMINA'} ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`.trim();
     exportarExcel(EXCEL_HEADERS_NOMINA, filas, nombreArchivo, 'Nómina');
   };
