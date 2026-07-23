@@ -50,6 +50,7 @@ import ReportesCesantiasPage from "../features/auth/pages/empresas/reportes/empl
 import ReportesConceptosPage from "../features/auth/pages/empresas/reportes/empleados/ReportesConceptosPage";
 import ReportesRetencionPage from "../features/auth/pages/empresas/reportes/empleados/ReportesRetencionPage";
 import LogsPage from '../features/auth/pages/LogsPage';
+import NotificacionesPage from '../features/auth/pages/NotificacionesPage';
 
 function RutaRaiz() {
   const { accessToken } = useAuthStore();
@@ -125,6 +126,7 @@ export default function AppRouter() {
             <Route path="/empresas/:id/reportes/empleados/cesantias" element={<ReportesCesantiasPage />} />
             <Route path="/empresas/:id/reportes/empleados/conceptos" element={<ReportesConceptosPage />} />
             <Route path="/empresas/:id/reportes/empleados/retencion" element={<ReportesRetencionPage />} />
+            <Route path="/notificaciones" element={<NotificacionesPage />} />
 
             {/* Logs */}
             <Route path="/logs" element={<LogsPage />} />

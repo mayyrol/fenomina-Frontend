@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import historicosService from '../services/historicosService';
+import NotificacionesToast from '../components/NotificacionesToast';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import {
@@ -7,7 +9,8 @@ import {
   Settings2,
   UserRound,
   ScrollText,
-  LogOut
+  LogOut,
+  Bell
 } from 'lucide-react';
 import logoFE from '../assets/logo_fe.png';
 import logoERP from '../assets/logoerp.png'; 
@@ -31,6 +34,40 @@ export default function MainLayout() {
   };
 
   const esSuperAdmin = usuario?.rolUsuario === 'SUPER_ADMIN';
+  
+  const esRRHHoAdmin = usuario?.rolUsuario === 'SUPER_ADMIN' ||
+                       usuario?.rolUsuario === 'RRHH';
+
+  const [toasts,     setToasts]     = useState([]);
+  const [noLeidas,   setNoLeidas]   = useState(0);
+  const [mostrarToast, setMostrarToast] = useState(false);
+
+  useEffect(() => {
+      if (!esRRHHoAdmin) return;
+
+      const actualizarBadge = () => {
+          historicosService.contarNoLeidas()
+              .then(res => setNoLeidas(res.data.count ?? 0))
+              .catch(() => {});
+      };
+
+      historicosService.evaluarNotificaciones()
+          .then(res => {
+              if (res.data && res.data.length > 0) {
+                  const noLeidas = res.data.filter(n => !n.leida);
+                  if (noLeidas.length > 0) {
+                      setToasts(noLeidas);
+                      setMostrarToast(true);
+                  }
+              }
+          })
+          .catch(() => {});
+
+      actualizarBadge();
+
+      window.addEventListener('actualizarBadgeNotif', actualizarBadge);
+      return () => window.removeEventListener('actualizarBadgeNotif', actualizarBadge);
+  }, []);
 
   const navItems = [
     { to: '/inicio', label: 'Inicio', icon: <LayoutGrid size={16} /> },
@@ -38,7 +75,37 @@ export default function MainLayout() {
     ...(esSuperAdmin ? [{ to: '/parametros', label: 'Parámetros Generales', icon: <Settings2 size={16} /> }] : []),
     ...(esSuperAdmin ? [{ to: '/usuarios', label: 'Usuarios', icon: <UserRound size={16} /> }] : []),
     ...(esSuperAdmin ? [{ to: '/logs', label: 'Logs FENomina', icon: <ScrollText size={16} /> }] : []),
+    ...(esRRHHoAdmin ? [{
+        to: '/notificaciones',
+        label: 'Notificaciones',
+        icon: (
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+                <Bell size={16} />
+                {noLeidas > 0 && (
+                    <span style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-6px',
+                        backgroundColor: '#e53e3e',
+                        color: '#fff',
+                        borderRadius: '50%',
+                        width: '16px',
+                        height: '16px',
+                        fontSize: '9px',
+                        fontWeight: '700',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        lineHeight: 1,
+                    }}>
+                        {noLeidas > 99 ? '99+' : noLeidas}
+                    </span>
+                )}
+            </div>
+        ),
+    }] : []),
   ];
+
 
   return (
     <div style={styles.container}>
@@ -116,6 +183,17 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
+      {mostrarToast && toasts.length > 0 && (
+          <NotificacionesToast
+              notificaciones={toasts}
+              onCerrar={() => {
+                  setMostrarToast(false);
+                  historicosService.contarNoLeidas()
+                      .then(res => setNoLeidas(res.data.count ?? 0))
+                      .catch(() => {});
+              }}
+          />
+      )}
     </div>
   );
 }

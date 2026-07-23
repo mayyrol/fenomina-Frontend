@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../../store/authStore';
 import { Layers, ChevronLeft, UserRound, Search } from 'lucide-react';
 import { useHistoricos } from "../../../../hooks/useHistoricos";
@@ -95,7 +95,10 @@ export default function ReportesConceptosPage() {
   const nombre = `${usuario?.nombresUsuario ?? ''} ${usuario?.apellidosUsuario ?? ''}`.trim();
   const cargo  = usuario?.cargoUsuario ?? '';
 
-  const [tabPrincipal, setTabPrincipal] = useState('horasExtra');
+  const [searchParams] = useSearchParams();
+  const [tabPrincipal, setTabPrincipal] = useState(
+      searchParams.get('tab') ?? 'horasExtra'
+  );
   const [busqueda,     setBusqueda]     = useState('');
   const [anioFiltro,   setAnioFiltro]   = useState('');
   const [fecha,        setFecha]         = useState('');
@@ -621,7 +624,7 @@ export default function ReportesConceptosPage() {
       <BarraAcciones justificar="flex-start">
         <button
           style={{ ...btnSecundario, padding: '10px 24px' }}
-          onClick={() => navigate(`/empresas/${id}/reportes/empleados`)}
+          onClick={() => navigate(-1)}
         >
           Volver
         </button>

@@ -83,6 +83,21 @@ const historicosService = {
 
   getProximasVacaciones: (params) =>
     axiosInstance.get(`${BASE}/conceptos/proximas-vacaciones`, { params }),
+
+  evaluarNotificaciones: () =>
+    axiosInstance.post(`${BASE}/notificaciones/evaluar`),
+
+  getNotificaciones: (params) =>
+    axiosInstance.get(`${BASE}/notificaciones`, { params }),
+
+  contarNoLeidas: () =>
+    axiosInstance.get(`${BASE}/notificaciones/no-leidas/count`),
+
+  marcarLeida: (id) =>
+    axiosInstance.patch(`${BASE}/notificaciones/${id}/leer`),
+
+  marcarTodasLeidas: () =>
+    axiosInstance.patch(`${BASE}/notificaciones/leer-todas`),
 };
 
 export default historicosService;
