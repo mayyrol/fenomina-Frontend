@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import payrollService from '../../../../../services/payrollService';
 import axiosInstance from '../../../../../api/axiosInstance'; 
@@ -206,7 +206,49 @@ export default function ResultadoLiquidacionPage() {
   const [hoverDescargar,setHoverDescargar] = useState(false);
   const [descargando,   setDescargando]   = useState(false);
 
+  const [modalEnvio, setModalEnvio] = useState(null); // null | 'preview' | 'enviando' | 'resultado'
+  const [previewEnvio, setPreviewEnvio] = useState(null);
+  const [resultadoEnvio, setResultadoEnvio] = useState(null);
+  const [errorEnvio, setErrorEnvio] = useState('');
+
+  const [searchParams] = useSearchParams();
   const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
+
+  const handleAbrirEnvio = async () => {
+    setErrorEnvio('');
+    try {
+      const { data } = await payrollService.getPreviewEnvio(nominaId);
+      setPreviewEnvio(data);
+      setModalEnvio('preview');
+    } catch (err) {
+      const msg = err.response?.data?.mensaje ?? 'No se pudo cargar la información de envío.';
+      setErrorEnvio(msg);
+      setModalEnvio('preview'); // se muestra igual, con el mensaje de error (ej. sin correos registrados)
+    }
+  };
+
+  useEffect(() => {
+    if (searchParams.get('accion') === 'enviar' && proceso?.estadoProcNomina === 'PAGADO') {
+      handleAbrirEnvio();
+    }
+  }, [proceso]);
+
+  const handleConfirmarEnvio = async () => {
+    setModalEnvio('enviando');
+    try {
+      const doc = await construirPdfDesprendibles();
+      const pdfBlob = doc.output('blob');
+      const nombreArchivo = `${empresa?.nombreEmpresa ?? 'NOMINA'} ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`.trim() + '.pdf';
+      const { data } = await payrollService.enviarDesprendibles(nominaId, pdfBlob, nombreArchivo);
+      setResultadoEnvio(data);
+      setModalEnvio('resultado');
+    } catch (err) {
+      const msg = err.response?.data?.mensaje ?? 'Ocurrió un error al enviar los desprendibles.';
+      setErrorEnvio(msg);
+      setResultadoEnvio(null);
+      setModalEnvio('resultado');
+    }
+  };
 
   useEffect(() => {
     if (!nominaId || !id) return;
@@ -242,128 +284,236 @@ export default function ResultadoLiquidacionPage() {
 
   const handleDescargar = async () => {
     setDescargando(true);
+    const doc = await construirPdfDesprendibles();
+    const nombreArchivo = `${empresa?.nombreEmpresa ?? 'NOMINA'} ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`.trim();
+    doc.save(`${nombreArchivo}.pdf`);
+    setDescargando(false);
+  };
 
-    let logoBase64 = null;
-    if (empresa?.logoEmpresaUrl) {
-      try {
-        const logoUrl = `${import.meta.env.VITE_GATEWAY_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
-        const token = useAuthStore.getState().accessToken;
-        const response = await fetch(logoUrl, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const blob = await response.blob();
- 
-        logoBase64 = await new Promise((resolve) => {
-          const img = new Image();
-          const url = URL.createObjectURL(blob);
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            // Limitar tamaño máximo a 100x100px
-            const maxSize = 100;
-            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
-            canvas.width = img.width * ratio;
-            canvas.height = img.height * ratio;
-            const ctx = canvas.getContext('2d');
+    const construirPdfDesprendibles = async () => {
+      let logoBase64 = null;
+      if (empresa?.logoEmpresaUrl) {
+        try {
+          const logoUrl = `${import.meta.env.VITE_GATEWAY_URL}/api/master/files/logos/${empresa.logoEmpresaUrl}`;
+          const token = useAuthStore.getState().accessToken;
+          const response = await fetch(logoUrl, { headers: { Authorization: `Bearer ${token}` } });
+          const blob = await response.blob();
 
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            // Comprimir al 60% de calidad en JPEG
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
-            URL.revokeObjectURL(url);
-          };
-          img.src = url;
-        });
-      } catch {
-        logoBase64 = null;
-      }
-    }
-
-    const doc = new jsPDF();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const mitad = pageHeight / 2;
-
-    const renderDesprendible = (desp, yInicio, mitad, pageHeight, conceptosFiltrados) => {
-      let y = yInicio + 6;
-
-      if (logoBase64) {
-        doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+          logoBase64 = await new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(blob);
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const maxSize = 100;
+              const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+              canvas.width = img.width * ratio;
+              canvas.height = img.height * ratio;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+              URL.revokeObjectURL(url);
+            };
+            img.src = url;
+          });
+        } catch {
+          logoBase64 = null;
+        }
       }
 
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
-      doc.setFontSize(9);
-      doc.setFont(undefined, 'normal');
-      doc.text(`NIT. ${empresa?.empresaNit ?? ''}`, 105, y + 11, { align: 'center' });
-      y += 24;
+      const doc = new jsPDF();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const mitad = pageHeight / 2;
 
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text('DESPRENDIBLE PAGO DE NÓMINA', 105, y, { align: 'center' });
-      y += 7;
+      const renderDesprendible = (desp, yInicio, mitad, pageHeight, conceptosFiltrados) => {
+        let y = yInicio + 6;
 
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')}`, 14, y);
-      y += 5;
-      const fechaFinMostrar = (proceso?.fechaFinPeriodo ?? '').replace(/-31$/, '-30');
-      doc.text(`Periodo: ${desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo ?? ''} - ${fechaFinMostrar}`, 14, y); y += 5;
-      doc.text(`Apellidos y Nombres: ${nombreCompleto(desp)}`, 14, y); y += 5;
-      doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
-      doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
-      doc.text(`Salario base  ${fmt(desp.salarioBasico)}`, 196, y - 15, { align: 'right' });
+        if (logoBase64) {
+          doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+        }
 
-      const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`NIT. ${empresa?.empresaNit ?? ''}`, 105, y + 11, { align: 'center' });
+        y += 24;
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text('DESPRENDIBLE PAGO DE NÓMINA', 105, y, { align: 'center' });
+        y += 7;
+
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')}`, 14, y);
+        y += 5;
+        const fechaFinMostrar = (proceso?.fechaFinPeriodo ?? '').replace(/-31$/, '-30');
+        doc.text(`Periodo: ${desp.fechaInicioCorteEmpleado ?? proceso?.fechaInicioPeriodo ?? ''} - ${fechaFinMostrar}`, 14, y); y += 5;
+        doc.text(`Apellidos y Nombres: ${nombreCompleto(desp)}`, 14, y); y += 5;
+        doc.text(`Doc. Identidad: ${desp.documentoEmpleado}`, 14, y); y += 5;
+        doc.text(`Mes: ${NOMBRE_MES[proceso?.periodo] ?? ''}`, 14, y); y += 5;
+        doc.text(`Salario base  ${fmt(desp.salarioBasico)}`, 196, y - 15, { align: 'right' });
+
+        const { totalDevengos, totalDeducciones, neto } = calcularTotales(desp);
 
       
-      const body = conceptosFiltrados.map(c => [
-          CONCEPTOS_CON_DESCRIPCION.includes(c.nombreConcepto) && c.observacion
-              ? c.observacion
-              : c.nombreConcepto,
-          c.cantidad != null
-              ? `${Number.isInteger(Number(c.cantidad))
-                  ? Math.floor(c.cantidad)
-                  : c.cantidad} ${c.unidadCantidad ?? ''}`.trim()
-              : '',
-          c.categoria === 'DEVENGO' && c.valorResultado != null ? fmt(c.valorResultado) : '',
-          c.categoria === 'DEDUCCION' && c.valorResultado != null ? fmt(c.valorResultado) : '',
-        ]);
+        const body = conceptosFiltrados.map(c => [
+            CONCEPTOS_CON_DESCRIPCION.includes(c.nombreConcepto) && c.observacion
+                ? c.observacion
+                : c.nombreConcepto,
+            c.cantidad != null
+                ? `${Number.isInteger(Number(c.cantidad))
+                    ? Math.floor(c.cantidad)
+                    : c.cantidad} ${c.unidadCantidad ?? ''}`.trim()
+                : '',
+            c.categoria === 'DEVENGO' && c.valorResultado != null ? fmt(c.valorResultado) : '',
+            c.categoria === 'DEDUCCION' && c.valorResultado != null ? fmt(c.valorResultado) : '',
+          ]);
 
-      body.push(
-        [{ content: 'SUBTOTAL', styles: { fontStyle: 'bold' } }, '', fmt(totalDevengos), fmt(totalDeducciones)],
-        [{ content: 'NETO A PAGAR', styles: { fontStyle: 'bold', textColor: [11, 102, 42] } }, '', fmt(neto), ''],
+        body.push(
+          [{ content: 'SUBTOTAL', styles: { fontStyle: 'bold' } }, '', fmt(totalDevengos), fmt(totalDeducciones)],
+          [{ content: 'NETO A PAGAR', styles: { fontStyle: 'bold', textColor: [11, 102, 42] } }, '', fmt(neto), ''],
+        );
+
+        autoTable(doc, {
+          startY: y,
+          head: [['CONCEPTO', 'CANTIDAD', 'DEVENGOS', 'DEDUCCIONES']],
+          body,
+          styles: { fontSize: 7, lineColor: [224, 224, 224], lineWidth: 0.1 },
+          headStyles: {
+            fillColor: [11, 102, 42],
+            textColor: 255,
+            fontStyle: 'bold',
+            halign: 'center',
+          },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
+          columnStyles: {
+            0: { halign: 'left' },
+            1: { halign: 'center' },
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+          },
+          margin: { left: 14, right: 14 },
+          didParseCell: (data) => {
+            const lastRow = data.table.body.length - 1;
+            const secondLast = data.table.body.length - 2;
+            if (data.row.index === secondLast) {
+              data.cell.styles.fillColor = [240, 240, 240];
+              data.cell.styles.fontStyle = 'bold';
+            }
+            if (data.row.index === lastRow) {
+              data.cell.styles.fillColor = [232, 245, 238];
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.textColor = [11, 102, 42];
+            }
+          },
+        });
+
+        if (desp.advertenciaNoSalarial) {
+            const finalY = doc.lastAutoTable.finalY + 4;
+    
+            // Fondo amarillo
+            doc.setFillColor(254, 243, 199);
+            doc.setDrawColor(217, 119, 6);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(14, finalY, 182, 10, 2, 2, 'FD');
+    
+            doc.setFontSize(7);
+            doc.setTextColor(146, 64, 14);
+            doc.text(
+                ` ${desp.advertenciaNoSalarial}`,
+                18,
+                finalY + 6,
+                { maxWidth: 174 }
+            );
+            doc.setTextColor(0, 0, 0);
+            doc.setDrawColor(0, 0, 0);
+        }
+      
+        const firmaY = doc.lastAutoTable.finalY + (desp.advertenciaNoSalarial ? 28 : 18);
+        doc.setDrawColor(100, 100, 100);
+        doc.setLineWidth(0.3);
+        doc.line(116, firmaY, 196, firmaY);
+        doc.setFontSize(7);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Firma del trabajador', 196, firmaY + 4, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+        doc.setDrawColor(0, 0, 0);
+    
+        const limiteInferior = yInicio === 0 ? mitad - 12 : pageHeight - 8;
+        doc.setTextColor(163, 163, 163);
+        doc.setTextColor(0, 0, 0);
+      };
+
+      let y = 14;
+      if (logoBase64) doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
+      doc.setFontSize(12); doc.setFont(undefined, 'bold');
+      doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
+      doc.setFontSize(9); doc.setFont(undefined, 'normal');
+      doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 105, y + 12, { align: 'center' });
+      doc.setFontSize(10); doc.setFont(undefined, 'bold');
+      doc.text(
+        `PLANILLA NÓMINA — ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`,
+        105, y + 20, { align: 'center' }
       );
 
+      const totalNeto = desprendibles.reduce((s, d) => s + (d.netoAPagar ?? 0), 0);
+
+      const columnasResumen = ['No', 'CC', 'APELLIDOS Y NOMBRES', 'SALARIO BÁSICO MENSUAL', 'TOTAL DEVENGADO'];
+      if (mostrarColumnaNoSalarial) columnasResumen.push('TOTAL DEVENGADO NO SALARIAL');
+      columnasResumen.push('AUX. TRANSPORTE', 'TOTAL DEDUCCIONES', 'NETO A PAGAR');
+
       autoTable(doc, {
-        startY: y,
-        head: [['CONCEPTO', 'CANTIDAD', 'DEVENGOS', 'DEDUCCIONES']],
-        body,
-        styles: { fontSize: 7, lineColor: [224, 224, 224], lineWidth: 0.1 },
+        startY: y + 28,
+        head: [columnasResumen],
+        body: [
+          ...desprendibles.map((desp, i) => {
+            const r = calcularResumenFila(desp);
+            const fila = [
+              i + 1,
+              desp.documentoEmpleado,
+              nombreCompleto(desp),
+              fmt(desp.salarioBasico),
+              fmt(r.devengadoSalarial),
+            ];
+            if (mostrarColumnaNoSalarial) {
+              fila.push(r.devengadoNoSalarial > 0 ? fmt(r.devengadoNoSalarial) : '-');
+            }
+            fila.push(
+              r.auxTransporteValor ? fmt(r.auxTransporteValor) : '-',
+              fmt(r.totalDeducciones),
+              fmt(desp.netoAPagar),
+            );
+            return fila;
+          }),
+          [
+            {
+              content: 'TOTAL',
+              colSpan: mostrarColumnaNoSalarial ? 7 : 6,
+              styles: { halign: 'right', fontStyle: 'bold' }
+            },
+            { content: fmt(totalNeto), styles: { fontStyle: 'bold' } },
+          ],
+        ],
+        styles: { fontSize: 6 },
         headStyles: {
           fillColor: [11, 102, 42],
           textColor: 255,
           fontStyle: 'bold',
-          halign: 'center',
+          fontSize: 6,
         },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
         columnStyles: {
-          0: { halign: 'left' },
+          0: { halign: 'center' },
           1: { halign: 'center' },
-          2: { halign: 'right' },
-          3: { halign: 'right' },
+          2: { halign: 'left' },
         },
-        margin: { left: 14, right: 14 },
+        margin: { left: 10, right: 10 },
         didParseCell: (data) => {
           const lastRow = data.table.body.length - 1;
-          const secondLast = data.table.body.length - 2;
-          if (data.row.index === secondLast) {
-            data.cell.styles.fillColor = [240, 240, 240];
-            data.cell.styles.fontStyle = 'bold';
-          }
           if (data.row.index === lastRow) {
             data.cell.styles.fillColor = [232, 245, 238];
             data.cell.styles.fontStyle = 'bold';
@@ -372,148 +522,36 @@ export default function ResultadoLiquidacionPage() {
         },
       });
 
-      if (desp.advertenciaNoSalarial) {
-          const finalY = doc.lastAutoTable.finalY + 4;
-    
-          // Fondo amarillo
-          doc.setFillColor(254, 243, 199);
-          doc.setDrawColor(217, 119, 6);
-          doc.setLineWidth(0.3);
-          doc.roundedRect(14, finalY, 182, 10, 2, 2, 'FD');
-    
-          doc.setFontSize(7);
-          doc.setTextColor(146, 64, 14);
-          doc.text(
-              ` ${desp.advertenciaNoSalarial}`,
-              18,
-              finalY + 6,
-              { maxWidth: 174 }
-          );
-          doc.setTextColor(0, 0, 0);
-          doc.setDrawColor(0, 0, 0);
-      }
-      
-      const firmaY = doc.lastAutoTable.finalY + (desp.advertenciaNoSalarial ? 28 : 18);
-      doc.setDrawColor(100, 100, 100);
-      doc.setLineWidth(0.3);
-      doc.line(116, firmaY, 196, firmaY);
-      doc.setFontSize(7);
-      doc.setTextColor(0, 0, 0);
-      doc.text('Firma del trabajador', 196, firmaY + 4, { align: 'right' });
-      doc.setTextColor(0, 0, 0);
-      doc.setDrawColor(0, 0, 0);
-    
-      const limiteInferior = yInicio === 0 ? mitad - 12 : pageHeight - 8;
-      doc.setTextColor(163, 163, 163);
-      doc.setTextColor(0, 0, 0);
-    };
+      doc.addPage();
 
-    let y = 14;
-    if (logoBase64) doc.addImage(logoBase64, 'JPEG', 14, y, 20, 20);
-    doc.setFontSize(12); doc.setFont(undefined, 'bold');
-    doc.text(empresa?.nombreEmpresa ?? '', 105, y + 6, { align: 'center' });
-    doc.setFontSize(9); doc.setFont(undefined, 'normal');
-    doc.text(`NIT: ${empresa?.empresaNit ?? ''}`, 105, y + 12, { align: 'center' });
-    doc.setFontSize(10); doc.setFont(undefined, 'bold');
-    doc.text(
-      `PLANILLA NÓMINA — ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`,
-      105, y + 20, { align: 'center' }
-    );
+      desprendibles.forEach((desp, idx) => {
+        //doc.addPage();
+        if (idx > 0) doc.addPage();
 
-    const totalNeto = desprendibles.reduce((s, d) => s + (d.netoAPagar ?? 0), 0);
+        const conceptosFiltrados = (desp.conceptos ?? [])
+          .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto))
+          .filter(c => {
+              const esConceptoOcultable = 
+                  c.nombreConcepto === 'Salario días trabajados' ||
+                  c.nombreConcepto === 'Auxilio de transporte';
+              if (esConceptoOcultable && (!c.valorResultado || Number(c.valorResultado) === 0)) {
+                  return false;
+              }
+              return true;
+          })
 
-    const columnasResumen = ['No', 'CC', 'APELLIDOS Y NOMBRES', 'SALARIO BÁSICO MENSUAL', 'TOTAL DEVENGADO'];
-    if (mostrarColumnaNoSalarial) columnasResumen.push('TOTAL DEVENGADO NO SALARIAL');
-    columnasResumen.push('AUX. TRANSPORTE', 'TOTAL DEDUCCIONES', 'NETO A PAGAR');
-
-    autoTable(doc, {
-      startY: y + 28,
-      head: [columnasResumen],
-      body: [
-        ...desprendibles.map((desp, i) => {
-          const r = calcularResumenFila(desp);
-          const fila = [
-            i + 1,
-            desp.documentoEmpleado,
-            nombreCompleto(desp),
-            fmt(desp.salarioBasico),
-            fmt(r.devengadoSalarial),
-          ];
-          if (mostrarColumnaNoSalarial) {
-            fila.push(r.devengadoNoSalarial > 0 ? fmt(r.devengadoNoSalarial) : '-');
-          }
-          fila.push(
-            r.auxTransporteValor ? fmt(r.auxTransporteValor) : '-',
-            fmt(r.totalDeducciones),
-            fmt(desp.netoAPagar),
-          );
-          return fila;
-        }),
-        [
-          {
-            content: 'TOTAL',
-            colSpan: mostrarColumnaNoSalarial ? 7 : 6,
-            styles: { halign: 'right', fontStyle: 'bold' }
-          },
-          { content: fmt(totalNeto), styles: { fontStyle: 'bold' } },
-        ],
-      ],
-      styles: { fontSize: 6 },
-      headStyles: {
-        fillColor: [11, 102, 42],
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 6,
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      columnStyles: {
-        0: { halign: 'center' },
-        1: { halign: 'center' },
-        2: { halign: 'left' },
-      },
-      margin: { left: 10, right: 10 },
-      didParseCell: (data) => {
-        const lastRow = data.table.body.length - 1;
-        if (data.row.index === lastRow) {
-          data.cell.styles.fillColor = [232, 245, 238];
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.textColor = [11, 102, 42];
-        }
-      },
-    });
-
-    doc.addPage();
-
-    desprendibles.forEach((desp, idx) => {
-      //doc.addPage();
-      if (idx > 0) doc.addPage();
-
-      const conceptosFiltrados = (desp.conceptos ?? [])
-        .filter(c => !CONCEPTOS_EXCLUIDOS.includes(c.nombreConcepto))
-        .filter(c => {
-            const esConceptoOcultable = 
-                c.nombreConcepto === 'Salario días trabajados' ||
-                c.nombreConcepto === 'Auxilio de transporte';
-            if (esConceptoOcultable && (!c.valorResultado || Number(c.valorResultado) === 0)) {
-                return false;
-            }
-            return true;
-        })
-
-      renderDesprendible(desp, 0, mitad, pageHeight, conceptosFiltrados);
+        renderDesprendible(desp, 0, mitad, pageHeight, conceptosFiltrados);
   
-      doc.setDrawColor(180, 180, 180);
-      doc.setLineDashPattern([3, 3], 0);
-      doc.line(14, mitad, 196, mitad);
-      doc.setLineDashPattern([], 0);
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineDashPattern([3, 3], 0);
+        doc.line(14, mitad, 196, mitad);
+        doc.setLineDashPattern([], 0);
 
-      renderDesprendible(desp, mitad, mitad, pageHeight, conceptosFiltrados);
-    });
+        renderDesprendible(desp, mitad, mitad, pageHeight, conceptosFiltrados);
+      });
 
-    const nombreArchivo = `${empresa?.nombreEmpresa ?? 'NOMINA'} ${NOMBRE_MES[proceso?.periodo] ?? ''} ${proceso?.anio ?? ''}`.trim();
-    doc.save(`${nombreArchivo}.pdf`)
-    setDescargando(false);
-  };
+      return doc;
+    };
 
   const hayHorasExtra       = desprendibles.some(d => calcularNovedades(d).hayHoras);
   const hayVacaciones       = desprendibles.some(d => calcularNovedades(d).hayVacaciones);
@@ -902,6 +940,14 @@ export default function ResultadoLiquidacionPage() {
           >
             Descargar Reportes en PDF
           </button>
+          {proceso?.estadoProcNomina === 'PAGADO' && (
+            <button
+              style={{ background: '#fff', border: '1px solid #0B662A', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#0B662A' }}
+              onClick={handleAbrirEnvio}
+            >
+              Enviar desprendibles
+            </button>
+          )}
         </div>
       </BarraAcciones>
 
@@ -933,6 +979,76 @@ export default function ResultadoLiquidacionPage() {
             <p style={{ fontSize: '13px', color: '#A3A3A3', margin: 0 }}>
               La descarga de los desprendibles tomará unos segundos.
             </p>
+          </div>
+        </div>
+      )}
+
+      {modalEnvio === 'preview' && (
+        <div style={styles.modalOverlayEnvio}>
+          <div style={styles.modalBoxEnvio}>
+            <p style={{ fontSize: '16px', fontWeight: '800', color: '#272525', margin: 0 }}>
+              Confirmar envío de desprendibles
+            </p>
+            {errorEnvio ? (
+              <p style={{ fontSize: '13px', color: '#E53E3E', textAlign: 'center' }}>{errorEnvio}</p>
+            ) : (
+              <>
+                <div style={{ width: '100%' }}>
+                  <p style={{ fontSize: '13px', fontWeight: '700', margin: '8px 0 4px 0' }}>Destinatarios:</p>
+                  {previewEnvio?.correosDestino?.map((c) => (
+                    <p key={c} style={{ fontSize: '13px', margin: '2px 0' }}>{c}</p>
+                  ))}
+                  <p style={{ fontSize: '13px', fontWeight: '700', margin: '12px 0 4px 0' }}>Asunto:</p>
+                  <p style={{ fontSize: '13px', margin: 0 }}>{previewEnvio?.asunto}</p>
+                  <p style={{ fontSize: '13px', fontWeight: '700', margin: '12px 0 4px 0' }}>Mensaje:</p>
+                  <div style={{ fontSize: '13px' }} dangerouslySetInnerHTML={{ __html: previewEnvio?.cuerpo }} />
+                </div>
+              </>
+            )}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button style={styles.btnCancelarEnvio} onClick={() => setModalEnvio(null)}>
+                {errorEnvio ? 'Cerrar' : 'Cancelar'}
+              </button>
+              {!errorEnvio && (
+                <button style={styles.btnConfirmarEnvio} onClick={handleConfirmarEnvio}>
+                  Confirmar envío
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalEnvio === 'enviando' && (
+        <div style={styles.modalOverlayEnvio}>
+          <div style={styles.modalBoxEnvio}>
+            <p style={{ fontSize: '14px', color: '#272525' }}>Enviando desprendibles...</p>
+          </div>
+        </div>
+      )}
+
+      {modalEnvio === 'resultado' && (
+        <div style={styles.modalOverlayEnvio}>
+          <div style={styles.modalBoxEnvio}>
+            {errorEnvio ? (
+              <p style={{ fontSize: '13px', color: '#E53E3E' }}>{errorEnvio}</p>
+            ) : (
+              <>
+                <p style={{ fontSize: '16px', fontWeight: '800', color: '#0B662A' }}>
+                  {resultadoEnvio?.estadoEnvio === 'ENVIADO' && 'Correo enviado exitosamente'}
+                  {resultadoEnvio?.estadoEnvio === 'PARCIAL' && 'Envío parcial'}
+                  {resultadoEnvio?.estadoEnvio === 'FALLIDO' && 'El envío falló'}
+                </p>
+                {resultadoEnvio?.detalles?.map((d) => (
+                  <p key={d.correoDestino} style={{ fontSize: '13px', margin: '2px 0' }}>
+                    {d.correoDestino}: {d.estadoDetalle === 'ENVIADO' ? ' Enviado' : ` ${d.mensajeError}`}
+                  </p>
+                ))}
+              </>
+            )}
+            <button style={styles.btnConfirmarEnvio} onClick={() => setModalEnvio(null)}>
+              Cerrar
+            </button>
           </div>
         </div>
       )}
@@ -974,4 +1090,26 @@ const styles = {
   td:                 { padding: '7px 12px', textAlign: 'center', color: '#272525', border: '1px solid #E0E0E0' },
   trPar:              { backgroundColor: '#fff' },
   trImpar:            { backgroundColor: '#FAFAFA' },
+  modalOverlayEnvio: {
+    position: 'fixed', inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 999,
+  },
+  modalBoxEnvio: {
+    backgroundColor: '#fff', borderRadius: '16px',
+    padding: '32px 36px', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: '8px', maxWidth: '460px', width: '90%',
+    maxHeight: '80vh', overflowY: 'auto', textAlign: 'center',
+  },
+  btnCancelarEnvio: {
+    padding: '12px 28px', border: '1px solid #D0D0D0', borderRadius: '8px',
+    fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+    cursor: 'pointer', backgroundColor: '#fff', color: '#272525',
+  },
+  btnConfirmarEnvio: {
+    padding: '12px 28px', border: 'none', borderRadius: '8px',
+    fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+    cursor: 'pointer', backgroundColor: '#0B662A', color: '#fff',
+  },
 };

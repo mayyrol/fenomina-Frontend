@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../../store/authStore';
-import { Building2, Camera, ChevronDown , UserRound} from 'lucide-react';
+import { Building2, Camera, ChevronDown , UserRound, Plus, Trash2} from 'lucide-react';
 import MensajeModal from '../../../../components/MensajeModal';
 import ConfirmarCambiosModal from '../../../../components/ConfirmarCambiosModal';
 import empresasService from '../../../../services/empresasService';
@@ -49,11 +49,55 @@ export default function CrearEmpresaPage() {
     setFotoPreview(URL.createObjectURL(file));
   };
 
-  // ── CAMBIO 2: eliminar logo ──
   const handleEliminarLogo = (e) => {
     e.preventDefault();
     setFoto(null);
     setFotoPreview(null);
+  };
+
+  const [correos, setCorreos] = useState([]);
+  const [erroresCorreos, setErroresCorreos] = useState({});
+
+  const agregarCorreo = () => setCorreos([...correos, { empresaCorreoId: null, correo: '' }]);
+
+  const eliminarCorreo = (i) => {
+    setCorreos(correos.filter((_, idx) => idx !== i));
+    setErroresCorreos(prev => {
+      const nuevo = { ...prev };
+      delete nuevo[i];
+      return nuevo;
+    });
+  };
+
+  const handleCorreo = (i, valor) => {
+    const n = [...correos];
+    n[i].correo = valor;
+    setCorreos(n);
+    setErroresCorreos({ ...erroresCorreos, [i]: '' });
+  };
+
+  const validarCorreos = () => {
+    const nuevosErrores = {};
+    const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const vistos = new Set();
+
+    correos.forEach((c, i) => {
+      const valor = c.correo.trim();
+      if (!valor) {
+        nuevosErrores[i] = 'Este campo es obligatorio.';
+      } else if (!regexCorreo.test(valor)) {
+        nuevosErrores[i] = 'Ingresa un correo electrónico válido.';
+      } else {
+        const normalizado = valor.toLowerCase();
+        if (vistos.has(normalizado)) {
+          nuevosErrores[i] = 'Este correo ya fue ingresado para esta empresa.';
+        }
+        vistos.add(normalizado);
+      }
+    });
+
+    setErroresCorreos(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
   };
 
   const validar = () => {
@@ -70,10 +114,15 @@ export default function CrearEmpresaPage() {
 
     setErrores(nuevosErrores);
 
-    // ── CAMBIO 4: mensaje general si faltan campos ──
+    const correosValidos = validarCorreos();
+
     if (Object.keys(nuevosErrores).length > 0) {
       setModalCampos(true);
       return false;
+    }
+
+    if (!correosValidos) {
+      return false; 
     }
 
     setMensajeGeneral('');
@@ -91,6 +140,9 @@ export default function CrearEmpresaPage() {
       aplicaNomina:       form.reportesNomina    === 'SI',
       aplicaPrima:        form.reportesPrimas    === 'SI',
       aplicaCesantias:    form.reportesCesantias === 'SI',
+      correos: correos
+        .filter(c => c.correo.trim())
+        .map(c => ({ empresaCorreoId: c.empresaCorreoId, correo: c.correo.trim() })),
     };
 
     try {
@@ -115,6 +167,7 @@ export default function CrearEmpresaPage() {
       setModal('error');
     }
   };
+
 
   return (
     <div style={styles.container}>
@@ -314,6 +367,51 @@ export default function CrearEmpresaPage() {
         </div>
       </div>
 
+      {/* ── Sección: Correos de Notificación ── */}
+      <div style={styles.card}>
+        <p style={styles.seccionTitulo}>Correos de Notificación</p>
+        <p style={styles.textoDescripcion}>
+          Registra la(s) dirección(es) de correo a las que se enviarán automáticamente los
+          desprendibles de nómina, primas o cesantías generados para esta empresa. Este campo
+          es opcional: si la empresa no recibe desprendibles por correo, puedes dejarlo vacío.
+        </p>
+
+        {correos.length === 0 ? (
+          <button
+            type="button"
+            onClick={agregarCorreo}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              border: '1px dashed #0B662A', borderRadius: '8px',
+              padding: '10px 16px', background: 'transparent',
+              color: '#0B662A', fontWeight: '700', fontSize: '13px',
+              fontFamily: 'Nunito, sans-serif', cursor: 'pointer',
+            }}
+          >
+            <Plus size={16} color="#0B662A" /> Agregar correo
+          </button>
+        ) : (
+          correos.map((c, i) => (
+            <div key={i} style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', marginBottom: '16px' }}>
+              <div style={{ ...styles.campo, flex: 1 }}>
+                {i === 0 && <label style={styles.label}>Correo electrónico</label>}
+                <input
+                  value={c.correo}
+                  onChange={(e) => handleCorreo(i, e.target.value)}
+                  placeholder="ejemplo@empresa.com"
+                  style={{ ...styles.input, ...(erroresCorreos[i] ? styles.inputError : {}) }}
+                />
+                {erroresCorreos[i] && <p style={styles.errorMsg}>{erroresCorreos[i]}</p>}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', paddingBottom: '2px' }}>
+                <button style={styles.btnIcono} onClick={agregarCorreo}><Plus size={18} color="#0B662A" /></button>
+                <button style={styles.btnIcono} onClick={() => eliminarCorreo(i)}><Trash2 size={18} color="#A3A3A3" /></button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* ── CAMBIO 4: Mensaje general faltan campos ── */}
       {mensajeGeneral && (
         <p style={{ textAlign: 'center', color: '#E53E3E', fontSize: '13px', fontWeight: '600', margin: '0' }}>
@@ -394,6 +492,7 @@ const styles = {
   inputError:      { border: '1px solid #E53E3E' },
   errorMsg:        { fontSize: '12px', color: '#E53E3E', margin: '2px 0 0 0' },
   selectWrapper:   { position: 'relative' },
+  btnIcono:         { width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #D0D0D0', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   select:          { width: '100%', border: '1px solid #D0D0D0', borderRadius: '8px', padding: '12px 40px 12px 16px', fontSize: '13px', fontFamily: 'Nunito, sans-serif', outline: 'none', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundColor: '#fff', color: '#A3A3A3', cursor: 'pointer', boxSizing: 'border-box', backgroundImage: 'none' },
   selectIcon:      { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
   logoBox:         { display: 'flex', alignItems: 'center', gap: '24px' },

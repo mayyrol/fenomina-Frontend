@@ -78,6 +78,16 @@ const payrollService = {
     axiosInstance.get(`${BASE}/desprendibles/prima/preview/${empresaId}/empleado/${empleadoId}`, {
       params: { semestre, anio }
     }),
+
+  getPreviewEnvio: (procesoId) =>
+    axiosInstance.get(`${BASE}/desprendibles/${procesoId}/preview-envio`),
+
+  enviarDesprendibles: (procesoId, pdfBlob, nombreArchivo) => {
+    const formData = new FormData();
+    formData.append('desprendiblePdf', pdfBlob, nombreArchivo);
+    return axiosInstance.post(`${BASE}/desprendibles/${procesoId}/enviar`, formData);
+  },
+  
 };
 
 export default payrollService;

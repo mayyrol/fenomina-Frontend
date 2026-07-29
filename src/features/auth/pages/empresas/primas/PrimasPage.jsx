@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { CreditCard, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X } from 'lucide-react';
+import { CreditCard, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X, Send  } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { usePrimaStore } from '../../../../../store/usePrimaStore';
@@ -365,6 +365,15 @@ export default function PrimasPage() {
                               onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/resultado`)}
                               title="Ver reportes">
                               <Eye size={16} color="#0B662A" />
+                            </button>
+                          )}
+                          {p.estadoProcNomina === 'PAGADO' && (
+                            <button
+                              style={styles.iconBtn}
+                              title="Enviar desprendibles por correo"
+                              onClick={() => navigate(`/empresas/${id}/primas/${p.procesoLiquiId}/resultado?accion=enviar`)}
+                            >
+                              <Send size={16} color="#0B662A" />
                             </button>
                           )}
                         </div>

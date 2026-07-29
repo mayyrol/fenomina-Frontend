@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X  } from 'lucide-react';
+import { FileText, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X, Send } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import { useNominas } from '../../../hooks/useNominas';
@@ -133,6 +133,7 @@ export default function NominasPage() {
     }
     return true;
   });
+
 
   const totalPaginas   = Math.max(1, Math.ceil(periodosFiltrados.length / itemsPerPage));
   const periodosPagina = periodosFiltrados.slice(pagina * itemsPerPage, pagina * itemsPerPage + itemsPerPage);
@@ -366,6 +367,15 @@ export default function NominasPage() {
                               onClick={() => navigate(`/empresas/${id}/nominas/${p.procesoLiquiId}/resultado`)}
                             >
                               <Eye size={16} color="#0B662A" />
+                            </button>
+                          )}
+                          {p.estadoProcNomina === 'PAGADO' && (
+                            <button
+                              style={styles.iconBtn}
+                              title="Enviar desprendibles por correo"
+                              onClick={() => navigate(`/empresas/${id}/nominas/${p.procesoLiquiId}/resultado?accion=enviar`)}
+                            >
+                              <Send size={16} color="#0B662A" />
                             </button>
                           )}
                         </div>

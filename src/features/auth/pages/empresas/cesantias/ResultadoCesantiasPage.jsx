@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
 import { Coins, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -89,14 +89,19 @@ export default function ResultadoCesantiasPage() {
   const [desprendibles, setDesprendibles] = useState([]);
   const [cargando,      setCargando]      = useState(false);
 
+  const [modalEnvio, setModalEnvio] = useState(null);
+  const [previewEnvio, setPreviewEnvio] = useState(null);
+  const [resultadoEnvio, setResultadoEnvio] = useState(null);
+  const [errorEnvio, setErrorEnvio] = useState('');
+  const [searchParams] = useSearchParams();
+
   const totalCesantias = desprendibles.reduce((s, d) => s + (d.valorPrestacion ?? 0), 0);
   const totalIntereses = desprendibles.reduce((s, d) => s + (d.valorInteresesCesantias ?? 0), 0);
 
   // Hook restaurado de V1
   const logoSrc = useImagenAutenticada(empresa?.logoEmpresaUrl);
 
-  const handleDescargar = async () => {
-    setDescargando(true);
+  const construirPdfCesantias = async () => {
     let logoBase64 = null;
     
     // Lógica restaurada de V1 para obtener el logo con Bearer token
@@ -282,6 +287,13 @@ export default function ResultadoCesantiasPage() {
     });
     
     const nombreArchivo = `${empresa?.nombreEmpresa ?? ''} CESANTIAS ${proceso?.anio ?? ''}`.trim();
+    return doc; 
+  };
+
+  const handleDescargar = async () => {
+    setDescargando(true);
+    const doc = await construirPdfCesantias();
+    const nombreArchivo = `${empresa?.nombreEmpresa ?? ''} CESANTIAS ${proceso?.anio ?? ''}`.trim();
     doc.save(`${nombreArchivo}.pdf`);
     setDescargando(false);
   };
@@ -306,6 +318,37 @@ export default function ResultadoCesantiasPage() {
     const nombreArchivo = `${empresa?.nombreEmpresa ?? ''} CESANTIAS ${proceso?.anio ?? ''}`.trim();
     exportarExcel(EXCEL_HEADERS_CESANTIAS, filas, nombreArchivo, 'Cesantías');
   };
+
+  const handleAbrirEnvio = async () => {
+    setErrorEnvio('');
+    try {
+      const { data } = await payrollService.getPreviewEnvio(cesantiaId);
+      setPreviewEnvio(data);
+      setModalEnvio('preview');
+    } catch (err) {
+      const msg = err.response?.data?.mensaje ?? 'No se pudo cargar la información de envío.';
+      setErrorEnvio(msg);
+      setModalEnvio('preview');
+    }
+  };
+
+  const handleConfirmarEnvio = async () => {
+    setModalEnvio('enviando');
+    try {
+      const doc = await construirPdfCesantias();
+      const pdfBlob = doc.output('blob');
+      const nombreArchivo = `${empresa?.nombreEmpresa ?? ''} CESANTIAS ${proceso?.anio ?? ''}`.trim() + '.pdf';
+      const { data } = await payrollService.enviarDesprendibles(cesantiaId, pdfBlob, nombreArchivo);
+      setResultadoEnvio(data);
+      setModalEnvio('resultado');
+    } catch (err) {
+      const msg = err.response?.data?.mensaje ?? 'Ocurrió un error al enviar los desprendibles.';
+      setErrorEnvio(msg);
+      setResultadoEnvio(null);
+      setModalEnvio('resultado');
+    }
+  };
+
 
   useEffect(() => {
     if (!cesantiaId || !id) return;
@@ -334,6 +377,12 @@ export default function ResultadoCesantiasPage() {
       })
       .finally(() => setCargando(false));
   }, [cesantiaId, id]);
+
+  useEffect(() => {
+    if (searchParams.get('accion') === 'enviar' && proceso?.estadoProcNomina === 'PAGADO') {
+      handleAbrirEnvio();
+    }
+  }, [proceso]);
 
   return (
     <div style={styles.container}>
@@ -544,9 +593,83 @@ export default function ResultadoCesantiasPage() {
           >
             Descargar Reportes en PDF
           </button>
+          {proceso?.estadoProcNomina === 'PAGADO' && (
+            <button
+              style={{ background: '#fff', border: '1px solid #0B662A', borderRadius: '8px', padding: '10px 28px', fontSize: '14px', fontWeight: '700', fontFamily: 'Nunito, sans-serif', cursor: 'pointer', color: '#0B662A' }}
+              onClick={handleAbrirEnvio}
+            >
+              Enviar desprendibles
+            </button>
+          )}
         </div>
       </BarraAcciones>
+        {modalEnvio === 'preview' && (
+          <div style={styles.modalOverlayEnvio}>
+            <div style={styles.modalBoxEnvio}>
+              <p style={{ fontSize: '16px', fontWeight: '800', color: '#272525', margin: 0 }}>
+                Confirmar envío de desprendibles
+              </p>
+              {errorEnvio ? (
+                <p style={{ fontSize: '13px', color: '#E53E3E', textAlign: 'center' }}>{errorEnvio}</p>
+              ) : (
+                <div style={{ width: '100%' }}>
+                  <p style={{ fontSize: '13px', fontWeight: '700', margin: '8px 0 4px 0' }}>Destinatarios:</p>
+                  {previewEnvio?.correosDestino?.map((c) => (
+                    <p key={c} style={{ fontSize: '13px', margin: '2px 0' }}>{c}</p>
+                  ))}
+                  <p style={{ fontSize: '13px', fontWeight: '700', margin: '12px 0 4px 0' }}>Asunto:</p>
+                  <p style={{ fontSize: '13px', margin: 0 }}>{previewEnvio?.asunto}</p>
+                  <p style={{ fontSize: '13px', fontWeight: '700', margin: '12px 0 4px 0' }}>Mensaje:</p>
+                  <div style={{ fontSize: '13px' }} dangerouslySetInnerHTML={{ __html: previewEnvio?.cuerpo }} />
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button style={styles.btnCancelarEnvio} onClick={() => setModalEnvio(null)}>
+                  {errorEnvio ? 'Cerrar' : 'Cancelar'}
+                </button>
+                {!errorEnvio && (
+                  <button style={styles.btnConfirmarEnvio} onClick={handleConfirmarEnvio}>
+                    Confirmar envío
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
+        {modalEnvio === 'enviando' && (
+          <div style={styles.modalOverlayEnvio}>
+            <div style={styles.modalBoxEnvio}>
+              <p style={{ fontSize: '14px', color: '#272525' }}>Enviando desprendibles...</p>
+            </div>
+          </div>
+        )}
+
+        {modalEnvio === 'resultado' && (
+          <div style={styles.modalOverlayEnvio}>
+            <div style={styles.modalBoxEnvio}>
+              {errorEnvio ? (
+                <p style={{ fontSize: '13px', color: '#E53E3E' }}>{errorEnvio}</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '16px', fontWeight: '800', color: '#0B662A' }}>
+                    {resultadoEnvio?.estadoEnvio === 'ENVIADO' && 'Correo enviado exitosamente'}
+                    {resultadoEnvio?.estadoEnvio === 'PARCIAL' && 'Envío parcial'}
+                    {resultadoEnvio?.estadoEnvio === 'FALLIDO' && 'El envío falló'}
+                  </p>
+                  {resultadoEnvio?.detalles?.map((d) => (
+                    <p key={d.correoDestino} style={{ fontSize: '13px', margin: '2px 0' }}>
+                      {d.correoDestino}: {d.estadoDetalle === 'ENVIADO' ? 'Enviado' : `${d.mensajeError}`}
+                    </p>
+                  ))}
+                </>
+              )}
+              <button style={styles.btnConfirmarEnvio} onClick={() => setModalEnvio(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}      
     </div>
   );
 }
@@ -576,4 +699,26 @@ const styles = {
   comprobante:      { border: '1px solid #D0D0D0', borderRadius: '4px', padding: '24px 28px', width: '100%', maxWidth: '680px', boxSizing: 'border-box', backgroundColor: '#fff', marginBottom: '8px' },
   comprobanteLabel: { fontSize: '11px', color: '#272525', margin: 0 },
   comprobanteValor: { fontSize: '11px', color: '#272525', margin: 0 },
+  modalOverlayEnvio: {
+    position: 'fixed', inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 999,
+  },
+  modalBoxEnvio: {
+    backgroundColor: '#fff', borderRadius: '16px',
+    padding: '32px 36px', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: '8px', maxWidth: '460px', width: '90%',
+    maxHeight: '80vh', overflowY: 'auto', textAlign: 'center',
+  },
+  btnCancelarEnvio: {
+    padding: '12px 28px', border: '1px solid #D0D0D0', borderRadius: '8px',
+    fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+    cursor: 'pointer', backgroundColor: '#fff', color: '#272525',
+  },
+  btnConfirmarEnvio: {
+    padding: '12px 28px', border: 'none', borderRadius: '8px',
+    fontSize: '13px', fontWeight: '700', fontFamily: 'Nunito, sans-serif',
+    cursor: 'pointer', backgroundColor: '#0B662A', color: '#fff',
+  },
 };

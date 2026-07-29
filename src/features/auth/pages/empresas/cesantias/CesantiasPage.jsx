@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../../../../../store/authStore';
-import { Coins, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X  } from 'lucide-react';
+import { Coins, Search, ChevronLeft, ChevronDown, UserRound, Pencil, Trash2, Upload, Eye, X, Send } from 'lucide-react';
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 import payrollService from '../../../../../services/payrollService';
@@ -343,6 +343,15 @@ export default function CesantiasPage() {
                               onClick={() => navigate(`/empresas/${id}/cesantias/${p.procesoLiquiId}/resultado`)}
                               title="Ver reportes">
                               <Eye size={16} color="#0B662A" />
+                            </button>
+                          )}
+                          {p.estadoProcNomina === 'PAGADO' && (
+                            <button
+                              style={styles.iconBtn}
+                              title="Enviar desprendibles por correo"
+                              onClick={() => navigate(`/empresas/${id}/cesantias/${p.procesoLiquiId}/resultado?accion=enviar`)}
+                            >
+                              <Send size={16} color="#0B662A" />
                             </button>
                           )}
                         </div>

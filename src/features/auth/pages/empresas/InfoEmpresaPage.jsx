@@ -117,7 +117,7 @@ export default function InfoEmpresaPage() {
         <div style={styles.card}>
           <p style={styles.seccionTitulo}>Ley 1607 de 2012</p>
           <p style={styles.textoDescripcion}>
-            Indique si el aportante ha sido marcado como exonerado de pago de aporte de parafiscales
+            El aportante ha sido marcado como exonerado de pago de aporte de parafiscales
             y salud conforme a la Ley 1607 de 2012 (campo 33 del archivo tipo 1 de la PILA)<span style={styles.req}>*</span>
           </p>
           {/* ── CAMBIO: input readOnly en vez de select disabled ── */}
@@ -149,7 +149,7 @@ export default function InfoEmpresaPage() {
       <div style={styles.card}>
         <p style={styles.seccionTitulo}>Servicios de Liquidación de Nómina a Prestación</p>
         <p style={styles.textoDescripcion}>
-          A continuación, marque las opciones que correspondan a los servicios de gestión administrativa
+          Opciones que corresponden a los servicios de gestión administrativa
           que Función Empresarial SAS le estará prestando a la empresa inscrita:
         </p>
         <div style={styles.fila3}>
@@ -169,6 +169,23 @@ export default function InfoEmpresaPage() {
             <input readOnly value={empresa.aplicaCesantias ? 'SI' : 'NO'} style={styles.inputReadOnly} />
           </div>
         </div>
+      </div>
+
+      {/* ── Sección: Correos de Notificación ── */}
+      <div style={styles.card}>
+        <p style={styles.seccionTitulo}>Correos de Notificación</p>
+        {empresa.correos?.length ? (
+          empresa.correos.map((c) => (
+            <input
+              key={c.empresaCorreoId}
+              readOnly
+              value={c.correo}
+              style={{ ...styles.inputReadOnly, marginBottom: '10px' }}
+            />
+          ))
+        ) : (
+          <p style={styles.textoDescripcion}>Esta empresa no tiene correos de notificación registrados.</p>
+        )}
       </div>
 
       {/* ── Botones ── */}
