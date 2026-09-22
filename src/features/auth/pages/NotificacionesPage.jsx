@@ -116,7 +116,7 @@ export default function NotificacionesPage() {
                     </div>
                 </div>
                 <div style={styles.fechaBox}>
-                    <span style={styles.fechaLabel}>Fecha de disparo</span>
+                    <span style={styles.fechaLabel}>Fecha de disparo de notificación</span>
                     <input
                         type="date"
                         style={styles.fechaInput}

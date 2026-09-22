@@ -41,7 +41,7 @@ export default function VerPrimaPage() {
           e => String(e.empleadoId) === String(empleadoId)
         );
         setEmpleado(encontrado ?? null);
-        setDiasCalculados(preview.diasLaborados ?? 0);
+        setDiasCalculados(preview.diasParaFormula ?? 0);
         setNovedades(preview.novedades ?? []);
       })
       .catch(() => {})

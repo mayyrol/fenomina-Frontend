@@ -83,7 +83,13 @@ export default function VerCesantiaPage() {
       })
       .then(diasPorNomina => {
         const totalDias = diasPorNomina.reduce((s, d) => s + d, 0);
-        setDiasCalculados(Math.min(totalDias, 360));
+
+        const diasLnr = todasNovedades
+          .filter(n => n.fkConcepNominaId === 15)
+          .reduce((s, n) => s + (n.cantidadDiasNovedad ?? 0), 0);
+
+        const diasParaFormula = Math.max(0, totalDias - diasLnr);
+        setDiasCalculados(Math.min(diasParaFormula, 360));
       })
       .catch(() => {})
       .finally(() => setCargando(false));

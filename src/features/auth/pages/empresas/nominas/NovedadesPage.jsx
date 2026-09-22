@@ -11,19 +11,19 @@ import {
 import ConfirmarCambiosModal from '../../../../../components/ConfirmarCambiosModal';
 import MensajeModal from '../../../../../components/MensajeModal';
 
-function BarraAcciones({ children, justificar = 'center' }) {
+function BarraAcciones({ children, justificar = 'center', sinFlotante = false }) {
   return (
     <div style={{
-      position: 'sticky',
-      bottom: '-24px',
+      position: sinFlotante ? 'relative' : 'sticky',
+      bottom: sinFlotante ? 'auto' : '-24px',
       display: 'flex',
       justifyContent: justificar,
       gap: '16px',
-      padding: '60px 32px 24px 32px',
-      background: 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
-      zIndex: 100,
+      padding: sinFlotante ? '24px 32px' : '40px 32px 24px 32px',
+      background: sinFlotante ? 'transparent' : 'linear-gradient(to top, #F0F2F5 30%, transparent 100%)',
+      zIndex: sinFlotante ? 'auto' : 100,
       flexWrap: 'wrap',
-      marginTop: '-40px',
+      marginTop: sinFlotante ? '16px' : '-40px',
       boxSizing: 'border-box',
       pointerEvents: 'none',
     }}>
@@ -484,11 +484,11 @@ export default function NovedadesPage() {
   const calcularDiasAusencia = () => {
       let dias = 0;
 
-      // IDs 4-15: licencias e incapacidades — días desde fechaInicio a fechaFin
+      // IDs 4-14: licencias e incapacidades — SE EXCLUYE ID=15 (Licencias no remuneradas)
       for (const f of tiempoLic) {
           if (f.concepNominaId && f.fechaInicio && f.fechaFin) {
               const idConcepto = Number(f.concepNominaId);
-              if ([4,5,6,7,8,9,10,11,12,13,14,15].includes(idConcepto)) {
+              if ([4,5,6,7,8,9,10,11,12,13,14].includes(idConcepto)) {  // ← quitado el 15
                   const [dI, mI, aI] = f.fechaInicio.split('/');
                   const [dF, mF, aF] = f.fechaFin.split('/');
                   const inicio = new Date(`${aI}-${mI}-${dI}`);
@@ -498,7 +498,7 @@ export default function NovedadesPage() {
           }
       }
 
-      // IDs 2-3: vacaciones — días del campo diasVacaciones
+      // IDs 2-3: vacaciones — sin cambios
       for (const f of vacaciones) {
           if (f.concepNominaId && f.diasVacaciones) {
               const idConcepto = Number(f.concepNominaId);
@@ -724,7 +724,7 @@ export default function NovedadesPage() {
               const idOriginal = novedadEdit.fkConcepNominaId;
               let diasOriginales = 0;
 
-              if ([4,5,6,7,8,9,10,11,12,13,14,15].includes(idOriginal)) {
+              if ([4,5,6,7,8,9,10,11,12,13,14].includes(idOriginal)) {
                   if (novedadEdit.fechaInicioAusen && novedadEdit.fechaFinAusen) {
                       const inicio = new Date(novedadEdit.fechaInicioAusen);
                       const fin    = new Date(novedadEdit.fechaFinAusen);
@@ -1128,11 +1128,9 @@ export default function NovedadesPage() {
       </div>
 
       {/* Botones */}
-      <BarraAcciones>
+      <BarraAcciones sinFlotante>
         <button
           style={btnSecundario}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #f0f0f0, #e0e0e0)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
           onClick={() => navigate(-1)}
         >
           Regresar
